@@ -6,6 +6,15 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 }
 
+function db() {
+  const d = getDb()
+  if (!d) {
+    console.error('[Ryan Todo] Supabase not connected — getDb() returned null')
+    return null
+  }
+  return d
+}
+
 function mapProject(r) {
   return { id: r.id, name: r.name, color: r.color, sortOrder: r.sort_order || 0 }
 }
@@ -42,12 +51,14 @@ const useStore = create((set, get) => ({
   },
 
   loadAll: async () => {
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
     try {
       const [pr, cr, tr] = await Promise.all([
-        getDb().from('projects').select('*').order('sort_order'),
-        getDb().from('categories').select('*').order('sort_order'),
-        getDb().from('tasks').select('*').order('sort_order'),
+        d.from('projects').select('*').order('sort_order'),
+        d.from('categories').select('*').order('sort_order'),
+        d.from('tasks').select('*').order('sort_order'),
       ])
       if (pr.error) throw pr.error
       if (cr.error) throw cr.error
@@ -58,7 +69,8 @@ const useStore = create((set, get) => ({
         tasks: tr.data.map(mapTask),
         syncStatus: 'ok',
       })
-    } catch {
+    } catch (e) {
+      console.error('[Ryan Todo] loadAll failed:', e)
       set({ syncStatus: 'error' })
     }
   },
@@ -66,12 +78,15 @@ const useStore = create((set, get) => ({
   addTask: async (task) => {
     const t = { id: uid(), done: false, notes: [], sortOrder: Date.now(), ...task }
     set(s => ({ tasks: [...s.tasks, t] }))
+    const d = db()
+    if (!d) { get().showToast('DB 연결 없음'); set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
-    const { error } = await getDb().from('tasks').upsert({
+    const { error } = await d.from('tasks').upsert({
       id: t.id, text: t.text, project_id: t.projectId, category_id: t.categoryId,
       done: t.done, start_date: t.startDate || null, due_date: t.dueDate || null,
       notes: t.notes, sort_order: t.sortOrder,
     })
+    if (error) console.error('[Ryan Todo] addTask failed:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
     if (error) get().showToast('저장 실패')
     else get().showToast('추가됐습니다 ✓')
@@ -81,12 +96,15 @@ const useStore = create((set, get) => ({
     set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) }))
     const t = get().tasks.find(x => x.id === id)
     if (!t) return
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
-    const { error } = await getDb().from('tasks').upsert({
+    const { error } = await d.from('tasks').upsert({
       id: t.id, text: t.text, project_id: t.projectId, category_id: t.categoryId,
       done: t.done, start_date: t.startDate || null, due_date: t.dueDate || null,
       notes: t.notes, sort_order: t.sortOrder,
     })
+    if (error) console.error('[Ryan Todo] updateTask failed:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
   },
 
@@ -98,7 +116,10 @@ const useStore = create((set, get) => ({
 
   deleteTask: async (id) => {
     set(s => ({ tasks: s.tasks.filter(t => t.id !== id) }))
-    await getDb().from('tasks').delete().eq('id', id)
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('tasks').delete().eq('id', id)
+    if (error) console.error('[Ryan Todo] deleteTask failed:', error)
     get().showToast('삭제됐습니다')
   },
 
@@ -106,24 +127,39 @@ const useStore = create((set, get) => ({
     const color = nextColor(get().projects.length)
     const p = { id: uid(), name, color, sortOrder: get().projects.length }
     set(s => ({ projects: [...s.projects, p] }))
-    await getDb().from('projects').upsert({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder })
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('projects').upsert({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder })
+    if (error) console.error('[Ryan Todo] addProject failed:', error)
   },
 
   updateProject: async (id, patch) => {
     set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) }))
     const p = get().projects.find(x => x.id === id)
     if (!p) return
-    await getDb().from('projects').upsert({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder })
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('projects').upsert({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder })
+    if (error) console.error('[Ryan Todo] updateProject failed:', error)
   },
 
   deleteProject: async (id) => {
+    const d = db()
     const taskIds = get().tasks.filter(t => t.projectId === id).map(t => t.id)
-    for (const tid of taskIds) await getDb().from('tasks').delete().eq('id', tid)
+    if (d) {
+      for (const tid of taskIds) {
+        const { error } = await d.from('tasks').delete().eq('id', tid)
+        if (error) console.error('[Ryan Todo] deleteProject task cleanup failed:', error)
+      }
+    }
     set(s => ({
       tasks: s.tasks.filter(t => t.projectId !== id),
       projects: s.projects.filter(p => p.id !== id),
     }))
-    await getDb().from('projects').delete().eq('id', id)
+    if (d) {
+      const { error } = await d.from('projects').delete().eq('id', id)
+      if (error) console.error('[Ryan Todo] deleteProject failed:', error)
+    }
     get().showToast('프로젝트가 삭제됐습니다')
   },
 
@@ -133,8 +169,11 @@ const useStore = create((set, get) => ({
       return { ...p, sortOrder: i }
     })
     set({ projects: reordered, syncStatus: 'syncing' })
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
     const rows = reordered.map(p => ({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder }))
-    const { error } = await getDb().from('projects').upsert(rows)
+    const { error } = await d.from('projects').upsert(rows)
+    if (error) console.error('[Ryan Todo] reorderProjects failed:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
     if (!error) get().showToast('순서가 변경됐습니다 ✓')
   },

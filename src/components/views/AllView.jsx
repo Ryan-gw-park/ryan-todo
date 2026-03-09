@@ -73,7 +73,8 @@ export default function AllView() {
           return (
             <div
               key={proj.id}
-              className={`bg-white rounded-md border border-[rgba(55,53,47,.09)] overflow-visible transition-colors hover:border-[rgba(55,53,47,.16)] ${dragId === proj.id ? 'opacity-30' : ''} ${overId === proj.id && dropPos === 'above' ? 'border-t-2 border-t-[#2383e2]' : ''} ${overId === proj.id && dropPos === 'below' ? 'border-b-2 border-b-[#2383e2]' : ''}`}
+              className={`rounded-md border border-[rgba(55,53,47,.09)] overflow-visible transition-colors hover:border-[rgba(55,53,47,.16)] ${dragId === proj.id ? 'opacity-30' : ''} ${overId === proj.id && dropPos === 'above' ? 'border-t-2 border-t-[#2383e2]' : ''} ${overId === proj.id && dropPos === 'below' ? 'border-b-2 border-b-[#2383e2]' : ''}`}
+              style={{ background: nc.colBg }}
               draggable
               onDragStart={e => handleDragStart(e, proj.id)}
               onDragEnd={handleDragEnd}
