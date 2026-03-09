@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import useStore from '../../store/useStore'
-import { getColor } from '../../lib/colors'
+import { getProjectColorMap } from '../../lib/colors'
 import Checkbox from '../shared/Checkbox'
 
 function fmt(s) {
@@ -23,6 +23,7 @@ function isOverdue(s) {
 
 export default function AllView() {
   const { projects, categories, tasks, toggleDone, openDetail, openModal, reorderProjects } = useStore()
+  const colorMap = getProjectColorMap(projects)
 
   const [dragId, setDragId] = useState(null)
   const [overId, setOverId] = useState(null)
@@ -53,7 +54,7 @@ export default function AllView() {
 
   if (!projects.length) {
     return (
-      <div className="p-3 md:p-4">
+      <div className="pt-10 px-6 md:px-12">
         <div className="p-12 text-center text-[rgba(55,53,47,.4)] text-[13px] leading-[2.2]">
           <div className="text-[26px] mb-1">📋</div>프로젝트를 추가해주세요
         </div>
@@ -62,12 +63,12 @@ export default function AllView() {
   }
 
   return (
-    <div className="p-3 md:p-4">
+    <div className="pt-10 px-6 md:px-12">
       <div className="flex flex-col gap-2 max-w-[760px]">
         {projects.map(proj => {
           const projTasks = tasks.filter(t => t.projectId === proj.id)
           const active = projTasks.filter(t => !t.done).length
-          const nc = getColor(proj.color)
+          const nc = colorMap[proj.id]
 
           return (
             <div

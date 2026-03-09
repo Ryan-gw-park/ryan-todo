@@ -3,7 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import TaskCard from './TaskCard'
 import useStore from '../../store/useStore'
 
-export default function CategorySection({ proj, cat, nc, tasks: catTasks }) {
+export default function CategorySection({ proj, cat, nc, tasks: catTasks, isDraggingTask }) {
   const { openModal } = useStore()
   const droppableId = `${proj.id}::${cat.id}`
   const { setNodeRef, isOver } = useDroppable({
@@ -23,13 +23,24 @@ export default function CategorySection({ proj, cat, nc, tasks: catTasks }) {
       </div>
       <div
         ref={setNodeRef}
-        className={`flex flex-col gap-1 min-h-[4px] transition-all ${isOver ? 'outline-dashed outline-2 outline-[#2383e2] outline-offset-1 rounded' : ''}`}
+        className={`flex flex-col gap-1 transition-all rounded ${
+          isOver
+            ? 'outline-dashed outline-2 outline-[#2383e2] outline-offset-1 bg-[rgba(35,131,226,.04)] min-h-[40px]'
+            : isDraggingTask
+              ? 'min-h-[32px] border border-dashed border-[rgba(55,53,47,.12)] bg-[rgba(55,53,47,.015)]'
+              : 'min-h-[4px]'
+        }`}
       >
         <SortableContext items={catTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {catTasks.map(t => (
             <TaskCard key={t.id} task={t} />
           ))}
         </SortableContext>
+        {isDraggingTask && catTasks.length === 0 && !isOver && (
+          <div className="flex items-center justify-center py-2 text-[10px] text-[rgba(55,53,47,.25)]">
+            여기에 놓기
+          </div>
+        )}
       </div>
       <button
         onClick={() => openModal({ projectId: proj.id, categoryId: cat.id })}

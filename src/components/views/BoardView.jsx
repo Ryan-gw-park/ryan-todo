@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import useStore from '../../store/useStore'
-import { getColor } from '../../lib/colors'
+import { getProjectColorMap } from '../../lib/colors'
 import Checkbox from '../shared/Checkbox'
 
 function fmt(s) {
@@ -23,6 +23,7 @@ function isOverdue(s) {
 
 export default function BoardView() {
   const { projects, categories, tasks, toggleDone, openDetail, openModal, moveTask } = useStore()
+  const colorMap = getProjectColorMap(projects)
 
   const [dragId, setDragId] = useState(null)
   const [overCol, setOverCol] = useState(null)
@@ -51,12 +52,12 @@ export default function BoardView() {
   }
 
   return (
-    <div className="p-3 md:p-4">
+    <div className="pt-10 px-6 md:px-12">
       <div className="flex gap-3 overflow-x-auto pb-4 items-start" style={{ WebkitOverflowScrolling: 'touch' }}>
         {projects.map(p => {
           const pt = tasks.filter(t => t.projectId === p.id)
           const ac = pt.filter(t => !t.done).length
-          const nc = getColor(p.color)
+          const nc = colorMap[p.id]
 
           return (
             <div

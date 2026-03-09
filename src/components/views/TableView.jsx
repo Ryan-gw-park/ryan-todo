@@ -1,4 +1,5 @@
 import useStore from '../../store/useStore'
+import { getProjectColorMap } from '../../lib/colors'
 import Checkbox from '../shared/Checkbox'
 
 function fmt(s) {
@@ -21,13 +22,14 @@ function isOverdue(s) {
 
 export default function TableView() {
   const { tasks, projects, categories, toggleDone, openDetail, deleteTask } = useStore()
+  const colorMap = getProjectColorMap(projects)
 
   const sorted = [...tasks].sort((a, b) =>
     a.categoryId !== b.categoryId ? a.categoryId.localeCompare(b.categoryId) : a.projectId.localeCompare(b.projectId)
   )
 
   return (
-    <div className="p-3 md:p-4">
+    <div className="pt-10 px-6 md:px-12">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse bg-white rounded-lg overflow-hidden border border-[rgba(55,53,47,.09)] shadow-[rgba(15,15,15,.05)_0_1px_2px,rgba(15,15,15,.05)_0_0_0_1px]">
           <thead>
@@ -43,6 +45,7 @@ export default function TableView() {
           <tbody>
             {sorted.map(t => {
               const p = projects.find(x => x.id === t.projectId) || { name: '?', color: '#ccc' }
+              const nc = colorMap[t.projectId]
               const cat = categories.find(x => x.id === t.categoryId) || { name: '?', color: '#999', bg: 'rgba(0,0,0,.05)' }
               return (
                 <tr
@@ -57,7 +60,7 @@ export default function TableView() {
                     <span className={t.done ? 'line-through' : ''}>{t.text}</span>
                   </td>
                   <td className="py-2 px-[13px]">
-                    <span className="inline-flex items-center px-[7px] py-[2px] rounded-[3px] text-[11px] font-medium" style={{ background: `${p.color}28` }}>{p.name}</span>
+                    <span className="inline-flex items-center px-[7px] py-[2px] rounded-[3px] text-[11px] font-medium" style={{ background: nc ? nc.pillBg : `${p.color}28`, color: nc ? nc.pillText : undefined }}>{p.name}</span>
                   </td>
                   <td className="py-2 px-[13px]">
                     <span className="inline-flex items-center px-[7px] py-[2px] rounded-[3px] text-[11px] font-medium" style={{ background: cat.bg || `${cat.color}10`, color: cat.color }}>{cat.name}</span>

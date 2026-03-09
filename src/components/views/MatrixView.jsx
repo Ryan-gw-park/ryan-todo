@@ -1,14 +1,32 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
-  DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter
+  DndContext, DragOverlay, PointerSensor, TouchSensor,
+  useSensor, useSensors, pointerWithin, rectIntersection,
 } from '@dnd-kit/core'
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../store/useStore'
+import { getProjectColorMap } from '../../lib/colors'
 import MatrixColumn from '../matrix/MatrixColumn'
-import TaskCard from '../matrix/TaskCard'
+
+// Custom collision detection: prioritize droppable category zones, then fallback
+function customCollision(args) {
+  // First try pointerWithin — works well for droppable areas
+  const pointerCollisions = pointerWithin(args)
+  if (pointerCollisions.length > 0) {
+    // Prioritize 'category' droppable zones over 'task' sortable items
+    const categoryHit = pointerCollisions.find(
+      c => c.data?.droppableContainer?.data?.current?.type === 'category'
+    )
+    if (categoryHit) return [categoryHit]
+    return pointerCollisions
+  }
+  // Fallback to rect intersection
+  return rectIntersection(args)
+}
 
 export default function MatrixView() {
   const { projects, tasks, reorderProjects, moveTask, addProject } = useStore()
+  const colorMap = getProjectColorMap(projects)
   const [activeItem, setActiveItem] = useState(null)
 
   const sensors = useSensors(
@@ -16,16 +34,16 @@ export default function MatrixView() {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
   )
 
-  const handleDragStart = (event) => {
+  const handleDragStart = useCallback((event) => {
     const { active } = event
     if (active.data.current?.type === 'column') {
       setActiveItem({ type: 'column', id: active.id })
     } else if (active.data.current?.type === 'task') {
       setActiveItem({ type: 'task', task: active.data.current.task })
     }
-  }
+  }, [])
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = useCallback((event) => {
     const { active, over } = event
     setActiveItem(null)
     if (!over) return
@@ -38,23 +56,29 @@ export default function MatrixView() {
         reorderProjects(newOrder)
       }
     } else if (active.data.current?.type === 'task') {
+      const activeTask = tasks.find(t => t.id === active.id)
       const overData = over.data.current
       if (overData?.type === 'category') {
-        moveTask(active.id, overData.projectId, overData.categoryId)
+        // Dropped on a category droppable zone
+        const isSameSpot = activeTask &&
+          activeTask.projectId === overData.projectId &&
+          activeTask.categoryId === overData.categoryId
+        if (!isSameSpot) {
+          moveTask(active.id, overData.projectId, overData.categoryId)
+        }
       } else if (overData?.type === 'task') {
+        // Dropped on another task — move to that task's location
         const overTask = tasks.find(t => t.id === over.id)
-        if (overTask) {
-          moveTask(active.id, overTask.projectId, overTask.categoryId)
+        if (overTask && activeTask) {
+          const isSameSpot = activeTask.projectId === overTask.projectId &&
+            activeTask.categoryId === overTask.categoryId
+          if (!isSameSpot) {
+            moveTask(active.id, overTask.projectId, overTask.categoryId)
+          }
         }
       }
     }
-  }
-
-  const handleDragOver = (event) => {
-    const { active, over } = event
-    if (!over || active.data.current?.type !== 'task') return
-    // Allow task to move between categories via droppable zones
-  }
+  }, [projects, tasks, reorderProjects, moveTask])
 
   // Add project inline
   const [addingProj, setAddingProj] = useState(false)
@@ -69,19 +93,20 @@ export default function MatrixView() {
     setAddingProj(false)
   }
 
+  const isDraggingTask = activeItem?.type === 'task'
+
   return (
-    <div className="p-3 md:p-4">
+    <div className="pt-10 px-6 md:px-12">
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={customCollision}
         onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={projects.map(p => p.id)} strategy={horizontalListSortingStrategy}>
-          <div className="flex gap-3 overflow-x-auto pb-4 items-start" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="flex gap-4 overflow-x-auto pb-4 items-start" style={{ WebkitOverflowScrolling: 'touch' }}>
             {projects.map(proj => (
-              <MatrixColumn key={proj.id} proj={proj} />
+              <MatrixColumn key={proj.id} proj={proj} nc={colorMap[proj.id]} isDraggingTask={isDraggingTask} />
             ))}
 
             {addingProj ? (

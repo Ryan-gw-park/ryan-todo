@@ -9,12 +9,23 @@ export const NOTION_COLORS = [
   { id: 'red',    colBg: '#fff5f5', pillBg: '#fee2e2', pillText: '#991b1b', dot: '#ef4444' },
 ]
 
-export function getColor(colorValue) {
+// DB color 값(id 또는 구형 hex)으로 매칭, 실패 시 인덱스 기반 fallback
+export function getColor(colorValue, index = 0) {
   return (
     NOTION_COLORS.find(c => c.id === colorValue) ||
     NOTION_COLORS.find(c => c.pillBg === colorValue) ||
-    NOTION_COLORS[0]
+    NOTION_COLORS[index % NOTION_COLORS.length]
   )
+}
+
+// 프로젝트 배열 → { [projectId]: colorObj } 매핑 생성
+// 각 뷰에서 colorMap[project.id]로 바로 접근 가능
+export function getProjectColorMap(projects) {
+  const map = {}
+  projects.forEach((p, i) => {
+    map[p.id] = getColor(p.color, i)
+  })
+  return map
 }
 
 export function nextColor(currentCount) {

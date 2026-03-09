@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import useStore from '../../store/useStore'
-import { getColor } from '../../lib/colors'
+import { getProjectColorMap } from '../../lib/colors'
 import Checkbox from '../shared/Checkbox'
 
 const DW = 26
@@ -10,6 +10,7 @@ function isWeekend(d) { const day = d.getDay(); return day === 0 || day === 6 }
 
 export default function GanttView() {
   const { projects, tasks, toggleDone, openDetail } = useStore()
+  const colorMap = getProjectColorMap(projects)
   const scrollRef = useRef()
 
   const TODAY = new Date(); TODAY.setHours(0,0,0,0)
@@ -26,7 +27,7 @@ export default function GanttView() {
 
   if (!hasDates.length) {
     return (
-      <div className="p-3 md:p-4">
+      <div className="pt-10 px-6 md:px-12">
         <div className="p-12 text-center text-[rgba(55,53,47,.4)] text-[13px] leading-[2.2]">
           <div className="text-[26px] mb-1">📅</div>
           시작일 또는 마감일을 설정하면 표시됩니다
@@ -62,7 +63,7 @@ export default function GanttView() {
   })
 
   return (
-    <div className="p-3 md:p-4">
+    <div className="pt-10 px-6 md:px-12">
       <div ref={scrollRef} className="rounded-lg border border-[rgba(55,53,47,.09)] bg-white overflow-auto max-h-[calc(100vh-130px)] shadow-[rgba(15,15,15,.05)_0_1px_2px,rgba(15,15,15,.05)_0_0_0_1px]">
         <div style={{ minWidth: 'max-content' }}>
           {/* Header */}
@@ -101,7 +102,7 @@ export default function GanttView() {
               {projects.map(proj => {
                 const pt = tasks.filter(t => t.projectId === proj.id)
                 if (!pt.length) return null
-                const nc = getColor(proj.color)
+                const nc = colorMap[proj.id]
                 return (
                   <div key={proj.id}>
                     <div className="flex border-b border-[rgba(55,53,47,.09)] min-h-[30px] items-stretch">
@@ -126,7 +127,7 @@ export default function GanttView() {
               {projects.map(proj => {
                 const pt = tasks.filter(t => t.projectId === proj.id)
                 if (!pt.length) return null
-                const nc = getColor(proj.color)
+                const nc = colorMap[proj.id]
                 const gridLines = days.map((d, i) => (
                   <div key={i} className={`absolute top-0 bottom-0 border-r border-[rgba(55,53,47,.09)] ${isWeekend(d) ? 'bg-[rgba(55,53,47,.02)]' : ''}`} style={{ left: i * DW, width: DW }} />
                 ))

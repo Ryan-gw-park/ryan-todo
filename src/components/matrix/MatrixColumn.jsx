@@ -1,13 +1,11 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getColor } from '../../lib/colors'
 import CategorySection from './CategorySection'
 import useStore from '../../store/useStore'
 import { useState, useRef } from 'react'
 
-export default function MatrixColumn({ proj }) {
+export default function MatrixColumn({ proj, nc, isDraggingTask }) {
   const { categories, tasks, updateProject, deleteProject } = useStore()
-  const nc = getColor(proj.color)
   const projTasks = tasks.filter(t => t.projectId === proj.id)
   const active = projTasks.filter(t => !t.done).length
 
@@ -82,7 +80,7 @@ export default function MatrixColumn({ proj }) {
       <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
         {categories.map(cat => {
           const catTasks = projTasks.filter(t => t.categoryId === cat.id)
-          return <CategorySection key={cat.id} proj={proj} cat={cat} nc={nc} tasks={catTasks} />
+          return <CategorySection key={cat.id} proj={proj} cat={cat} nc={nc} tasks={catTasks} isDraggingTask={isDraggingTask} />
         })}
       </div>
     </div>
