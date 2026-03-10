@@ -80,7 +80,7 @@ function MemoCard({ memo }) {
     deleteMemo(memo.id)
   }
 
-  const colorObj = COLOR_OPTIONS.find(c => c.key === memo.color) || COLOR_OPTIONS[0]
+  const colorObj = COLOR_OPTIONS.find(c => c.id === memo.color) || COLOR_OPTIONS[0]
   const accentColor = colorObj.dot
 
   const formatDate = (iso) => {
@@ -90,7 +90,7 @@ function MemoCard({ memo }) {
   }
 
   return (
-    <div style={{ position: 'relative', background: 'white', border: '1px solid #e8e8e8', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <div style={{ position: 'relative', background: colorObj.card, border: '1px solid #e8e8e8', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
       {/* Color bar */}
       <div
         onClick={() => setShowColorPicker(p => !p)}
@@ -102,9 +102,9 @@ function MemoCard({ memo }) {
         <div style={{ position: 'absolute', left: 12, top: 8, background: 'white', border: '1px solid #e8e8e8', borderRadius: 8, padding: 8, display: 'flex', gap: 4, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
           {COLOR_OPTIONS.map(c => (
             <div
-              key={c.key}
-              onClick={() => { updateMemo(memo.id, { color: c.key }); setShowColorPicker(false) }}
-              style={{ width: 20, height: 20, borderRadius: 4, background: c.dot, cursor: 'pointer', border: memo.color === c.key ? '2px solid #37352f' : '2px solid transparent' }}
+              key={c.id}
+              onClick={() => { updateMemo(memo.id, { color: c.id }); setShowColorPicker(false) }}
+              style={{ width: 20, height: 20, borderRadius: 4, background: c.dot, cursor: 'pointer', border: memo.color === c.id ? '2px solid #37352f' : '2px solid transparent' }}
             />
           ))}
         </div>
@@ -120,7 +120,7 @@ function MemoCard({ memo }) {
             onBlur={saveTitle}
             onKeyDown={handleTitleKeyDown}
             placeholder="메모 제목..."
-            style={{ flex: 1, fontSize: 16, fontWeight: 600, border: 'none', outline: 'none', background: 'transparent', color: '#37352f', fontFamily: 'inherit', padding: 0 }}
+            style={{ flex: 1, fontSize: 16, fontWeight: 600, border: 'none', outline: 'none', background: 'transparent', color: colorObj.text, fontFamily: 'inherit', padding: 0 }}
           />
           <button onClick={handleDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 4, display: 'flex', flexShrink: 0 }}
             onMouseEnter={e => e.currentTarget.style.color = '#e57373'}
@@ -131,7 +131,9 @@ function MemoCard({ memo }) {
         </div>
 
         {/* Notes — OutlinerEditor */}
-        <OutlinerEditor notes={memo.notes} onChange={handleNotesChange} accentColor={accentColor} />
+        <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 8 }}>
+          <OutlinerEditor notes={memo.notes} onChange={handleNotesChange} accentColor={accentColor} />
+        </div>
 
         {/* Created date */}
         <div style={{ fontSize: 11, color: '#ccc', marginTop: 8, textAlign: 'right' }}>

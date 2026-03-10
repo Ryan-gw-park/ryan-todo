@@ -50,7 +50,7 @@ export default function ProjectView() {
 
         {/* Category sections */}
         {CATEGORIES.map(cat => {
-          const catTasks = tasks.filter(t => t.projectId === p.id && t.category === cat.key)
+          const catTasks = tasks.filter(t => t.projectId === p.id && t.category === cat.key).sort((a, b) => a.sortOrder - b.sortOrder)
           return (
             <CategorySection
               key={cat.key}
