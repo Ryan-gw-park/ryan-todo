@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import { parseNotes, serializeNotes } from '../../utils/notes'
+import { parseDateFromText } from '../../utils/dateParser'
 import { SettingsIcon, PlusIcon, ChevronIcon, CheckIcon, UndoIcon, TrashIcon, IndentIcon, OutdentIcon } from '../shared/Icons'
 import { getBulletStyle } from '../../utils/colors'
 
@@ -200,7 +201,8 @@ function AddTaskButton({ projectId, category, color }) {
 
   const handleAdd = () => {
     if (!text.trim()) { setAdding(false); return }
-    addTask({ text: text.trim(), projectId, category })
+    const { startDate, dueDate } = parseDateFromText(text.trim())
+    addTask({ text: text.trim(), projectId, category, startDate, dueDate })
     setText('')
   }
 

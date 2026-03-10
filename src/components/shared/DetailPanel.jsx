@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
+import { parseDateFromText } from '../../utils/dateParser'
 import BulletNoteEditor from './BulletNoteEditor'
 
 export default function DetailPanel() {
@@ -38,7 +39,16 @@ export default function DetailPanel() {
           <input
             defaultValue={task.text}
             key={task.id + task.text}
-            onBlur={e => { if (e.target.value.trim() && e.target.value !== task.text) updateTask(task.id, { text: e.target.value.trim() }) }}
+            onBlur={e => {
+              const v = e.target.value.trim()
+              if (v && v !== task.text) {
+                const { startDate, dueDate } = parseDateFromText(v)
+                const patch = { text: v }
+                if (startDate) patch.startDate = startDate
+                if (dueDate) patch.dueDate = dueDate
+                updateTask(task.id, patch)
+              }
+            }}
             style={{ width: '100%', fontSize: 20, fontWeight: 600, color: '#37352f', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit', background: 'transparent', boxSizing: 'border-box' }}
           />
         </div>
@@ -69,11 +79,23 @@ export default function DetailPanel() {
             </div>
           </DetailRow>
 
+          {/* Start Date */}
+          <DetailRow label="시작일">
+            <input
+              type="date"
+              defaultValue={task.startDate || ''}
+              key={task.id + '-start-' + task.startDate}
+              onChange={e => updateTask(task.id, { startDate: e.target.value })}
+              style={{ fontSize: 13, border: '1px solid #e0e0e0', borderRadius: 6, padding: '4px 10px', color: '#37352f', fontFamily: 'inherit' }}
+            />
+          </DetailRow>
+
           {/* Due Date */}
           <DetailRow label="마감일">
             <input
               type="date"
               defaultValue={task.dueDate || ''}
+              key={task.id + '-due-' + task.dueDate}
               onChange={e => updateTask(task.id, { dueDate: e.target.value })}
               style={{ fontSize: 13, border: '1px solid #e0e0e0', borderRadius: 6, padding: '4px 10px', color: '#37352f', fontFamily: 'inherit' }}
             />
