@@ -10,6 +10,12 @@ function db() {
   return d
 }
 
+function mapMemo(r) {
+  return {
+    id: r.id, title: r.title || '', notes: r.notes || '', color: r.color || 'yellow',
+    sortOrder: r.sort_order || 0, createdAt: r.created_at, updatedAt: r.updated_at,
+  }
+}
 function mapProject(r) {
   return { id: r.id, name: r.name, color: r.color, sortOrder: r.sort_order || 0 }
 }
@@ -25,20 +31,27 @@ function mapTask(r) {
 const useStore = create((set, get) => ({
   projects: [],
   tasks: [],
+  memos: [],
   syncStatus: 'ok',
   currentView: 'today',
   detailTask: null,
   showProjectMgr: false,
-  toastMsg: '',
+  toast: null, // { msg, undoTaskId?, undoPrevCategory? }
 
   setView: (v) => set({ currentView: v }),
+  logout: async () => {
+    const d = db()
+    if (d) await d.auth.signOut()
+  },
   openDetail: (task) => set({ detailTask: task }),
   closeDetail: () => set({ detailTask: null }),
   setShowProjectMgr: (v) => set({ showProjectMgr: v }),
-  showToast: (msg) => {
-    set({ toastMsg: msg })
-    setTimeout(() => set({ toastMsg: '' }), 2200)
+  showToast: (msg, opts) => {
+    const id = Date.now()
+    set({ toast: { msg, id, ...opts } })
+    setTimeout(() => set(s => s.toast?.id === id ? { toast: null } : {}), 2500)
   },
+  clearToast: () => set({ toast: null }),
 
   // ─── Load All ───
   loadAll: async () => {
@@ -46,15 +59,17 @@ const useStore = create((set, get) => ({
     if (!d) { set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
     try {
-      const [pr, tr] = await Promise.all([
+      const [pr, tr, mr] = await Promise.all([
         d.from('projects').select('*').order('sort_order'),
         d.from('tasks').select('*').order('sort_order'),
+        d.from('memos').select('*').order('sort_order'),
       ])
       if (pr.error) throw pr.error
       if (tr.error) throw tr.error
       set({
         projects: pr.data.map(mapProject),
         tasks: tr.data.map(mapTask),
+        memos: mr.error ? [] : mr.data.map(mapMemo),
         syncStatus: 'ok',
       })
     } catch (e) {
@@ -111,13 +126,23 @@ const useStore = create((set, get) => ({
     const t = get().tasks.find(x => x.id === id)
     if (!t) return
     if (!t.done) {
-      // Mark done → move to "done" category
+      // Mark done → move to "done" category + show toast with undo
       get().updateTask(id, { done: true, category: 'done', prevCategory: t.category })
+      setTimeout(() => {
+        get().showToast('할일이 완료되었습니다', { undoTaskId: id, undoPrevCategory: t.category })
+      }, 300)
     } else {
       // Undo → move back to prev category
       const dest = t.prevCategory && t.prevCategory !== 'done' ? t.prevCategory : 'backlog'
       get().updateTask(id, { done: false, category: dest, prevCategory: '' })
     }
+  },
+
+  // ─── Undo completion (called from toast) ───
+  undoComplete: (taskId, prevCategory) => {
+    const dest = prevCategory && prevCategory !== 'done' ? prevCategory : 'backlog'
+    get().updateTask(taskId, { done: false, category: dest, prevCategory: '' })
+    set({ toast: null })
   },
 
   // ─── Move task to different category ───
@@ -188,6 +213,40 @@ const useStore = create((set, get) => ({
     const { error } = await d.from('projects').upsert(rows)
     if (error) console.error('[Ryan Todo] reorderProjects:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
+  },
+
+  // ─── Memo CRUD ───
+  addMemo: async (memo) => {
+    const m = { id: uid(), title: '', notes: '', color: 'yellow', sortOrder: Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...memo }
+    set(s => ({ memos: [...s.memos, m] }))
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('memos').upsert({
+      id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder,
+    })
+    if (error) console.error('[Ryan Todo] addMemo:', error)
+  },
+
+  updateMemo: async (id, patch) => {
+    set(s => ({ memos: s.memos.map(m => m.id === id ? { ...m, ...patch, updatedAt: new Date().toISOString() } : m) }))
+    const m = get().memos.find(x => x.id === id)
+    if (!m) return
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('memos').upsert({
+      id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder,
+    })
+    if (error) console.error('[Ryan Todo] updateMemo:', error)
+  },
+
+  deleteMemo: async (id) => {
+    set(s => ({ memos: s.memos.filter(m => m.id !== id) }))
+    const d = db()
+    if (d) {
+      const { error } = await d.from('memos').delete().eq('id', id)
+      if (error) console.error('[Ryan Todo] deleteMemo:', error)
+    }
+    get().showToast('메모가 삭제됐습니다')
   },
 }))
 

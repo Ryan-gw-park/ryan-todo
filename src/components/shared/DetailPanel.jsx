@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import { parseDateFromText } from '../../utils/dateParser'
-import BulletNoteEditor from './BulletNoteEditor'
+import OutlinerEditor from './OutlinerEditor'
 
 export default function DetailPanel() {
   const { detailTask, closeDetail, tasks, projects, updateTask, deleteTask, toggleDone } = useStore()
@@ -115,7 +115,7 @@ export default function DetailPanel() {
               <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>📝 노트</span>
               <span style={{ fontSize: 11, color: '#bbb' }}>프로젝트 뷰와 동기화</span>
             </div>
-            <BulletNoteEditor notes={task.notes} onChange={handleNotesChange} accentColor={c.dot} />
+            <OutlinerEditor notes={task.notes} onChange={handleNotesChange} accentColor={c.dot} />
           </div>
         </div>
       </div>

@@ -4,7 +4,7 @@ import { COLOR_OPTIONS, getColor } from '../../utils/colors'
 import { PlusIcon, GripIcon, EditIcon, TrashIcon } from './Icons'
 
 export default function ProjectManager() {
-  const { projects, setShowProjectMgr, addProject, updateProject, deleteProject, reorderProjects } = useStore()
+  const { projects, setShowProjectMgr, addProject, updateProject, deleteProject, reorderProjects, logout } = useStore()
   const isMobile = window.innerWidth < 768
 
   const [editingId, setEditingId] = useState(null)
@@ -113,6 +113,17 @@ export default function ProjectManager() {
               <PlusIcon size={14} /> 새 프로젝트 추가
             </button>
           )}
+        </div>
+
+        {/* Logout */}
+        <div style={{ padding: '12px 24px', borderTop: '1px solid #f0f0f0' }}>
+          <button onClick={logout}
+            style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #e8e8e8', background: 'white', cursor: 'pointer', fontSize: 12, color: '#999', fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.borderColor = '#fca5a5' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#999'; e.currentTarget.style.borderColor = '#e8e8e8' }}
+          >
+            로그아웃
+          </button>
         </div>
       </div>
     </>

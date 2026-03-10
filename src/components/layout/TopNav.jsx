@@ -6,10 +6,11 @@ const VIEWS = [
   { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
   { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },
+  { id: 'memory', label: '메모리', icon: ViewIcons.memory },
 ]
 
 export default function TopNav() {
-  const { currentView, setView, setShowProjectMgr } = useStore()
+  const { currentView, setView, setShowProjectMgr, logout } = useStore()
 
   return (
     <div style={{ borderBottom: '1px solid #f0f0f0', background: 'white', position: 'sticky', top: 0, zIndex: 50 }} className="desktop-nav">
@@ -32,6 +33,11 @@ export default function TopNav() {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <button onClick={() => setShowProjectMgr(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e8e8e8', background: 'white', cursor: 'pointer', color: '#999', fontSize: 12, fontFamily: 'inherit' }}><SettingsIcon /></button>
           <button onClick={() => useStore.getState().setView('today')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: 'none', fontFamily: 'inherit', background: '#37352f', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}><PlusIcon /> 새 할일</button>
+          <button onClick={logout} title="로그아웃"
+            style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e8e8e8', background: '#f5f5f5', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#999', fontFamily: 'inherit', marginLeft: 4 }}
+            onMouseEnter={e => e.currentTarget.style.background = '#eee'}
+            onMouseLeave={e => e.currentTarget.style.background = '#f5f5f5'}
+          >G</button>
         </div>
       </div>
     </div>

@@ -1,18 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
-import { parseNotes, serializeNotes } from '../../utils/notes'
 import { parseDateFromText } from '../../utils/dateParser'
-import { SettingsIcon, PlusIcon, ChevronIcon, CheckIcon, UndoIcon, TrashIcon, IndentIcon, OutdentIcon } from '../shared/Icons'
-import { getBulletStyle } from '../../utils/colors'
+import { SettingsIcon, PlusIcon, ChevronIcon, CheckIcon, UndoIcon, TrashIcon } from '../shared/Icons'
+import OutlinerEditor from '../shared/OutlinerEditor'
 
 export default function ProjectView() {
-  const { projects, tasks, setShowProjectMgr, toggleDone, updateTask, deleteTask, addTask, openDetail } = useStore()
+  const { projects, tasks, setShowProjectMgr } = useStore()
   const isMobile = window.innerWidth < 768
   const [activeProject, setActiveProject] = useState(projects[0]?.id || '')
   const [expanded, setExpanded] = useState({})
 
-  // Initialize expanded state for all tasks
   useEffect(() => {
     const exp = {}
     tasks.forEach(t => { if (expanded[t.id] === undefined) exp[t.id] = true })
@@ -48,27 +46,21 @@ export default function ProjectView() {
           <div style={{ width: 14, height: 14, borderRadius: 4, background: c.dot }} />
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#37352f', margin: 0 }}>{p.name}</h1>
         </div>
-        <p style={{ fontSize: 13, color: '#bbb', marginBottom: 28, paddingLeft: 26 }}>클릭하여 편집 · Tab 레벨 조절 · Enter 연속 입력 · Alt+Shift+↑↓ 이동</p>
+        <p style={{ fontSize: 13, color: '#bbb', marginBottom: 28, paddingLeft: 26 }}>↑↓ 자유 이동 · Enter 새 항목/분리 · Tab 레벨 · Alt+Shift+↑↓ 순서 이동</p>
 
         {/* Category sections */}
         {CATEGORIES.map(cat => {
           const catTasks = tasks.filter(t => t.projectId === p.id && t.category === cat.key)
-          const isDoneCat = cat.key === 'done'
           return (
-            <div key={cat.key} style={{ marginBottom: 28 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `2px solid ${isDoneCat ? '#e0e0e0' : c.dot}20`, marginBottom: 8 }}>
-                <span style={{ fontSize: 15 }}>{cat.emoji}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: isDoneCat ? '#999' : '#37352f' }}>{cat.label}</span>
-                <span style={{ fontSize: 11, color: isDoneCat ? '#aaa' : c.dot, background: isDoneCat ? '#f0f0f0' : c.header, borderRadius: 8, padding: '1px 8px', fontWeight: 600 }}>{catTasks.length}</span>
-              </div>
-              <div style={{ paddingLeft: 4 }}>
-                {catTasks.length === 0 && isDoneCat && <div style={{ fontSize: 12, color: '#ccc', padding: '4px 16px' }}>아직 완료된 항목이 없습니다</div>}
-                {catTasks.map(task => (
-                  <OutlinerTaskNode key={task.id} task={task} color={c} expanded={expanded} toggleExpand={toggleExpand} />
-                ))}
-                {!isDoneCat && <AddTaskButton projectId={p.id} category={cat.key} color={c} />}
-              </div>
-            </div>
+            <CategorySection
+              key={cat.key}
+              cat={cat}
+              catTasks={catTasks}
+              projectId={p.id}
+              color={c}
+              expanded={expanded}
+              toggleExpand={toggleExpand}
+            />
           )
         })}
       </div>
@@ -76,233 +68,268 @@ export default function ProjectView() {
   )
 }
 
-function OutlinerTaskNode({ task, color, expanded, toggleExpand }) {
-  const { toggleDone, updateTask, deleteTask, openDetail } = useStore()
-  const [editing, setEditing] = useState(false)
-  const [editText, setEditText] = useState(task.text)
-  const editRef = useRef(null)
-  const noteRefs = useRef([])
-  const [editingNoteIdx, setEditingNoteIdx] = useState(null)
-  const blurTimer = useRef(null)
+/* ── Category section — manages inter-task navigation ── */
+function CategorySection({ cat, catTasks, projectId, color, expanded, toggleExpand }) {
+  const { addTask, updateTask, deleteTask } = useStore()
+  const taskRefs = useRef({})
+  const pendingFocusRef = useRef(null)
+  const isDoneCat = cat.key === 'done'
 
-  const noteNodes = parseNotes(task.notes)
+  /* Focus a newly created task after re-render */
+  useEffect(() => {
+    if (pendingFocusRef.current) {
+      const { idx, pos } = pendingFocusRef.current
+      pendingFocusRef.current = null
+      const task = catTasks[idx]
+      if (task) {
+        setTimeout(() => taskRefs.current[task.id]?.focusTitle(pos), 40)
+      }
+    }
+  })
+
+  const handleSwap = useCallback((i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= catTasks.length) return
+    const a = catTasks[i], b = catTasks[j]
+    const aOrder = a.sortOrder, bOrder = b.sortOrder
+    updateTask(a.id, { sortOrder: bOrder })
+    updateTask(b.id, { sortOrder: aOrder })
+    setTimeout(() => taskRefs.current[a.id]?.focusTitle('end'), 50)
+  }, [catTasks, updateTask])
+
+  const handleTitleEnter = useCallback((i, afterText) => {
+    const task = catTasks[i]
+    const nextTask = catTasks[i + 1]
+    const sortOrder = nextTask
+      ? (task.sortOrder + nextTask.sortOrder) / 2
+      : task.sortOrder + 1
+    addTask({ text: afterText, projectId, category: cat.key, sortOrder })
+    pendingFocusRef.current = { idx: i + 1, pos: 'start' }
+  }, [catTasks, addTask, projectId, cat.key])
+
+  const handleTitleBackspace = useCallback((i) => {
+    const task = catTasks[i]
+    if (!task.text && catTasks.length <= 1) return
+    deleteTask(task.id)
+    if (i > 0) {
+      setTimeout(() => taskRefs.current[catTasks[i - 1].id]?.focusTitle('end'), 40)
+    }
+  }, [catTasks, deleteTask])
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `2px solid ${isDoneCat ? '#e0e0e0' : color.dot}20`, marginBottom: 8 }}>
+        <span style={{ fontSize: 15 }}>{cat.emoji}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: isDoneCat ? '#999' : '#37352f' }}>{cat.label}</span>
+        <span style={{ fontSize: 11, color: isDoneCat ? '#aaa' : color.dot, background: isDoneCat ? '#f0f0f0' : color.header, borderRadius: 8, padding: '1px 8px', fontWeight: 600 }}>{catTasks.length}</span>
+      </div>
+      <div style={{ paddingLeft: 4 }}>
+        {catTasks.length === 0 && isDoneCat && <div style={{ fontSize: 12, color: '#ccc', padding: '4px 16px' }}>아직 완료된 항목이 없습니다</div>}
+        {catTasks.map((task, i) => (
+          <OutlinerTaskNode
+            key={task.id}
+            ref={el => taskRefs.current[task.id] = el}
+            task={task}
+            color={color}
+            expanded={expanded}
+            toggleExpand={toggleExpand}
+            onExitUp={() => {
+              if (i > 0) taskRefs.current[catTasks[i - 1].id]?.focusLast()
+            }}
+            onExitDown={() => {
+              if (i < catTasks.length - 1) taskRefs.current[catTasks[i + 1].id]?.focusTitle('start')
+            }}
+            onTitleEnter={(afterText) => handleTitleEnter(i, afterText)}
+            onTitleBackspace={() => handleTitleBackspace(i)}
+            onSwapUp={() => handleSwap(i, -1)}
+            onSwapDown={() => handleSwap(i, 1)}
+          />
+        ))}
+        {!isDoneCat && <AddTaskButton projectId={projectId} category={cat.key} color={color} />}
+      </div>
+    </div>
+  )
+}
+
+/* ── Task node — always-editable title + outliner notes ── */
+const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
+  { task, color, expanded, toggleExpand, onExitUp, onExitDown, onTitleEnter, onTitleBackspace, onSwapUp, onSwapDown },
+  ref
+) {
+  const { toggleDone, updateTask, deleteTask, openDetail } = useStore()
+  const titleRef = useRef(null)
+  const editorRef = useRef(null)
+  const [titleText, setTitleText] = useState(task.text)
+
+  const hasNotes = !!(task.notes && task.notes.trim())
   const isOpen = expanded[task.id] !== false
-  const hasChildren = noteNodes.length > 0
   const isDone = task.category === 'done'
 
-  useEffect(() => { setEditText(task.text) }, [task.text])
-  useEffect(() => { if (editing && editRef.current) { editRef.current.focus(); editRef.current.select() } }, [editing])
+  useEffect(() => { setTitleText(task.text) }, [task.text])
 
-  useEffect(() => {
-    if (editingNoteIdx !== null && editingNoteIdx >= 0) {
+  /* ── Expose to parent for inter-task navigation ── */
+  useImperativeHandle(ref, () => ({
+    focusTitle: (pos = 'end') => {
       setTimeout(() => {
-        const el = noteRefs.current[editingNoteIdx]
-        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) }
+        const el = titleRef.current
+        if (!el) return
+        el.focus()
+        const p = pos === 'start' ? 0 : (typeof pos === 'number' ? pos : el.value.length)
+        el.setSelectionRange(p, p)
       }, 30)
+    },
+    focusLast: () => {
+      if (isOpen && hasNotes && editorRef.current) {
+        editorRef.current.focusLast()
+      } else {
+        setTimeout(() => {
+          const el = titleRef.current
+          if (!el) return
+          el.focus()
+          el.setSelectionRange(el.value.length, el.value.length)
+        }, 30)
+      }
+    },
+  }))
+
+  const saveTitle = useCallback(() => {
+    const trimmed = titleText.trim()
+    if (trimmed && trimmed !== task.text) {
+      const { startDate, dueDate } = parseDateFromText(trimmed)
+      const patch = { text: trimmed }
+      if (startDate) patch.startDate = startDate
+      if (dueDate) patch.dueDate = dueDate
+      updateTask(task.id, patch)
     }
-  }, [editingNoteIdx])
-
-  const editNote = (idx) => {
-    if (blurTimer.current) clearTimeout(blurTimer.current)
-    setEditingNoteIdx(idx >= 0 ? idx : null)
-  }
-  const stopEditNote = () => setEditingNoteIdx(null)
-
-  const saveText = () => {
-    if (editText.trim() && editText !== task.text) updateTask(task.id, { text: editText.trim() })
-    setEditing(false)
-  }
+    if (!trimmed) setTitleText(task.text)
+  }, [titleText, task.text, task.id, updateTask])
 
   const handleTitleKeyDown = (e) => {
+    // Alt+Shift+↑↓ — reorder tasks
+    if (e.altKey && e.shiftKey && e.key === 'ArrowUp') { e.preventDefault(); onSwapUp?.(); return }
+    if (e.altKey && e.shiftKey && e.key === 'ArrowDown') { e.preventDefault(); onSwapDown?.(); return }
+
+    // Enter — text split + new task
     if (e.key === 'Enter') {
       e.preventDefault()
-      const updates = {}
-      if (editText.trim() && editText !== task.text) updates.text = editText.trim()
-      const n = [...noteNodes, { text: '', level: 0 }]
-      updates.notes = serializeNotes(n)
-      updateTask(task.id, updates)
-      setEditing(false)
-      if (expanded[task.id] === false) toggleExpand(task.id)
-      editNote(n.length - 1)
-    } else if (e.key === 'Escape') {
-      setEditText(task.text); setEditing(false)
+      const cursor = e.target.selectionStart
+      const before = titleText.slice(0, cursor)
+      const after = titleText.slice(cursor)
+
+      if (!before && !after) {
+        onTitleBackspace?.()
+        return
+      }
+      // Update current title to "before" text
+      const saveBefore = before || titleText
+      setTitleText(saveBefore)
+      if (saveBefore !== task.text) updateTask(task.id, { text: saveBefore })
+      // Create new task with "after" text
+      onTitleEnter?.(after)
+      return
     }
-  }
 
-  const changeNoteLevel = (i, d) => {
-    const n = [...noteNodes]; const nl = Math.max(0, Math.min(3, n[i].level + d))
-    if (d > 0 && i > 0 && nl > n[i - 1].level + 1) return
-    n[i] = { ...n[i], level: nl }; updateTask(task.id, { notes: serializeNotes(n) })
-  }
+    // Backspace on empty
+    if (e.key === 'Backspace' && titleText === '') { e.preventDefault(); onTitleBackspace?.(); return }
 
-  const handleNoteAction = (action, idx, text) => {
-    switch (action) {
-      case 'enter': {
-        if (text.trim() === '') {
-          const n = noteNodes.filter((_, j) => j !== idx)
-          updateTask(task.id, { notes: serializeNotes(n) })
-          stopEditNote()
-          return
-        }
-        const n = [...noteNodes]
-        n[idx] = { ...n[idx], text }
-        n.splice(idx + 1, 0, { text: '', level: n[idx].level })
-        updateTask(task.id, { notes: serializeNotes(n) })
-        editNote(idx + 1)
-        break
-      }
-      case 'moveUp': {
-        if (idx === 0) return
-        const n = [...noteNodes]
-        n[idx] = { ...n[idx], text }
-        ;[n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]
-        updateTask(task.id, { notes: serializeNotes(n) })
-        editNote(idx - 1)
-        break
-      }
-      case 'moveDown': {
-        if (idx >= noteNodes.length - 1) return
-        const n = [...noteNodes]
-        n[idx] = { ...n[idx], text }
-        ;[n[idx], n[idx + 1]] = [n[idx + 1], n[idx]]
-        updateTask(task.id, { notes: serializeNotes(n) })
-        editNote(idx + 1)
-        break
-      }
-      case 'backspace': {
-        const n = noteNodes.filter((_, j) => j !== idx)
-        updateTask(task.id, { notes: serializeNotes(n) })
-        if (idx > 0) editNote(idx - 1)
-        else stopEditNote()
-        break
-      }
-      case 'arrowUp': {
-        if (idx <= 0) return
-        if (text !== noteNodes[idx].text) {
-          const n = [...noteNodes]; n[idx] = { ...n[idx], text }
-          updateTask(task.id, { notes: serializeNotes(n) })
-        }
-        editNote(idx - 1)
-        break
-      }
-      case 'arrowDown': {
-        if (idx >= noteNodes.length - 1) return
-        if (text !== noteNodes[idx].text) {
-          const n = [...noteNodes]; n[idx] = { ...n[idx], text }
-          updateTask(task.id, { notes: serializeNotes(n) })
-        }
-        editNote(idx + 1)
-        break
-      }
-      case 'tab': { changeNoteLevel(idx, 1); break }
-      case 'shiftTab': { changeNoteLevel(idx, -1); break }
-      case 'escape': { stopEditNote(); break }
-      case 'blur': {
-        if (noteNodes[idx] && text !== noteNodes[idx].text) {
-          const n = [...noteNodes]; n[idx] = { ...n[idx], text }
-          updateTask(task.id, { notes: serializeNotes(n) })
-        }
-        blurTimer.current = setTimeout(() => stopEditNote(), 100)
-        break
-      }
-      case 'startEdit': { editNote(idx); break }
-      case 'delete': {
-        const n = noteNodes.filter((_, j) => j !== idx)
-        updateTask(task.id, { notes: serializeNotes(n) })
-        if (editingNoteIdx === idx) stopEditNote()
-        break
-      }
+    // ↑ — save and exit up
+    if (e.key === 'ArrowUp') { e.preventDefault(); saveTitle(); onExitUp?.(); return }
+
+    // ↓ — go to notes (if expanded) or exit down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      saveTitle()
+      if (isOpen && editorRef.current) editorRef.current.focusFirst()
+      else onExitDown?.()
+      return
     }
+
+    // Escape — revert and blur
+    if (e.key === 'Escape') { setTitleText(task.text); e.target.blur() }
   }
 
-  const addChildNote = () => {
-    const n = [...noteNodes, { text: '', level: 0 }]
-    updateTask(task.id, { notes: serializeNotes(n) })
-    if (expanded[task.id] === false) toggleExpand(task.id)
-    editNote(n.length - 1)
+  const handleNotesChange = useCallback((newNotes) => {
+    updateTask(task.id, { notes: newNotes })
+  }, [task.id, updateTask])
+
+  const handleNotesExitUp = useCallback(() => {
+    setTimeout(() => {
+      const el = titleRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }, 30)
+  }, [])
+
+  const handleNotesExitDown = useCallback(() => {
+    onExitDown?.()
+  }, [onExitDown])
+
+  /* Done tasks: read-only display */
+  if (isDone) {
+    return (
+      <div style={{ opacity: 0.5 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, padding: '4px 0' }} className="outliner-row">
+          <div style={{ width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0, marginTop: 1, padding: '2px 0', color: '#e0e0e0' }}>
+            <ChevronIcon open={false} />
+          </div>
+          <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ marginTop: 2, flexShrink: 0 }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#66bb6a' }}><UndoIcon /></div>
+          </div>
+          <div onClick={() => openDetail(task)} style={{ flex: 1, minWidth: 0, paddingLeft: 6, fontSize: 14, fontWeight: 500, color: '#bbb', textDecoration: 'line-through', cursor: 'pointer', padding: '2px 6px', lineHeight: '22px' }}>
+            {task.text}{task.dueDate && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 8, fontWeight: 400 }}>{task.dueDate}</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0, marginTop: 2 }} className="outliner-actions">
+            <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 3, display: 'flex' }}><TrashIcon /></button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ opacity: isDone ? 0.5 : 1 }}>
+    <div>
+      {/* Task title row — always editable (auto-edit mode) */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, padding: '4px 0' }} className="outliner-row">
-        <div onClick={() => hasChildren && toggleExpand(task.id)} style={{ cursor: hasChildren ? 'pointer' : 'default', padding: '2px 0', color: hasChildren ? '#999' : '#e0e0e0', width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-          <ChevronIcon open={isOpen && hasChildren} />
+        <div onClick={() => toggleExpand(task.id)} style={{ cursor: 'pointer', padding: '2px 0', color: hasNotes ? '#999' : '#e0e0e0', width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+          <ChevronIcon open={isOpen && hasNotes} />
         </div>
         <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ marginTop: 2, flexShrink: 0 }}>
-          {isDone ? <div style={{ width: 16, height: 16, borderRadius: 4, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#66bb6a' }}><UndoIcon /></div> : <CheckIcon checked={false} size={16} />}
+          <CheckIcon checked={false} size={16} />
         </div>
-        <div style={{ flex: 1, minWidth: 0, paddingLeft: 6 }}>
-          {editing && !isDone
-            ? <input ref={editRef} value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={saveText}
-                style={{ width: '100%', fontSize: 14, fontWeight: 500, border: 'none', borderBottom: `2px solid ${color.dot}`, outline: 'none', padding: '2px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box' }} />
-            : <div onClick={() => !isDone ? setEditing(true) : openDetail(task)} style={{ fontSize: 14, fontWeight: 500, color: isDone ? '#bbb' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: isDone ? 'pointer' : 'text', padding: '2px 0', lineHeight: '22px' }}>
-                {task.text}{task.dueDate && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 8, fontWeight: 400 }}>{task.dueDate}</span>}
-              </div>
-          }
-        </div>
+        <input
+          ref={titleRef}
+          value={titleText}
+          onChange={e => setTitleText(e.target.value)}
+          onKeyDown={handleTitleKeyDown}
+          onBlur={saveTitle}
+          placeholder="할일 입력..."
+          style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, border: 'none', outline: 'none', padding: '2px 6px', fontFamily: 'inherit', background: 'transparent', color: '#37352f', lineHeight: '22px', boxSizing: 'border-box' }}
+        />
+        {task.dueDate && <span style={{ fontSize: 11, color: '#ccc', fontWeight: 400, flexShrink: 0, marginTop: 4 }}>{task.dueDate}</span>}
         <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0, marginTop: 2 }} className="outliner-actions">
-          {!isDone && <button onClick={addChildNote} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 3, display: 'flex' }}><PlusIcon size={13} /></button>}
           <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 3, display: 'flex' }}><TrashIcon /></button>
         </div>
       </div>
 
-      {isOpen && hasChildren && (
-        <div style={{ marginLeft: 26, borderLeft: '1px solid #f0f0f0', paddingLeft: 10 }}>
-          {noteNodes.map((node, i) => (
-            <OutlinerNoteNode key={i} node={node} idx={i} color={color}
-              isEditing={editingNoteIdx === i}
-              inputRef={el => noteRefs.current[i] = el}
-              onAction={handleNoteAction}
-              totalCount={noteNodes.length}
-            />
-          ))}
+      {/* Notes — shared OutlinerEditor with exit callbacks */}
+      {isOpen && (
+        <div style={{ marginLeft: 26, paddingLeft: 10, borderLeft: '1px solid #f0f0f0' }}>
+          <OutlinerEditor
+            ref={editorRef}
+            notes={task.notes}
+            onChange={handleNotesChange}
+            accentColor={color.dot}
+            onExitUp={handleNotesExitUp}
+            onExitDown={handleNotesExitDown}
+          />
         </div>
       )}
     </div>
   )
-}
+})
 
-function OutlinerNoteNode({ node, idx, color, isEditing, inputRef, onAction, totalCount }) {
-  const [text, setText] = useState(node.text)
-
-  useEffect(() => { setText(node.text) }, [node.text])
-
-  const handleKeyDown = (e) => {
-    if (e.altKey && e.shiftKey && e.key === 'ArrowUp') { e.preventDefault(); onAction('moveUp', idx, text) }
-    else if (e.altKey && e.shiftKey && e.key === 'ArrowDown') { e.preventDefault(); onAction('moveDown', idx, text) }
-    else if (e.key === 'Enter') { e.preventDefault(); onAction('enter', idx, text) }
-    else if (e.key === 'Escape') { setText(node.text); onAction('escape', idx, text) }
-    else if (e.key === 'Tab') { e.preventDefault(); onAction(e.shiftKey ? 'shiftTab' : 'tab', idx, text) }
-    else if (e.key === 'Backspace' && text === '') { e.preventDefault(); onAction('backspace', idx, text) }
-    else if (e.key === 'ArrowUp' && idx > 0) { e.preventDefault(); onAction('arrowUp', idx, text) }
-    else if (e.key === 'ArrowDown' && idx < totalCount - 1) { e.preventDefault(); onAction('arrowDown', idx, text) }
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', minHeight: 26, marginLeft: node.level * 22 }} className="outliner-row">
-      <div style={{ width: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <div style={getBulletStyle(node.level, color.dot)} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {isEditing
-          ? <input ref={inputRef} value={text} onChange={e => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={() => onAction('blur', idx, text)}
-              style={{ width: '100%', fontSize: 13, border: 'none', borderBottom: `1.5px solid ${color.dot}40`, outline: 'none', padding: '1px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box' }} />
-          : <div onMouseDown={() => onAction('startEdit', idx, text)} style={{ fontSize: 13, color: '#555', cursor: 'text', padding: '1px 0', lineHeight: '20px' }}>
-              {node.text || <span style={{ color: '#ccc' }}>빈 노트</span>}
-            </div>
-        }
-      </div>
-      <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0 }} className="outliner-actions">
-        {node.level > 0 && <button onClick={() => onAction('shiftTab', idx, text)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}><OutdentIcon /></button>}
-        {node.level < 3 && idx > 0 && <button onClick={() => onAction('tab', idx, text)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}><IndentIcon /></button>}
-        <button onClick={() => onAction('delete', idx, text)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 2, display: 'flex' }}><TrashIcon /></button>
-      </div>
-    </div>
-  )
-}
-
+/* ── Add task button ── */
 function AddTaskButton({ projectId, category, color }) {
   const { addTask } = useStore()
   const [adding, setAdding] = useState(false)
