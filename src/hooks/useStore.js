@@ -165,6 +165,30 @@ const useStore = create((set, get) => ({
     get().updateTask(id, patch)
   },
 
+  // ─── Reorder tasks (batch sortOrder update) ───
+  reorderTasks: async (reorderedTasks) => {
+    const updates = reorderedTasks.map((t, i) => ({ id: t.id, sortOrder: i }))
+    set(s => ({
+      tasks: s.tasks.map(t => {
+        const u = updates.find(x => x.id === t.id)
+        return u ? { ...t, sortOrder: u.sortOrder } : t
+      })
+    }))
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    for (const u of updates) {
+      const t = get().tasks.find(x => x.id === u.id)
+      if (!t) continue
+      await d.from('tasks').upsert({
+        id: t.id, text: t.text, project_id: t.projectId, category: t.category,
+        done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
+        notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
+      })
+    }
+    set({ syncStatus: 'ok' })
+  },
+
   // ─── Project CRUD ───
   addProject: async (name, color) => {
     const p = { id: uid(), name, color, sortOrder: Date.now() }
@@ -217,7 +241,7 @@ const useStore = create((set, get) => ({
 
   // ─── Memo CRUD ───
   addMemo: async (memo) => {
-    const m = { id: uid(), title: '', notes: '', color: 'yellow', sortOrder: Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...memo }
+    const m = { id: crypto.randomUUID(), title: '', notes: '', color: 'yellow', sortOrder: Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...memo }
     set(s => ({ memos: [...s.memos, m] }))
     const d = db()
     if (!d) return

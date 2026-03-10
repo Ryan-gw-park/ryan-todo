@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor } from '@dnd-kit/core'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import { SettingsIcon, CheckIcon, UndoIcon } from '../shared/Icons'
+import { parseDateFromText } from '../../utils/dateParser'
 import InlineAdd from '../shared/InlineAdd'
 
 export default function MatrixView() {
-  const { projects, tasks, setShowProjectMgr, moveTaskTo } = useStore()
+  const { projects, tasks, setShowProjectMgr, moveTaskTo, reorderTasks } = useStore()
   const isMobile = window.innerWidth < 768
   const LW = isMobile ? 80 : 110
   const COL_GAP = 10
@@ -22,16 +24,44 @@ export default function MatrixView() {
   const dd = new Date()
   const dateStr = `${dd.getFullYear()}년 ${dd.getMonth()+1}월 ${dd.getDate()}일 ${['일','월','화','수','목','금','토'][dd.getDay()]}요일`
 
+  const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
+
   const handleDragStart = (e) => setActiveId(e.active.id)
   const handleDragEnd = (e) => {
     setActiveId(null)
     const { active, over } = e
     if (!over) return
-    const [targetProjectId, targetCategory] = over.id.split(':')
+
     const task = tasks.find(t => t.id === active.id)
     if (!task) return
-    if (task.projectId === targetProjectId && task.category === targetCategory) return
-    moveTaskTo(active.id, targetProjectId, targetCategory)
+    const overId = over.id
+
+    // Dropped on a category drop zone (projectId:category)
+    if (typeof overId === 'string' && overId.includes(':')) {
+      const [targetProjectId, targetCategory] = overId.split(':')
+      if (task.projectId === targetProjectId && task.category === targetCategory) return
+      moveTaskTo(active.id, targetProjectId, targetCategory)
+      return
+    }
+
+    // Dropped on another task
+    const overTask = tasks.find(t => t.id === overId)
+    if (!overTask) return
+
+    if (task.projectId === overTask.projectId && task.category === overTask.category) {
+      // Same cell: reorder
+      const cellTasks = tasks
+        .filter(t => t.projectId === task.projectId && t.category === task.category)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+      const oldIndex = cellTasks.findIndex(t => t.id === active.id)
+      const newIndex = cellTasks.findIndex(t => t.id === overId)
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        reorderTasks(arrayMove(cellTasks, oldIndex, newIndex))
+      }
+    } else {
+      // Cross-cell: move to target's project+category
+      moveTaskTo(active.id, overTask.projectId, overTask.category)
+    }
   }
 
   const N = projects.length
@@ -93,7 +123,9 @@ export default function MatrixView() {
 
                     {projects.map(p => {
                       const c = getColor(p.color)
-                      const catTasks = tasks.filter(t => t.projectId === p.id && t.category === cat.key)
+                      const catTasks = tasks
+                        .filter(t => t.projectId === p.id && t.category === cat.key)
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
                       const isCollapsed = isDone && doneCollapsed[p.id] !== false && catTasks.length > 0
                       const cellRadius = isLast ? '0 0 10px 10px' : '0'
 
@@ -129,7 +161,11 @@ export default function MatrixView() {
                           <div style={{ minHeight: 20 }}>
                             {isDone && isCollapsed
                               ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {catTasks.length}건</div>
-                              : catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} />)
+                              : (
+                                <SortableContext items={catTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                  {catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} />)}
+                                </SortableContext>
+                              )
                             }
                           </div>
                           {!isDone && <InlineAdd projectId={p.id} category={cat.key} color={c} />}
@@ -141,6 +177,11 @@ export default function MatrixView() {
               })}
             </div>
           </div>
+
+          {/* Drag overlay */}
+          <DragOverlay dropAnimation={null}>
+            {activeTask ? <TaskOverlay task={activeTask} /> : null}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>
@@ -161,46 +202,104 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
   )
 }
 
-/* ─── Task card: 14px checkbox, click→detail, drag→DnD ─── */
+/* ─── Task card: whole card draggable, click text to edit inline ─── */
 function MatrixCard({ task, color, isDone }) {
-  const { openDetail, toggleDone } = useStore()
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
+  const { toggleDone, updateTask } = useStore()
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
+
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(task.text)
+  const inputRef = useRef(null)
+
+  useEffect(() => { setText(task.text) }, [task.text])
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus() }, [editing])
+
+  const saveText = useCallback(() => {
+    const trimmed = text.trim()
+    if (trimmed && trimmed !== task.text) {
+      const { startDate, dueDate } = parseDateFromText(trimmed)
+      const patch = { text: trimmed }
+      if (startDate) patch.startDate = startDate
+      if (dueDate) patch.dueDate = dueDate
+      updateTask(task.id, patch)
+    }
+    if (!trimmed) setText(task.text)
+    setEditing(false)
+  }, [text, task.text, task.id, updateTask])
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveText() }
+    if (e.key === 'Escape') { setText(task.text); setEditing(false) }
+  }
 
   const style = {
     background: '#ffffff',
     borderRadius: 8,
-    padding: '10px 12px',
+    padding: '8px 10px',
     border: '1px solid rgba(0,0,0,0.06)',
     boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
     marginBottom: 6,
-    cursor: isDragging ? 'grabbing' : 'pointer',
     transition: isDragging ? 'none' : 'box-shadow 0.15s',
-    opacity: isDone ? 0.5 : isDragging ? 0.9 : 1,
-    transform: transform ? `translate(${transform.x}px, ${transform.y}px)${isDragging ? ' rotate(2deg)' : ''}` : undefined,
+    opacity: isDone ? 0.5 : isDragging ? 0.3 : 1,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     zIndex: isDragging ? 100 : undefined,
     position: isDragging ? 'relative' : undefined,
     display: 'flex',
     alignItems: 'flex-start',
     gap: 6,
+    cursor: isDragging ? 'grabbing' : 'default',
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}
-      onClick={() => { if (!isDragging) openDetail(task) }}
-      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
-      onMouseLeave={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)' }}
-    >
-      <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0 }}>
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      {/* Checkbox */}
+      <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0, cursor: 'pointer' }}>
         {isDone
-          ? <div style={{ width: 14, height: 14, borderRadius: 3, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#66bb6a' }}>
-              <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 5.5h5.5a3 3 0 010 6H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M5.5 3L3 5.5 5.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          ? <div style={{ width: 14, height: 14, borderRadius: 3, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#66bb6a' }}>
+              <UndoIcon />
             </div>
           : <CheckIcon checked={false} size={14} />
         }
       </div>
+      {/* Text: inline edit or display */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none' }}>{task.text}</div>
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={saveText}
+            style={{ width: '100%', fontSize: 13, lineHeight: '19px', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box' }}
+          />
+        ) : (
+          <div
+            onClick={() => { if (!isDragging) setEditing(true) }}
+            style={{ fontSize: 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: 'text', minHeight: 19 }}
+          >
+            {task.text}
+          </div>
+        )}
         {task.dueDate && <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{task.dueDate}</div>}
+      </div>
+    </div>
+  )
+}
+
+/* ─── Drag overlay card ─── */
+function TaskOverlay({ task }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 6,
+      padding: '8px 10px', borderRadius: 8, background: 'white',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.06)',
+      transform: 'rotate(2deg)', cursor: 'grabbing', maxWidth: 300,
+    }}>
+      <div style={{ paddingTop: 1, flexShrink: 0 }}>
+        <CheckIcon checked={false} size={14} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, lineHeight: '19px', color: '#37352f' }}>{task.text}</div>
       </div>
     </div>
   )

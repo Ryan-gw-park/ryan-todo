@@ -6,7 +6,7 @@ const VIEWS = [
   { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
   { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },
-  { id: 'memory', label: '메모리', icon: ViewIcons.memory },
+  { id: 'memory', label: '메모', icon: ViewIcons.memory },
 ]
 
 export default function TopNav() {

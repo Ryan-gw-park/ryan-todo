@@ -1,75 +1,515 @@
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
 
+/* ─── Date helpers ─── */
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
+function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate() }
+function addMonths(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, 1) }
+function isSameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate() }
+function isWeekend(d) { const day = d.getDay(); return day === 0 || day === 6 }
+function diffDays(a, b) { return Math.round((b - a) / 86400000) }
+function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n) }
+function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+function parseDate(s) { if (!s) return null; const d = new Date(s + 'T00:00:00'); return isNaN(d) ? null : d }
+function getMonday(d) { const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); return new Date(d.getFullYear(), d.getMonth(), diff) }
+
+/* ─── Generate columns for each scale ─── */
+function getColumns(baseDate, scale) {
+  const cols = []
+  if (scale === 'month') {
+    const y = baseDate.getFullYear(), m = baseDate.getMonth()
+    const n = daysInMonth(y, m)
+    for (let i = 1; i <= n; i++) {
+      const d = new Date(y, m, i)
+      cols.push({ date: d, label: String(i), isWeekend: isWeekend(d) })
+    }
+  } else if (scale === 'quarter') {
+    for (let mo = 0; mo < 3; mo++) {
+      const mDate = addMonths(baseDate, mo)
+      const y = mDate.getFullYear(), m = mDate.getMonth()
+      const n = daysInMonth(y, m)
+      for (let i = 1; i <= n; i++) {
+        const d = new Date(y, m, i)
+        const showLabel = i === 1 || i === 5 || i === 10 || i === 15 || i === 20 || i === 25
+        cols.push({ date: d, label: showLabel ? String(i) : '', isWeekend: isWeekend(d), monthStart: i === 1 })
+      }
+    }
+  } else {
+    // year — weekly columns
+    const y = baseDate.getFullYear()
+    let cur = getMonday(new Date(y, 0, 1))
+    if (cur.getFullYear() < y) cur = addDays(cur, 7)
+    while (cur.getFullYear() <= y) {
+      cols.push({ date: new Date(cur), label: '', isWeekend: false, weekStart: true })
+      cur = addDays(cur, 7)
+      if (cur.getFullYear() > y && cur.getMonth() > 0) break
+    }
+  }
+  return cols
+}
+
+function getMonthHeaders(baseDate, scale) {
+  if (scale === 'month') {
+    return [{ label: `${baseDate.getFullYear()}년 ${baseDate.getMonth() + 1}월`, span: daysInMonth(baseDate.getFullYear(), baseDate.getMonth()) }]
+  }
+  if (scale === 'quarter') {
+    return [0, 1, 2].map(i => {
+      const d = addMonths(baseDate, i)
+      return { label: `${d.getMonth() + 1}월`, span: daysInMonth(d.getFullYear(), d.getMonth()) }
+    })
+  }
+  // year
+  const y = baseDate.getFullYear()
+  const headers = []
+  for (let m = 0; m < 12; m++) {
+    // count weeks that start in this month
+    const cols = getColumns(baseDate, 'year')
+    const count = cols.filter(c => c.date.getMonth() === m && c.date.getFullYear() === y).length
+    if (count > 0) headers.push({ label: `${m + 1}월`, span: count })
+  }
+  return headers
+}
+
+const COL_WIDTHS = { month: 36, quarter: 12, year: 18 }
+const LEFT_PANEL = 170
+const LEFT_PANEL_MOBILE = 100
+const SCALES = [
+  { key: 'month', label: '월간' },
+  { key: 'quarter', label: '분기' },
+  { key: 'year', label: '연간' },
+]
+
 export default function TimelineView() {
-  const { projects, tasks } = useStore()
+  const { projects, tasks, openDetail, updateTask, reorderTasks } = useStore()
   const isMobile = window.innerWidth < 768
+  const panelW = isMobile ? LEFT_PANEL_MOBILE : LEFT_PANEL
 
-  const dd = new Date()
-  const currentDay = dd.getDate()
+  const today = useMemo(() => new Date(), [])
+  const [baseDate, setBaseDate] = useState(() => startOfMonth(today))
+  const [scale, setScale] = useState('month')
+  const [collapsed, setCollapsed] = useState({})
+  const gridRef = useRef(null)
 
-  // Generate day columns for current month
-  const year = dd.getFullYear()
-  const month = dd.getMonth()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+  const colW = COL_WIDTHS[scale]
+  const columns = useMemo(() => getColumns(baseDate, scale), [baseDate, scale])
+  const monthHeaders = useMemo(() => getMonthHeaders(baseDate, scale), [baseDate, scale])
+  const gridW = columns.length * colW
+
+  /* ─── Navigate ─── */
+  const navigate = (dir) => {
+    if (scale === 'month') setBaseDate(d => addMonths(d, dir))
+    else if (scale === 'quarter') setBaseDate(d => addMonths(d, dir * 3))
+    else setBaseDate(d => new Date(d.getFullYear() + dir, 0, 1))
+  }
+  const goToday = () => {
+    setBaseDate(startOfMonth(today))
+    // scroll to today
+    setTimeout(() => {
+      if (!gridRef.current) return
+      const idx = columns.findIndex(c => isSameDay(c.date, today))
+      if (idx >= 0) gridRef.current.scrollLeft = idx * colW - 200
+    }, 50)
+  }
+
+  /* Auto-scroll to today on mount / scale change */
+  useEffect(() => {
+    setTimeout(() => {
+      if (!gridRef.current) return
+      const idx = columns.findIndex(c => {
+        if (scale === 'year') return c.date <= today && addDays(c.date, 7) > today
+        return isSameDay(c.date, today)
+      })
+      if (idx >= 0) gridRef.current.scrollLeft = Math.max(0, idx * colW - 200)
+    }, 100)
+  }, [scale, baseDate])
+
+  /* ─── Data ─── */
+  const projectRows = useMemo(() => {
+    return projects.map(p => {
+      const c = getColor(p.color)
+      const projectTasks = tasks
+        .filter(t => t.projectId === p.id && t.category !== 'done')
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+      return { project: p, color: c, tasks: projectTasks }
+    })
+  }, [projects, tasks])
+
+  /* ─── Column index for a date ─── */
+  const dateToCol = useCallback((dateStr) => {
+    const d = parseDate(dateStr)
+    if (!d) return -1
+    if (scale === 'year') {
+      // find closest week column
+      for (let i = columns.length - 1; i >= 0; i--) {
+        if (columns[i].date <= d) return i
+      }
+      return 0
+    }
+    return columns.findIndex(c => isSameDay(c.date, d))
+  }, [columns, scale])
+
+  /* ─── Today column index ─── */
+  const todayCol = useMemo(() => {
+    if (scale === 'year') {
+      for (let i = columns.length - 1; i >= 0; i--) {
+        if (columns[i].date <= today) return i
+      }
+      return -1
+    }
+    return columns.findIndex(c => isSameDay(c.date, today))
+  }, [columns, today, scale])
+
+  /* ─── Period label ─── */
+  const periodLabel = useMemo(() => {
+    if (scale === 'month') return `${baseDate.getFullYear()}년 ${baseDate.getMonth() + 1}월`
+    if (scale === 'quarter') {
+      const m1 = baseDate.getMonth() + 1, m3 = m1 + 2
+      return `${baseDate.getFullYear()}년 ${m1}~${m3}월`
+    }
+    return `${baseDate.getFullYear()}년`
+  }, [baseDate, scale])
+
+  const prevLabel = scale === 'month' ? `${addMonths(baseDate, -1).getMonth() + 1}월` : scale === 'quarter' ? '이전' : `${baseDate.getFullYear() - 1}`
+  const nextLabel = scale === 'month' ? `${addMonths(baseDate, 1).getMonth() + 1}월` : scale === 'quarter' ? '다음' : `${baseDate.getFullYear() + 1}`
+
+  const ROW_H = 30
 
   return (
-    <div style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>타임라인 뷰</h1>
-          <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{year}년 {month + 1}월</p>
+    <div style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+        {/* ── Header ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: isMobile ? '0 16px' : 0, flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate(-1)} style={navBtnStyle}>◀ {prevLabel}</button>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#37352f', margin: 0, minWidth: 160, textAlign: 'center' }}>{periodLabel}</h1>
+            <button onClick={() => navigate(1)} style={navBtnStyle}>{nextLabel} ▶</button>
+            <button onClick={goToday} style={{ ...navBtnStyle, background: '#ef4444', color: 'white', border: 'none', fontWeight: 600 }}>오늘</button>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {SCALES.map(s => (
+              <button key={s.key} onClick={() => setScale(s.key)}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                  fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.1s',
+                  background: scale === s.key ? '#37352f' : 'white',
+                  color: scale === s.key ? 'white' : '#666',
+                  border: scale === s.key ? 'none' : '1px solid #e0e0e0',
+                }}
+              >{s.label}</button>
+            ))}
+          </div>
         </div>
 
-        {/* Day header */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', marginBottom: 16, paddingLeft: 140, overflow: 'auto' }}>
-          {days.map(d => (
-            <div key={d} style={{ minWidth: 40, textAlign: 'center', fontSize: 11, color: d === currentDay ? '#37352f' : '#bbb', paddingBottom: 8, fontWeight: d === currentDay ? 600 : 400, borderBottom: d === currentDay ? '2px solid #37352f' : 'none' }}>{d}</div>
-          ))}
-        </div>
-
-        {/* Project rows */}
-        {projects.map(p => {
-          const c = getColor(p.color)
-          const activeTasks = tasks.filter(t => t.projectId === p.id && t.category !== 'done')
-          if (!activeTasks.length) return null
-
-          return (
-            <div key={p.id} style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: c.dot }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{p.name}</span>
-              </div>
-              {activeTasks.map(task => {
-                // Parse dates to get day positions
-                let barLeft = 0, barWidth = 80
-                if (task.startDate || task.dueDate) {
-                  const start = task.startDate ? new Date(task.startDate).getDate() : task.dueDate ? new Date(task.dueDate).getDate() : currentDay
-                  const end = task.dueDate ? new Date(task.dueDate).getDate() : start
-                  barLeft = (start - 1) * 40
-                  barWidth = Math.max((end - start + 1) * 40, 40)
-                }
-
-                return (
-                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', height: 28 }}>
-                    <div style={{ width: 140, fontSize: 12, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 12 }}>{task.text}</div>
-                    <div style={{ flex: 1, position: 'relative', height: 20 }}>
-                      <div style={{ position: 'absolute', left: barLeft, width: barWidth, height: 20, background: c.header, borderRadius: 4, border: `1px solid ${c.dot}30`, display: 'flex', alignItems: 'center', paddingLeft: 8, fontSize: 11, color: c.text, fontWeight: 500 }}>
-                        {task.dueDate && <span>{task.dueDate.slice(5)}</span>}
-                      </div>
+        {/* ── Timeline grid ── */}
+        <div style={{ display: 'flex', overflow: 'hidden', background: 'white' }}>
+          {/* Left panel */}
+          <div style={{ width: panelW, flexShrink: 0, borderRight: '1px solid #f0f0f0', background: 'white', zIndex: 5 }}>
+            {/* Month header spacer */}
+            {scale !== 'month' && <div style={{ height: 24 }} />}
+            {/* Date header spacer */}
+            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+              <span style={{ fontSize: 11, color: '#999', fontWeight: 500 }}>프로젝트 / 할일</span>
+            </div>
+            {/* Project rows */}
+            {projectRows.map(({ project, color, tasks: pts }) => {
+              const isCollapsed = collapsed[project.id]
+              return (
+                <div key={project.id}>
+                  {/* Project header */}
+                  <div
+                    onClick={() => setCollapsed(p => ({ ...p, [project.id]: !isCollapsed }))}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', cursor: 'pointer', height: ROW_H, boxSizing: 'border-box' }}
+                  >
+                    <span style={{ fontSize: 10, color: '#bbb', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>▾</span>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: color.dot, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: color.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
+                  </div>
+                  {/* Tasks */}
+                  {!isCollapsed && pts.map(task => (
+                    <div
+                      key={task.id}
+                      onClick={() => openDetail(task)}
+                      style={{ padding: '0 10px 0 26px', height: ROW_H, display: 'flex', alignItems: 'center', cursor: 'pointer', boxSizing: 'border-box' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</span>
                     </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Right grid (scrollable) */}
+          <div ref={gridRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
+            <div style={{ width: gridW, minHeight: 200 }}>
+              {/* Month header row (quarter/year) */}
+              {scale !== 'month' && (
+                <div style={{ display: 'flex', height: 24 }}>
+                  {monthHeaders.map((mh, i) => (
+                    <div key={i} style={{ width: mh.span * colW, fontSize: 11, fontWeight: 600, color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {mh.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Date header row */}
+              <div style={{ display: 'flex', height: 32, position: 'sticky', top: 0, background: 'white', zIndex: 3 }}>
+                {columns.map((col, i) => {
+                  const isToday = todayCol === i
+                  return (
+                    <div key={i} style={{
+                      width: colW, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: scale === 'month' ? 11 : 9, fontWeight: isToday ? 700 : 400,
+                      color: isToday ? '#ef4444' : col.isWeekend ? '#ccc' : '#999',
+                      background: col.isWeekend ? 'rgba(0,0,0,0.025)' : 'transparent',
+                      position: 'relative',
+                    }}>
+                      {col.label}
+                      {isToday && <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Project task rows with blocks */}
+              {projectRows.map(({ project, color, tasks: pts }) => {
+                const isCollapsed = collapsed[project.id]
+                return (
+                  <div key={project.id}>
+                    {/* Project header row — empty in grid */}
+                    <div style={{ height: ROW_H, position: 'relative' }}>
+                      <WeekendShading columns={columns} colW={colW} h={ROW_H} />
+                    </div>
+                    {/* Task rows with blocks */}
+                    {!isCollapsed && pts.map(task => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        color={color}
+                        columns={columns}
+                        colW={colW}
+                        scale={scale}
+                        todayCol={todayCol}
+                        dateToCol={dateToCol}
+                        rowH={ROW_H}
+                        openDetail={openDetail}
+                        updateTask={updateTask}
+                      />
+                    ))}
                   </div>
                 )
               })}
+
+              {/* Today red vertical line — above grid lines, below blocks */}
+              {todayCol >= 0 && (
+                <div style={{
+                  position: 'absolute', top: scale !== 'month' ? 24 : 0, bottom: 0,
+                  left: todayCol * colW + colW / 2 - 1,
+                  width: 2, background: '#ef4444', zIndex: 1, pointerEvents: 'none', opacity: 0.55,
+                }} />
+              )}
             </div>
-          )
-        })}
+          </div>
+        </div>
 
         {!projects.length && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>프로젝트를 추가하면 타임라인이 표시됩니다</div>
+          <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>프로젝트를 추가하면 타임라인이 표시됩니다</div>
         )}
       </div>
     </div>
   )
+}
+
+/* ─── Weekend shading columns ─── */
+function WeekendShading({ columns, colW, h }) {
+  return (
+    <>
+      {columns.map((col, i) => col.isWeekend ? (
+        <div key={i} style={{ position: 'absolute', left: i * colW, width: colW, height: h, background: 'rgba(0,0,0,0.025)', top: 0 }} />
+      ) : null)}
+    </>
+  )
+}
+
+/* ─── Task row: block rendering + drag/resize ─── */
+function TaskRow({ task, color, columns, colW, scale, todayCol, dateToCol, rowH, openDetail, updateTask }) {
+  const rowRef = useRef(null)
+  const [dragState, setDragState] = useState(null) // { type: 'move'|'resizeL'|'resizeR', startX, origStart, origEnd }
+
+  const startCol = dateToCol(task.startDate)
+  const endCol = dateToCol(task.dueDate)
+  const hasStart = startCol >= 0
+  const hasEnd = endCol >= 0
+  const noDates = !hasStart && !hasEnd
+
+  // Compute block position — no-date tasks get a 1-day block at today
+  let blockLeft, blockWidth
+  if (hasStart && hasEnd) {
+    blockLeft = startCol * colW
+    blockWidth = (endCol - startCol + 1) * colW
+  } else if (hasStart) {
+    blockLeft = startCol * colW
+    blockWidth = colW
+  } else if (hasEnd) {
+    blockLeft = endCol * colW
+    blockWidth = colW
+  } else {
+    // No dates — place at today
+    blockLeft = todayCol >= 0 ? todayCol * colW : 0
+    blockWidth = colW
+  }
+
+  // Apply drag offset
+  if (dragState) {
+    const dx = dragState.currentX - dragState.startX
+    const colDelta = Math.round(dx / colW)
+
+    if (dragState.type === 'move') {
+      const baseCol = hasStart ? startCol : hasEnd ? endCol : (todayCol >= 0 ? todayCol : 0)
+      blockLeft = baseCol * colW + colDelta * colW
+      // blockWidth stays same
+    } else if (dragState.type === 'resizeL') {
+      const baseStart = hasStart ? startCol : (todayCol >= 0 ? todayCol : 0)
+      const baseEnd = hasEnd ? endCol : baseStart
+      const newStartCol = baseStart + colDelta
+      const clampedStart = Math.min(newStartCol, baseEnd)
+      blockLeft = clampedStart * colW
+      blockWidth = (baseEnd - clampedStart + 1) * colW
+    } else if (dragState.type === 'resizeR') {
+      const baseStart = hasStart ? startCol : (todayCol >= 0 ? todayCol : 0)
+      const baseEnd = hasEnd ? endCol : baseStart
+      const newEndCol = baseEnd + colDelta
+      const clampedEnd = Math.max(newEndCol, baseStart)
+      blockWidth = (clampedEnd - baseStart + 1) * colW
+    }
+  }
+
+  const handleMouseDown = useCallback((e, type) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    setDragState({ type, startX, currentX: startX })
+
+    const handleMouseMove = (ev) => {
+      setDragState(prev => prev ? { ...prev, currentX: ev.clientX } : null)
+    }
+    const handleMouseUp = (ev) => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+
+      const dx = ev.clientX - startX
+      const colDelta = Math.round(dx / colW)
+      setDragState(null)
+
+      if (Math.abs(dx) < 5) {
+        // It's a click, not drag
+        openDetail(task)
+        return
+      }
+
+      if (colDelta === 0) return
+
+      const patch = {}
+      if (type === 'move') {
+        if (task.startDate) {
+          patch.startDate = fmtDate(addDays(parseDate(task.startDate), colDelta))
+        }
+        if (task.dueDate) {
+          patch.dueDate = fmtDate(addDays(parseDate(task.dueDate), colDelta))
+        }
+        // No dates → assign today + offset as both start and due
+        if (!task.startDate && !task.dueDate && todayCol >= 0) {
+          const targetDate = fmtDate(columns[Math.max(0, Math.min(todayCol + colDelta, columns.length - 1))].date)
+          patch.startDate = targetDate
+          patch.dueDate = targetDate
+        }
+      } else if (type === 'resizeL') {
+        const baseDate = task.startDate ? parseDate(task.startDate) : (todayCol >= 0 ? columns[todayCol].date : null)
+        const endDate = task.dueDate ? parseDate(task.dueDate) : baseDate
+        if (!baseDate) return
+        const newDate = addDays(baseDate, colDelta)
+        if (endDate && newDate > endDate) return
+        patch.startDate = fmtDate(newDate)
+        if (!task.dueDate) patch.dueDate = fmtDate(endDate)
+      } else if (type === 'resizeR') {
+        const endDate = task.dueDate ? parseDate(task.dueDate) : (todayCol >= 0 ? columns[todayCol].date : null)
+        const startDate = task.startDate ? parseDate(task.startDate) : endDate
+        if (!endDate) return
+        const newDate = addDays(endDate, colDelta)
+        if (startDate && newDate < startDate) return
+        patch.dueDate = fmtDate(newDate)
+        if (!task.startDate) patch.startDate = fmtDate(startDate)
+      }
+
+      if (Object.keys(patch).length) updateTask(task.id, patch)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }, [task, colW, columns, todayCol, updateTask, openDetail])
+
+  return (
+    <div ref={rowRef} style={{ height: rowH, position: 'relative' }}>
+      <WeekendShading columns={columns} colW={colW} h={rowH} />
+
+      {/* Always render a block — no-date tasks get a 1-day block at today */}
+      <div
+        style={{
+          position: 'absolute', top: 3, left: Math.max(blockLeft, 0),
+          width: Math.max(blockWidth, colW), height: 24,
+          background: `${color.dot}18`, borderRadius: 4,
+          border: `1px solid ${color.dot}25`,
+          cursor: dragState ? 'grabbing' : 'grab',
+          display: 'flex', alignItems: 'center', overflow: 'hidden',
+          boxShadow: dragState ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+          opacity: dragState ? 0.85 : noDates ? 0.6 : 1,
+          transition: dragState ? 'none' : 'box-shadow 0.15s, opacity 0.15s',
+          zIndex: dragState ? 10 : 2,
+          userSelect: 'none',
+        }}
+        onMouseDown={e => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const relX = e.clientX - rect.left
+          if (relX <= 5) {
+            handleMouseDown(e, 'resizeL')
+          } else if (relX >= rect.width - 5) {
+            handleMouseDown(e, 'resizeR')
+          } else {
+            handleMouseDown(e, 'move')
+          }
+        }}
+        onMouseMove={e => {
+          if (dragState) return
+          const rect = e.currentTarget.getBoundingClientRect()
+          const relX = e.clientX - rect.left
+          if (relX <= 5 || relX >= rect.width - 5) {
+            e.currentTarget.style.cursor = 'col-resize'
+          } else {
+            e.currentTarget.style.cursor = 'grab'
+          }
+        }}
+        title={task.text}
+      >
+        <div style={{ width: 4, height: '100%', cursor: 'col-resize', flexShrink: 0 }} />
+        <span style={{
+          fontSize: 11, fontWeight: 500, color: color.text,
+          padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap', flex: 1, pointerEvents: 'none',
+        }}>
+          {scale === 'month' ? task.text : ''}
+        </span>
+        <div style={{ width: 4, height: '100%', cursor: 'col-resize', flexShrink: 0 }} />
+      </div>
+    </div>
+  )
+}
+
+const navBtnStyle = {
+  padding: '5px 12px', borderRadius: 6, border: '1px solid #e0e0e0',
+  background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 500,
+  fontFamily: 'inherit', color: '#666', transition: 'all 0.1s',
 }
