@@ -125,6 +125,21 @@ const useStore = create((set, get) => ({
     get().updateTask(id, { category: newCategory })
   },
 
+  // ─── Move task to different project/category (DnD) ───
+  moveTaskTo: async (id, projectId, category) => {
+    const t = get().tasks.find(x => x.id === id)
+    if (!t) return
+    const patch = { projectId, category }
+    if (category === 'done' && !t.done) {
+      patch.done = true
+      patch.prevCategory = t.category !== 'done' ? t.category : t.prevCategory
+    } else if (category !== 'done' && t.done) {
+      patch.done = false
+      patch.prevCategory = ''
+    }
+    get().updateTask(id, patch)
+  },
+
   // ─── Project CRUD ───
   addProject: async (name, color) => {
     const p = { id: uid(), name, color, sortOrder: Date.now() }
