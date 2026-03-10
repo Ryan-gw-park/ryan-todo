@@ -1,12 +1,12 @@
 export const COLOR_OPTIONS = [
-  { id: 'yellow', label: '노랑', card: '#fef9ec', header: '#fef3c7', text: '#92400e', dot: '#d97706' },
-  { id: 'pink',   label: '핑크', card: '#fdf2f0', header: '#fce7e4', text: '#9b2c2c', dot: '#e05252' },
-  { id: 'green',  label: '초록', card: '#f0faf5', header: '#d1fae5', text: '#166534', dot: '#22c55e' },
-  { id: 'blue',   label: '파랑', card: '#eff6ff', header: '#dbeafe', text: '#1e40af', dot: '#3b82f6' },
-  { id: 'purple', label: '보라', card: '#f5f3ff', header: '#ede9fe', text: '#5b21b6', dot: '#8b5cf6' },
-  { id: 'orange', label: '주황', card: '#fff7ed', header: '#fed7aa', text: '#9a3412', dot: '#f97316' },
-  { id: 'teal',   label: '청록', card: '#f0fdfa', header: '#ccfbf1', text: '#134e4a', dot: '#14b8a6' },
-  { id: 'red',    label: '빨강', card: '#fff5f5', header: '#fee2e2', text: '#991b1b', dot: '#ef4444' },
+  { id: 'yellow', label: '노랑', card: '#faf8f3', header: '#f7e8c5', text: '#9a6c2a', dot: '#d4a039' },
+  { id: 'pink',   label: '핑크', card: '#faf5f4', header: '#f5ddd8', text: '#944a3b', dot: '#cb7161' },
+  { id: 'green',  label: '초록', card: '#f3f8f4', header: '#d6ecda', text: '#3a7248', dot: '#5b9a6a' },
+  { id: 'blue',   label: '파랑', card: '#f4f7fa', header: '#d5e3f5', text: '#3868a1', dot: '#5b8fd4' },
+  { id: 'purple', label: '보라', card: '#f6f4fa', header: '#e0d5f0', text: '#6a4b9a', dot: '#8e6ebf' },
+  { id: 'orange', label: '주황', card: '#faf6f1', header: '#f5dcc5', text: '#9a5e2a', dot: '#d48a3f' },
+  { id: 'teal',   label: '청록', card: '#f1f8f7', header: '#cce8e3', text: '#2e6b5e', dot: '#4a9e8e' },
+  { id: 'red',    label: '빨강', card: '#faf4f4', header: '#f0d0d0', text: '#8b3a3a', dot: '#c46060' },
 ]
 
 export function getColor(id) {

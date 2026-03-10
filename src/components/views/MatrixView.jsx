@@ -8,8 +8,8 @@ import InlineAdd from '../shared/InlineAdd'
 export default function MatrixView() {
   const { projects, tasks, setShowProjectMgr, moveTaskTo } = useStore()
   const isMobile = window.innerWidth < 768
-  const LW = isMobile ? 80 : 108
-  const COL_GAP = isMobile ? 8 : 10
+  const LW = isMobile ? 80 : 110
+  const COL_GAP = 10
   const COL_MIN = isMobile ? 200 : 0
 
   const [doneCollapsed, setDoneCollapsed] = useState({})
@@ -23,13 +23,14 @@ export default function MatrixView() {
     setActiveId(null)
     const { active, over } = e
     if (!over) return
-    // over.id format: "projectId:category"
     const [targetProjectId, targetCategory] = over.id.split(':')
     const task = tasks.find(t => t.id === active.id)
     if (!task) return
     if (task.projectId === targetProjectId && task.category === targetCategory) return
     moveTaskTo(active.id, targetProjectId, targetCategory)
   }
+
+  const N = projects.length
 
   return (
     <div style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
@@ -49,52 +50,77 @@ export default function MatrixView() {
 
         <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
-            <div style={{ display: 'flex', gap: COL_GAP, minWidth: isMobile ? LW + projects.length * (COL_MIN + COL_GAP) : 'auto' }}>
+            <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
 
-              {/* Category label column */}
-              <div style={{ width: LW, flexShrink: 0, ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}) }}>
-                <div style={{ height: 52 }} />
-                {CATEGORIES.map(cat => {
-                  const isDone = cat.key === 'done'
+              {/* ── Header row ── */}
+              <div style={{ display: 'flex', gap: COL_GAP, marginBottom: 0 }}>
+                <div style={{ width: LW, flexShrink: 0, ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}) }} />
+                {projects.map(p => {
+                  const c = getColor(p.color)
+                  const pt = tasks.filter(t => t.projectId === p.id)
                   return (
-                    <div key={cat.key} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 14, paddingRight: 8, minHeight: isDone ? 50 : 90, alignSelf: 'flex-start' }}>
-                      <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{cat.emoji}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? '#999' : '#555', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{cat.label}</span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Project columns */}
-              {projects.map(p => {
-                const c = getColor(p.color)
-                const pt = tasks.filter(t => t.projectId === p.id)
-
-                return (
-                  <div key={p.id} style={{ flex: 1, minWidth: COL_MIN, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 3px rgba(0,0,0,0.03)', background: 'white' }}>
-                    {/* Project header */}
-                    <div style={{ background: c.header, borderBottom: `2.5px solid ${c.dot}`, padding: isMobile ? '10px 10px' : '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52, boxSizing: 'border-box' }}>
+                    <div key={p.id} style={{ flex: 1, minWidth: COL_MIN, background: c.header, borderRadius: '10px 10px 0 0', padding: isMobile ? '10px 10px' : '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 48, boxSizing: 'border-box', borderBottom: `2.5px solid ${c.dot}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                         <div style={{ width: 10, height: 10, borderRadius: 3, background: c.dot, flexShrink: 0 }} />
                         <span style={{ fontSize: 13, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{p.name}</span>
                       </div>
                       <span style={{ fontSize: 11, color: c.text, background: 'rgba(255,255,255,0.55)', borderRadius: 10, padding: '1px 8px', fontWeight: 600, flexShrink: 0 }}>{pt.length}</span>
                     </div>
+                  )
+                })}
+              </div>
 
-                    {/* Category sections inside column */}
-                    {CATEGORIES.map((cat, ri) => {
-                      const isDoneRow = cat.key === 'done'
+              {/* ── Category rows ── */}
+              {CATEGORIES.map((cat, ri) => {
+                const isDone = cat.key === 'done'
+                const isLast = ri === CATEGORIES.length - 1
+                const isFirst = ri === 0
+
+                return (
+                  <div key={cat.key} style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
+                    {/* Left label */}
+                    <div style={{
+                      width: LW, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6,
+                      alignSelf: 'flex-start', paddingTop: 14, paddingRight: 8,
+                      ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}),
+                    }}>
+                      <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{cat.emoji}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? '#999' : '#555', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{cat.label}</span>
+                    </div>
+
+                    {/* Project cells for this category */}
+                    {projects.map(p => {
+                      const c = getColor(p.color)
                       const catTasks = tasks.filter(t => t.projectId === p.id && t.category === cat.key)
-                      const isCollapsed = isDoneRow && doneCollapsed[p.id] !== false && catTasks.length > 0
+                      const isCollapsed = isDone && doneCollapsed[p.id] !== false && catTasks.length > 0
+
+                      const cellRadius = isLast ? '0 0 10px 10px' : '0'
 
                       return (
-                        <CategoryDropZone key={cat.key} id={`${p.id}:${cat.key}`} color={c} isDone={isDoneRow} isLast={ri === CATEGORIES.length - 1} activeId={activeId}>
+                        <CategoryDropZone
+                          key={p.id}
+                          id={`${p.id}:${cat.key}`}
+                          color={c}
+                          isDone={isDone}
+                          activeId={activeId}
+                          style={{
+                            flex: 1, minWidth: COL_MIN,
+                            background: isDone ? '#f7f7f5' : c.card,
+                            borderRadius: cellRadius,
+                            borderLeft: `1px solid rgba(0,0,0,0.04)`,
+                            borderRight: `1px solid rgba(0,0,0,0.04)`,
+                            borderBottom: isLast ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                            borderTop: isFirst ? 'none' : '1px solid rgba(0,0,0,0.06)',
+                            padding: isMobile ? '8px 8px' : '10px 14px',
+                            minHeight: isDone ? 50 : 80,
+                          }}
+                        >
                           {/* Category sub-label */}
                           <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: isDoneRow ? '#ccc' : c.dot, flexShrink: 0 }} />
-                            <span style={{ fontSize: 11, fontWeight: 600, color: isDoneRow ? '#aaa' : c.text }}>{cat.shortLabel || cat.label}</span>
-                            <span style={{ fontSize: 10, color: isDoneRow ? '#bbb' : c.dot, fontWeight: 600 }}>{catTasks.length}</span>
-                            {isDoneRow && catTasks.length > 0 && (
+                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: isDone ? '#ccc' : c.dot, flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: isDone ? '#aaa' : c.text, opacity: 0.7 }}>{cat.shortLabel}</span>
+                            <span style={{ fontSize: 10, color: isDone ? '#bbb' : c.dot, fontWeight: 600 }}>{catTasks.length}</span>
+                            {isDone && catTasks.length > 0 && (
                               <button onClick={() => setDoneCollapsed(prev => ({ ...prev, [p.id]: !isCollapsed }))}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 10, fontFamily: 'inherit', padding: '0 4px' }}>
                                 {isCollapsed ? '펼치기' : '접기'}
@@ -103,12 +129,12 @@ export default function MatrixView() {
                           </div>
 
                           <div style={{ minHeight: 20 }}>
-                            {isDoneRow && isCollapsed
+                            {isDone && isCollapsed
                               ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {catTasks.length}건</div>
-                              : catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDoneRow} />)
+                              : catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} />)
                             }
                           </div>
-                          {!isDoneRow && <InlineAdd projectId={p.id} category={cat.key} color={c} />}
+                          {!isDone && <InlineAdd projectId={p.id} category={cat.key} color={c} />}
                         </CategoryDropZone>
                       )
                     })}
@@ -124,7 +150,7 @@ export default function MatrixView() {
 }
 
 /* ─── Droppable category zone ─── */
-function CategoryDropZone({ id, color, isDone, isLast, activeId, children }) {
+function CategoryDropZone({ id, color, isDone, activeId, style: cellStyle, children }) {
   const { isOver, setNodeRef } = useDroppable({ id })
   const showHighlight = isOver && activeId
 
@@ -132,12 +158,15 @@ function CategoryDropZone({ id, color, isDone, isLast, activeId, children }) {
     <div
       ref={setNodeRef}
       style={{
-        padding: '10px 14px',
-        background: showHighlight ? `${color.header}` : isDone ? '#fcfcfc' : 'white',
-        borderBottom: isLast ? 'none' : '1px dashed rgba(0,0,0,0.06)',
-        minHeight: isDone ? 44 : 80,
+        ...cellStyle,
+        display: 'flex',
+        flexDirection: 'column',
         transition: 'background 0.15s',
-        ...(showHighlight ? { outline: `2px dashed ${color.dot}`, outlineOffset: -2, borderRadius: 4 } : {}),
+        ...(showHighlight ? {
+          background: color.header,
+          outline: `2px dashed ${color.dot}`,
+          outlineOffset: -2,
+        } : {}),
       }}
     >
       {children}
@@ -151,11 +180,11 @@ function MatrixCard({ task, color, isDone }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
 
   const style = {
-    background: 'white',
+    background: '#ffffff',
     borderRadius: 8,
     padding: '10px 12px',
-    border: '1px solid #e8e8e8',
-    boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.04)',
+    border: '1px solid rgba(0,0,0,0.06)',
+    boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
     marginBottom: 6,
     cursor: isDragging ? 'grabbing' : 'grab',
     transition: isDragging ? 'none' : 'box-shadow 0.15s',
@@ -171,7 +200,7 @@ function MatrixCard({ task, color, isDone }) {
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
-      onMouseLeave={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)' }}
+      onMouseLeave={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)' }}
     >
       <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0 }}>
         {isDone
