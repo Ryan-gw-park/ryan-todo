@@ -1,15 +1,15 @@
-import useStore from '../../store/useStore'
+import useStore from '../../hooks/useStore'
 
 export default function Toast() {
   const toastMsg = useStore(s => s.toastMsg)
+  if (!toastMsg) return null
 
   return (
-    <div
-      className={`fixed left-1/2 z-[999] bg-[rgb(36,35,30)] text-white/90 px-3.5 py-[7px] rounded-md text-xs font-medium whitespace-nowrap pointer-events-none shadow-[rgba(15,15,15,.25)_0_3px_12px] transition-transform duration-200 ${
-        toastMsg ? '-translate-x-1/2 translate-y-0' : '-translate-x-1/2 translate-y-[60px]'
-      }`}
-      style={{ bottom: '24px' }}
-    >
+    <div style={{
+      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+      background: '#37352f', color: 'white', padding: '8px 20px', borderRadius: 8,
+      fontSize: 13, fontWeight: 500, zIndex: 300, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+    }}>
       {toastMsg}
     </div>
   )

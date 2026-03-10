@@ -1,0 +1,179 @@
+import { create } from 'zustand'
+import { getDb } from '../utils/supabase'
+import { CATEGORIES } from '../utils/colors'
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
+
+function db() {
+  const d = getDb()
+  if (!d) { console.error('[Ryan Todo] Supabase not connected'); return null }
+  return d
+}
+
+function mapProject(r) {
+  return { id: r.id, name: r.name, color: r.color, sortOrder: r.sort_order || 0 }
+}
+function mapTask(r) {
+  return {
+    id: r.id, text: r.text, projectId: r.project_id, category: r.category || 'backlog',
+    done: r.done || false, dueDate: r.due_date || '', startDate: r.start_date || '',
+    notes: r.notes || '', prevCategory: r.prev_category || '',
+    sortOrder: r.sort_order || 0,
+  }
+}
+
+const useStore = create((set, get) => ({
+  projects: [],
+  tasks: [],
+  syncStatus: 'ok',
+  currentView: 'today',
+  detailTask: null,
+  showProjectMgr: false,
+  toastMsg: '',
+
+  setView: (v) => set({ currentView: v }),
+  openDetail: (task) => set({ detailTask: task }),
+  closeDetail: () => set({ detailTask: null }),
+  setShowProjectMgr: (v) => set({ showProjectMgr: v }),
+  showToast: (msg) => {
+    set({ toastMsg: msg })
+    setTimeout(() => set({ toastMsg: '' }), 2200)
+  },
+
+  // ─── Load All ───
+  loadAll: async () => {
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    try {
+      const [pr, tr] = await Promise.all([
+        d.from('projects').select('*').order('sort_order'),
+        d.from('tasks').select('*').order('sort_order'),
+      ])
+      if (pr.error) throw pr.error
+      if (tr.error) throw tr.error
+      set({
+        projects: pr.data.map(mapProject),
+        tasks: tr.data.map(mapTask),
+        syncStatus: 'ok',
+      })
+    } catch (e) {
+      console.error('[Ryan Todo] loadAll:', e)
+      set({ syncStatus: 'error' })
+    }
+  },
+
+  // ─── Task CRUD ───
+  addTask: async (task) => {
+    const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', ...task }
+    set(s => ({ tasks: [...s.tasks, t] }))
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    const { error } = await d.from('tasks').upsert({
+      id: t.id, text: t.text, project_id: t.projectId, category: t.category,
+      done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
+      notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
+    })
+    if (error) console.error('[Ryan Todo] addTask:', error)
+    set({ syncStatus: error ? 'error' : 'ok' })
+    if (!error) get().showToast('추가됐습니다 ✓')
+  },
+
+  updateTask: async (id, patch) => {
+    set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) }))
+    const t = get().tasks.find(x => x.id === id)
+    if (!t) return
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    const { error } = await d.from('tasks').upsert({
+      id: t.id, text: t.text, project_id: t.projectId, category: t.category,
+      done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
+      notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
+    })
+    if (error) console.error('[Ryan Todo] updateTask:', error)
+    set({ syncStatus: error ? 'error' : 'ok' })
+  },
+
+  deleteTask: async (id) => {
+    set(s => ({ tasks: s.tasks.filter(t => t.id !== id), detailTask: null }))
+    const d = db()
+    if (d) {
+      const { error } = await d.from('tasks').delete().eq('id', id)
+      if (error) console.error('[Ryan Todo] deleteTask:', error)
+    }
+    get().showToast('삭제됐습니다')
+  },
+
+  // ─── Toggle Done (auto-move category) ───
+  toggleDone: async (id) => {
+    const t = get().tasks.find(x => x.id === id)
+    if (!t) return
+    if (!t.done) {
+      // Mark done → move to "done" category
+      get().updateTask(id, { done: true, category: 'done', prevCategory: t.category })
+    } else {
+      // Undo → move back to prev category
+      const dest = t.prevCategory && t.prevCategory !== 'done' ? t.prevCategory : 'backlog'
+      get().updateTask(id, { done: false, category: dest, prevCategory: '' })
+    }
+  },
+
+  // ─── Move task to different category ───
+  moveTask: async (id, newCategory) => {
+    get().updateTask(id, { category: newCategory })
+  },
+
+  // ─── Project CRUD ───
+  addProject: async (name, color) => {
+    const p = { id: uid(), name, color, sortOrder: Date.now() }
+    set(s => ({ projects: [...s.projects, p] }))
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('projects').upsert({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder })
+    if (error) console.error('[Ryan Todo] addProject:', error)
+  },
+
+  updateProject: async (id, patch) => {
+    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) }))
+    const p = get().projects.find(x => x.id === id)
+    if (!p) return
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('projects').upsert({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder })
+    if (error) console.error('[Ryan Todo] updateProject:', error)
+  },
+
+  deleteProject: async (id) => {
+    const d = db()
+    const taskIds = get().tasks.filter(t => t.projectId === id).map(t => t.id)
+    if (d) {
+      for (const tid of taskIds) {
+        await d.from('tasks').delete().eq('id', tid)
+      }
+    }
+    set(s => ({
+      tasks: s.tasks.filter(t => t.projectId !== id),
+      projects: s.projects.filter(p => p.id !== id),
+    }))
+    if (d) {
+      const { error } = await d.from('projects').delete().eq('id', id)
+      if (error) console.error('[Ryan Todo] deleteProject:', error)
+    }
+    get().showToast('프로젝트가 삭제됐습니다')
+  },
+
+  reorderProjects: async (newList) => {
+    const reordered = newList.map((p, i) => ({ ...p, sortOrder: i }))
+    set({ projects: reordered, syncStatus: 'syncing' })
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    const rows = reordered.map(p => ({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder }))
+    const { error } = await d.from('projects').upsert(rows)
+    if (error) console.error('[Ryan Todo] reorderProjects:', error)
+    set({ syncStatus: error ? 'error' : 'ok' })
+  },
+}))
+
+export default useStore

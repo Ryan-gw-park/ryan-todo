@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #fff;
+  color: #37352f;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.outliner-row:hover .outliner-actions { opacity: 1 !important; }
+.bullet-row:hover .bullet-actions { opacity: 1 !important; }
+
+/* Responsive visibility */
+.desktop-nav { display: none !important; }
+.mobile-topbar { display: flex !important; }
+.mobile-bottomnav { display: flex !important; }
+.mobile-fab { display: flex !important; }
+
+@media (min-width: 768px) {
+  .desktop-nav { display: block !important; }
+  .mobile-topbar { display: none !important; }
+  .mobile-bottomnav { display: none !important; }
+  .mobile-fab { display: none !important; }
+}
+
+/* Prevent iOS zoom on inputs */
+@media (max-width: 767px) {
+  input, textarea, select { font-size: 16px !important; }
+}

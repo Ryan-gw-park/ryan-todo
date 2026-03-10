@@ -9,6 +9,8 @@ export function getDb() { return _db }
 
 export function initSupabase(u, k) {
   _db = createClient(u, k)
+  localStorage.setItem('sb_url', u)
+  localStorage.setItem('sb_key', k)
 }
 
 export function getCreds() {

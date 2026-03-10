@@ -1,42 +1,25 @@
-import useStore from '../../store/useStore'
+import useStore from '../../hooks/useStore'
+import { ViewIcons } from '../shared/Icons'
 
 const TABS = [
-  { id: 'today', icon: '☀️', label: '오늘할일' },
-  { id: 'matrix', icon: '⊞', label: '매트릭스' },
-  { id: 'all', icon: '📋', label: '전체할일' },
-  { id: 'board', icon: '▦', label: '보드' },
-  { id: 'table', icon: '▤', label: '테이블' },
-  { id: 'gantt', icon: '📅', label: '타임라인' },
+  { id: 'today', label: '오늘할일', icon: ViewIcons.today },
+  { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
+  { id: 'project', label: '프로젝트', icon: ViewIcons.project },
+  { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },
 ]
 
 export default function BottomNav() {
-  const { currentView, setView, openModal } = useStore()
+  const { currentView, setView } = useStore()
 
   return (
-    <>
-      <nav className="flex md:hidden flex-none items-center bg-white/95 backdrop-blur-xl border-t border-[rgba(55,53,47,.09)] z-50 overflow-x-auto"
-           style={{ height: 'calc(52px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex items-center justify-around w-full min-w-max px-1">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setView(t.id)}
-              className={`flex flex-col items-center gap-0.5 px-2.5 py-[5px] rounded border-none bg-transparent cursor-pointer text-[9px] font-medium min-w-[48px] transition-colors whitespace-nowrap
-                ${currentView === t.id ? 'text-[#2383e2]' : 'text-[rgba(55,53,47,.4)]'}`}
-            >
-              <span className="text-base leading-tight">{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </nav>
-      <button
-        onClick={() => openModal()}
-        className="flex md:hidden fixed right-4 z-[49] w-[50px] h-[50px] rounded-full bg-[#2383e2] text-white border-none text-[26px] cursor-pointer items-center justify-center shadow-[0_4px_18px_rgba(35,131,226,.45)] active:scale-[0.92] transition-transform leading-none"
-        style={{ bottom: 'calc(52px + env(safe-area-inset-bottom) + 10px)' }}
-      >
-        +
-      </button>
-    </>
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: '1px solid #f0f0f0', display: 'flex', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 8px)' }} className="mobile-bottomnav">
+      {TABS.map(v => (
+        <button key={v.id} onClick={() => setView(v.id)}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 4px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', color: currentView === v.id ? '#37352f' : '#c0c0c0', transition: 'color 0.15s' }}>
+          <div style={{ opacity: currentView === v.id ? 1 : 0.5 }}>{v.icon}</div>
+          <span style={{ fontSize: 10, fontWeight: currentView === v.id ? 600 : 400 }}>{v.label}</span>
+        </button>
+      ))}
+    </div>
   )
 }
