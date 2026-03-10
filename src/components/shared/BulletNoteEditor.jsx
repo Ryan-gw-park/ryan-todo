@@ -28,7 +28,15 @@ export default function BulletNoteEditor({ notes, onChange, accentColor }) {
   }
 
   const handleKeyDown = (e, i) => {
-    if (e.key === 'Tab') { e.preventDefault(); changeLevel(i, e.shiftKey ? -1 : 1) }
+    if (e.altKey && e.shiftKey && e.key === 'ArrowUp') {
+      e.preventDefault(); if (i === 0) return
+      const n = [...nodes]; [n[i - 1], n[i]] = [n[i], n[i - 1]]
+      onChange(serializeNotes(n)); setFocusIdx(i - 1)
+    } else if (e.altKey && e.shiftKey && e.key === 'ArrowDown') {
+      e.preventDefault(); if (i >= nodes.length - 1) return
+      const n = [...nodes]; [n[i], n[i + 1]] = [n[i + 1], n[i]]
+      onChange(serializeNotes(n)); setFocusIdx(i + 1)
+    } else if (e.key === 'Tab') { e.preventDefault(); changeLevel(i, e.shiftKey ? -1 : 1) }
     else if (e.key === 'Enter') { e.preventDefault(); const n = [...nodes]; n.splice(i+1, 0, { text: '', level: nodes[i].level }); onChange(serializeNotes(n)); setFocusIdx(i+1) }
     else if (e.key === 'Backspace' && nodes[i].text === '') { e.preventDefault(); if (nodes.length <= 1) return; onChange(serializeNotes(nodes.filter((_, j) => j !== i))); setFocusIdx(Math.max(0, i-1)) }
     else if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); focusRow(i-1) }
@@ -73,7 +81,7 @@ export default function BulletNoteEditor({ notes, onChange, accentColor }) {
       >
         <PlusIcon size={12} /> 추가
       </button>
-      <div style={{ fontSize: 10, color: '#c8c8c8', padding: '2px 20px 0' }}>Tab 들여쓰기 · Shift+Tab 내어쓰기 · Enter 새 줄</div>
+      <div style={{ fontSize: 10, color: '#c8c8c8', padding: '2px 20px 0' }}>Tab 들여쓰기 · Shift+Tab 내어쓰기 · Enter 새 줄 · Alt+Shift+↑↓ 이동</div>
     </div>
   )
 }

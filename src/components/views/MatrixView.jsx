@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DndContext, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core'
+import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import { SettingsIcon, CheckIcon, UndoIcon } from '../shared/Icons'
@@ -14,6 +14,10 @@ export default function MatrixView() {
 
   const [doneCollapsed, setDoneCollapsed] = useState({})
   const [activeId, setActiveId] = useState(null)
+
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 5 } })
+  const sensors = useSensors(pointerSensor, touchSensor)
 
   const dd = new Date()
   const dateStr = `${dd.getFullYear()}년 ${dd.getMonth()+1}월 ${dd.getDate()}일 ${['일','월','화','수','목','금','토'][dd.getDay()]}요일`
@@ -48,7 +52,7 @@ export default function MatrixView() {
           </button>
         </div>
 
-        <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
 
@@ -78,7 +82,6 @@ export default function MatrixView() {
 
                 return (
                   <div key={cat.key} style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
-                    {/* Left label */}
                     <div style={{
                       width: LW, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6,
                       alignSelf: 'flex-start', paddingTop: 14, paddingRight: 8,
@@ -88,12 +91,10 @@ export default function MatrixView() {
                       <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? '#999' : '#555', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{cat.label}</span>
                     </div>
 
-                    {/* Project cells for this category */}
                     {projects.map(p => {
                       const c = getColor(p.color)
                       const catTasks = tasks.filter(t => t.projectId === p.id && t.category === cat.key)
                       const isCollapsed = isDone && doneCollapsed[p.id] !== false && catTasks.length > 0
-
                       const cellRadius = isLast ? '0 0 10px 10px' : '0'
 
                       return (
@@ -101,21 +102,19 @@ export default function MatrixView() {
                           key={p.id}
                           id={`${p.id}:${cat.key}`}
                           color={c}
-                          isDone={isDone}
                           activeId={activeId}
                           style={{
                             flex: 1, minWidth: COL_MIN,
                             background: isDone ? '#f7f7f5' : c.card,
                             borderRadius: cellRadius,
-                            borderLeft: `1px solid rgba(0,0,0,0.04)`,
-                            borderRight: `1px solid rgba(0,0,0,0.04)`,
+                            borderLeft: '1px solid rgba(0,0,0,0.04)',
+                            borderRight: '1px solid rgba(0,0,0,0.04)',
                             borderBottom: isLast ? '1px solid rgba(0,0,0,0.04)' : 'none',
                             borderTop: isFirst ? 'none' : '1px solid rgba(0,0,0,0.06)',
                             padding: isMobile ? '8px 8px' : '10px 14px',
                             minHeight: isDone ? 50 : 80,
                           }}
                         >
-                          {/* Category sub-label */}
                           <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
                             <div style={{ width: 4, height: 4, borderRadius: '50%', background: isDone ? '#ccc' : c.dot, flexShrink: 0 }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: isDone ? '#aaa' : c.text, opacity: 0.7 }}>{cat.shortLabel}</span>
@@ -127,7 +126,6 @@ export default function MatrixView() {
                               </button>
                             )}
                           </div>
-
                           <div style={{ minHeight: 20 }}>
                             {isDone && isCollapsed
                               ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {catTasks.length}건</div>
@@ -149,32 +147,21 @@ export default function MatrixView() {
   )
 }
 
-/* ─── Droppable category zone ─── */
-function CategoryDropZone({ id, color, isDone, activeId, style: cellStyle, children }) {
+function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
   const { isOver, setNodeRef } = useDroppable({ id })
   const showHighlight = isOver && activeId
 
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        ...cellStyle,
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'background 0.15s',
-        ...(showHighlight ? {
-          background: color.header,
-          outline: `2px dashed ${color.dot}`,
-          outlineOffset: -2,
-        } : {}),
-      }}
-    >
+    <div ref={setNodeRef} style={{
+      ...cellStyle, display: 'flex', flexDirection: 'column', transition: 'background 0.15s',
+      ...(showHighlight ? { background: color.header, outline: `2px dashed ${color.dot}`, outlineOffset: -2 } : {}),
+    }}>
       {children}
     </div>
   )
 }
 
-/* ─── Draggable task card (board-view style) ─── */
+/* ─── Task card: 14px checkbox, click→detail, drag→DnD ─── */
 function MatrixCard({ task, color, isDone }) {
   const { openDetail, toggleDone } = useStore()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
@@ -186,7 +173,7 @@ function MatrixCard({ task, color, isDone }) {
     border: '1px solid rgba(0,0,0,0.06)',
     boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
     marginBottom: 6,
-    cursor: isDragging ? 'grabbing' : 'grab',
+    cursor: isDragging ? 'grabbing' : 'pointer',
     transition: isDragging ? 'none' : 'box-shadow 0.15s',
     opacity: isDone ? 0.5 : isDragging ? 0.9 : 1,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)${isDragging ? ' rotate(2deg)' : ''}` : undefined,
@@ -194,21 +181,24 @@ function MatrixCard({ task, color, isDone }) {
     position: isDragging ? 'relative' : undefined,
     display: 'flex',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 6,
   }
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
+      onClick={() => { if (!isDragging) openDetail(task) }}
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
       onMouseLeave={e => { if (!isDragging) e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)' }}
     >
       <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0 }}>
         {isDone
-          ? <div style={{ width: 18, height: 18, borderRadius: 4, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#66bb6a' }}><UndoIcon /></div>
-          : <CheckIcon checked={false} />
+          ? <div style={{ width: 14, height: 14, borderRadius: 3, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#66bb6a' }}>
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 5.5h5.5a3 3 0 010 6H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M5.5 3L3 5.5 5.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            </div>
+          : <CheckIcon checked={false} size={14} />
         }
       </div>
-      <div style={{ flex: 1, minWidth: 0 }} onClick={() => openDetail(task)}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none' }}>{task.text}</div>
         {task.dueDate && <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{task.dueDate}</div>}
       </div>

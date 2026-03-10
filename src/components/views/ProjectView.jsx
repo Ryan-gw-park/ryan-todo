@@ -48,7 +48,7 @@ export default function ProjectView() {
           <div style={{ width: 14, height: 14, borderRadius: 4, background: c.dot }} />
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#37352f', margin: 0 }}>{p.name}</h1>
         </div>
-        <p style={{ fontSize: 13, color: '#bbb', marginBottom: 28, paddingLeft: 26 }}>클릭하여 편집 · Tab 레벨 조절 · 체크 시 완료로 자동 이동</p>
+        <p style={{ fontSize: 13, color: '#bbb', marginBottom: 28, paddingLeft: 26 }}>클릭하여 편집 · Tab 레벨 조절 · Enter 연속 입력 · Alt+Shift+↑↓ 이동</p>
 
         {/* Category sections */}
         {CATEGORIES.map(cat => {
@@ -80,10 +80,10 @@ function OutlinerTaskNode({ task, color, expanded, toggleExpand }) {
   const { toggleDone, updateTask, deleteTask, openDetail } = useStore()
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(task.text)
-  const [addingChild, setAddingChild] = useState(false)
-  const [childText, setChildText] = useState('')
   const editRef = useRef(null)
-  const childRef = useRef(null)
+  const noteRefs = useRef([])
+  const [editingNoteIdx, setEditingNoteIdx] = useState(null)
+  const blurTimer = useRef(null)
 
   const noteNodes = parseNotes(task.notes)
   const isOpen = expanded[task.id] !== false
@@ -92,22 +92,134 @@ function OutlinerTaskNode({ task, color, expanded, toggleExpand }) {
 
   useEffect(() => { setEditText(task.text) }, [task.text])
   useEffect(() => { if (editing && editRef.current) { editRef.current.focus(); editRef.current.select() } }, [editing])
-  useEffect(() => { if (addingChild && childRef.current) childRef.current.focus() }, [addingChild])
 
-  const saveText = () => { if (editText.trim() && editText !== task.text) updateTask(task.id, { text: editText.trim() }); setEditing(false) }
+  useEffect(() => {
+    if (editingNoteIdx !== null && editingNoteIdx >= 0) {
+      setTimeout(() => {
+        const el = noteRefs.current[editingNoteIdx]
+        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) }
+      }, 30)
+    }
+  }, [editingNoteIdx])
 
-  const updateNoteNode = (i, t) => { const n = [...noteNodes]; n[i] = { ...n[i], text: t }; updateTask(task.id, { notes: serializeNotes(n) }) }
-  const deleteNoteNode = (i) => updateTask(task.id, { notes: serializeNotes(noteNodes.filter((_, j) => j !== i)) })
+  const editNote = (idx) => {
+    if (blurTimer.current) clearTimeout(blurTimer.current)
+    setEditingNoteIdx(idx >= 0 ? idx : null)
+  }
+  const stopEditNote = () => setEditingNoteIdx(null)
+
+  const saveText = () => {
+    if (editText.trim() && editText !== task.text) updateTask(task.id, { text: editText.trim() })
+    setEditing(false)
+  }
+
+  const handleTitleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const updates = {}
+      if (editText.trim() && editText !== task.text) updates.text = editText.trim()
+      const n = [...noteNodes, { text: '', level: 0 }]
+      updates.notes = serializeNotes(n)
+      updateTask(task.id, updates)
+      setEditing(false)
+      if (expanded[task.id] === false) toggleExpand(task.id)
+      editNote(n.length - 1)
+    } else if (e.key === 'Escape') {
+      setEditText(task.text); setEditing(false)
+    }
+  }
+
   const changeNoteLevel = (i, d) => {
     const n = [...noteNodes]; const nl = Math.max(0, Math.min(3, n[i].level + d))
-    if (d > 0 && i > 0 && nl > n[i-1].level + 1) return
+    if (d > 0 && i > 0 && nl > n[i - 1].level + 1) return
     n[i] = { ...n[i], level: nl }; updateTask(task.id, { notes: serializeNotes(n) })
   }
-  const addNoteAfter = (i, l) => { const n = [...noteNodes]; n.splice(i+1, 0, { text: '', level: l }); updateTask(task.id, { notes: serializeNotes(n) }) }
-  const addChild = () => {
-    if (!childText.trim()) { setAddingChild(false); return }
-    updateTask(task.id, { notes: serializeNotes([...noteNodes, { text: childText.trim(), level: 0 }]) })
-    setChildText('')
+
+  const handleNoteAction = (action, idx, text) => {
+    switch (action) {
+      case 'enter': {
+        if (text.trim() === '') {
+          const n = noteNodes.filter((_, j) => j !== idx)
+          updateTask(task.id, { notes: serializeNotes(n) })
+          stopEditNote()
+          return
+        }
+        const n = [...noteNodes]
+        n[idx] = { ...n[idx], text }
+        n.splice(idx + 1, 0, { text: '', level: n[idx].level })
+        updateTask(task.id, { notes: serializeNotes(n) })
+        editNote(idx + 1)
+        break
+      }
+      case 'moveUp': {
+        if (idx === 0) return
+        const n = [...noteNodes]
+        n[idx] = { ...n[idx], text }
+        ;[n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]
+        updateTask(task.id, { notes: serializeNotes(n) })
+        editNote(idx - 1)
+        break
+      }
+      case 'moveDown': {
+        if (idx >= noteNodes.length - 1) return
+        const n = [...noteNodes]
+        n[idx] = { ...n[idx], text }
+        ;[n[idx], n[idx + 1]] = [n[idx + 1], n[idx]]
+        updateTask(task.id, { notes: serializeNotes(n) })
+        editNote(idx + 1)
+        break
+      }
+      case 'backspace': {
+        const n = noteNodes.filter((_, j) => j !== idx)
+        updateTask(task.id, { notes: serializeNotes(n) })
+        if (idx > 0) editNote(idx - 1)
+        else stopEditNote()
+        break
+      }
+      case 'arrowUp': {
+        if (idx <= 0) return
+        if (text !== noteNodes[idx].text) {
+          const n = [...noteNodes]; n[idx] = { ...n[idx], text }
+          updateTask(task.id, { notes: serializeNotes(n) })
+        }
+        editNote(idx - 1)
+        break
+      }
+      case 'arrowDown': {
+        if (idx >= noteNodes.length - 1) return
+        if (text !== noteNodes[idx].text) {
+          const n = [...noteNodes]; n[idx] = { ...n[idx], text }
+          updateTask(task.id, { notes: serializeNotes(n) })
+        }
+        editNote(idx + 1)
+        break
+      }
+      case 'tab': { changeNoteLevel(idx, 1); break }
+      case 'shiftTab': { changeNoteLevel(idx, -1); break }
+      case 'escape': { stopEditNote(); break }
+      case 'blur': {
+        if (noteNodes[idx] && text !== noteNodes[idx].text) {
+          const n = [...noteNodes]; n[idx] = { ...n[idx], text }
+          updateTask(task.id, { notes: serializeNotes(n) })
+        }
+        blurTimer.current = setTimeout(() => stopEditNote(), 100)
+        break
+      }
+      case 'startEdit': { editNote(idx); break }
+      case 'delete': {
+        const n = noteNodes.filter((_, j) => j !== idx)
+        updateTask(task.id, { notes: serializeNotes(n) })
+        if (editingNoteIdx === idx) stopEditNote()
+        break
+      }
+    }
+  }
+
+  const addChildNote = () => {
+    const n = [...noteNodes, { text: '', level: 0 }]
+    updateTask(task.id, { notes: serializeNotes(n) })
+    if (expanded[task.id] === false) toggleExpand(task.id)
+    editNote(n.length - 1)
   }
 
   return (
@@ -121,7 +233,7 @@ function OutlinerTaskNode({ task, color, expanded, toggleExpand }) {
         </div>
         <div style={{ flex: 1, minWidth: 0, paddingLeft: 6 }}>
           {editing && !isDone
-            ? <input ref={editRef} value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveText(); if (e.key === 'Escape') { setEditText(task.text); setEditing(false) } }} onBlur={saveText}
+            ? <input ref={editRef} value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={handleTitleKeyDown} onBlur={saveText}
                 style={{ width: '100%', fontSize: 14, fontWeight: 500, border: 'none', borderBottom: `2px solid ${color.dot}`, outline: 'none', padding: '2px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box' }} />
             : <div onClick={() => !isDone ? setEditing(true) : openDetail(task)} style={{ fontSize: 14, fontWeight: 500, color: isDone ? '#bbb' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: isDone ? 'pointer' : 'text', padding: '2px 0', lineHeight: '22px' }}>
                 {task.text}{task.dueDate && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 8, fontWeight: 400 }}>{task.dueDate}</span>}
@@ -129,7 +241,7 @@ function OutlinerTaskNode({ task, color, expanded, toggleExpand }) {
           }
         </div>
         <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0, marginTop: 2 }} className="outliner-actions">
-          {!isDone && <button onClick={() => setAddingChild(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 3, display: 'flex' }}><PlusIcon size={13} /></button>}
+          {!isDone && <button onClick={addChildNote} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 3, display: 'flex' }}><PlusIcon size={13} /></button>}
           <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 3, display: 'flex' }}><TrashIcon /></button>
         </div>
       </div>
@@ -137,34 +249,34 @@ function OutlinerTaskNode({ task, color, expanded, toggleExpand }) {
       {isOpen && hasChildren && (
         <div style={{ marginLeft: 26, borderLeft: '1px solid #f0f0f0', paddingLeft: 10 }}>
           {noteNodes.map((node, i) => (
-            <OutlinerNoteNode key={i} node={node} idx={i} color={color} onUpdate={updateNoteNode} onDelete={deleteNoteNode} onChangeLevel={changeNoteLevel} onAddAfter={addNoteAfter} />
+            <OutlinerNoteNode key={i} node={node} idx={i} color={color}
+              isEditing={editingNoteIdx === i}
+              inputRef={el => noteRefs.current[i] = el}
+              onAction={handleNoteAction}
+              totalCount={noteNodes.length}
+            />
           ))}
-        </div>
-      )}
-
-      {isOpen && addingChild && (
-        <div style={{ marginLeft: 44, display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0' }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: color.dot }} />
-          <input ref={childRef} value={childText} onChange={e => setChildText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && childText.trim()) addChild(); else if (e.key === 'Enter' || e.key === 'Escape') { setAddingChild(false); setChildText('') } }}
-            onBlur={() => { if (childText.trim()) addChild(); setAddingChild(false) }}
-            placeholder="하위 노트 입력..."
-            style={{ flex: 1, fontSize: 13, border: 'none', borderBottom: `1.5px solid ${color.dot}40`, outline: 'none', padding: '2px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f' }} />
         </div>
       )}
     </div>
   )
 }
 
-function OutlinerNoteNode({ node, idx, color, onUpdate, onDelete, onChangeLevel, onAddAfter }) {
-  const [editing, setEditing] = useState(false)
+function OutlinerNoteNode({ node, idx, color, isEditing, inputRef, onAction, totalCount }) {
   const [text, setText] = useState(node.text)
-  const r = useRef(null)
 
   useEffect(() => { setText(node.text) }, [node.text])
-  useEffect(() => { if (editing && r.current) { r.current.focus(); r.current.select() } }, [editing])
 
-  const save = () => { if (text !== node.text) onUpdate(idx, text); setEditing(false) }
+  const handleKeyDown = (e) => {
+    if (e.altKey && e.shiftKey && e.key === 'ArrowUp') { e.preventDefault(); onAction('moveUp', idx, text) }
+    else if (e.altKey && e.shiftKey && e.key === 'ArrowDown') { e.preventDefault(); onAction('moveDown', idx, text) }
+    else if (e.key === 'Enter') { e.preventDefault(); onAction('enter', idx, text) }
+    else if (e.key === 'Escape') { setText(node.text); onAction('escape', idx, text) }
+    else if (e.key === 'Tab') { e.preventDefault(); onAction(e.shiftKey ? 'shiftTab' : 'tab', idx, text) }
+    else if (e.key === 'Backspace' && text === '') { e.preventDefault(); onAction('backspace', idx, text) }
+    else if (e.key === 'ArrowUp' && idx > 0) { e.preventDefault(); onAction('arrowUp', idx, text) }
+    else if (e.key === 'ArrowDown' && idx < totalCount - 1) { e.preventDefault(); onAction('arrowDown', idx, text) }
+  }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', minHeight: 26, marginLeft: node.level * 22 }} className="outliner-row">
@@ -172,20 +284,20 @@ function OutlinerNoteNode({ node, idx, color, onUpdate, onDelete, onChangeLevel,
         <div style={getBulletStyle(node.level, color.dot)} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {editing
-          ? <input ref={r} value={text} onChange={e => setText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { save(); onAddAfter(idx, node.level) } if (e.key === 'Escape') { setText(node.text); setEditing(false) } if (e.key === 'Tab') { e.preventDefault(); onChangeLevel(idx, e.shiftKey ? -1 : 1) } }}
-              onBlur={save}
+        {isEditing
+          ? <input ref={inputRef} value={text} onChange={e => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={() => onAction('blur', idx, text)}
               style={{ width: '100%', fontSize: 13, border: 'none', borderBottom: `1.5px solid ${color.dot}40`, outline: 'none', padding: '1px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box' }} />
-          : <div onClick={() => setEditing(true)} style={{ fontSize: 13, color: '#555', cursor: 'text', padding: '1px 0', lineHeight: '20px' }}>
+          : <div onMouseDown={() => onAction('startEdit', idx, text)} style={{ fontSize: 13, color: '#555', cursor: 'text', padding: '1px 0', lineHeight: '20px' }}>
               {node.text || <span style={{ color: '#ccc' }}>빈 노트</span>}
             </div>
         }
       </div>
       <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0 }} className="outliner-actions">
-        {node.level > 0 && <button onClick={() => onChangeLevel(idx, -1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}><OutdentIcon /></button>}
-        {node.level < 3 && idx > 0 && <button onClick={() => onChangeLevel(idx, 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}><IndentIcon /></button>}
-        <button onClick={() => onDelete(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 2, display: 'flex' }}><TrashIcon /></button>
+        {node.level > 0 && <button onClick={() => onAction('shiftTab', idx, text)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}><OutdentIcon /></button>}
+        {node.level < 3 && idx > 0 && <button onClick={() => onAction('tab', idx, text)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}><IndentIcon /></button>}
+        <button onClick={() => onAction('delete', idx, text)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 2, display: 'flex' }}><TrashIcon /></button>
       </div>
     </div>
   )
