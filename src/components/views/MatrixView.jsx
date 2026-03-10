@@ -17,8 +17,8 @@ export default function MatrixView() {
   const [doneCollapsed, setDoneCollapsed] = useState({})
   const [activeId, setActiveId] = useState(null)
 
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 5 } })
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
 
   const dd = new Date()
@@ -204,7 +204,7 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
 
 /* ─── Task card: whole card draggable, click text to edit inline ─── */
 function MatrixCard({ task, color, isDone }) {
-  const { toggleDone, updateTask } = useStore()
+  const { toggleDone, updateTask, openDetail } = useStore()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
   const [editing, setEditing] = useState(false)
@@ -274,13 +274,13 @@ function MatrixCard({ task, color, isDone }) {
           />
         ) : (
           <div
-            onClick={() => { if (!isDragging) setEditing(true) }}
-            style={{ fontSize: 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: 'text', minHeight: 19 }}
+            onClick={() => { if (!isDragging) openDetail(task) }}
+            onDoubleClick={(e) => { e.stopPropagation(); if (!isDragging) setEditing(true) }}
+            style={{ fontSize: 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: 'pointer', minHeight: 19 }}
           >
             {task.text}
           </div>
         )}
-        {task.dueDate && <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{task.dueDate}</div>}
       </div>
     </div>
   )

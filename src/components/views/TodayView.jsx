@@ -17,7 +17,7 @@ export default function TodayView() {
 
   const [activeId, setActiveId] = useState(null)
 
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
 
@@ -211,18 +211,21 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
   { task, color, onMoveUp, onMoveDown, onSwapUp, onSwapDown, onTitleEnter, onTitleBackspace },
   ref
 ) {
-  const { toggleDone, updateTask } = useStore()
+  const { toggleDone, updateTask, openDetail } = useStore()
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: task.id })
 
   const titleRef = useRef(null)
   const [titleText, setTitleText] = useState(task.text)
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => { setTitleText(task.text) }, [task.text])
+  useEffect(() => { if (editing && titleRef.current) titleRef.current.focus() }, [editing])
 
   useImperativeHandle(ref, () => ({
     focusTitle: (pos = 'end') => {
+      setEditing(true)
       setTimeout(() => {
         const el = titleRef.current
         if (!el) return
@@ -243,6 +246,7 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
       updateTask(task.id, patch)
     }
     if (!trimmed) setTitleText(task.text)
+    setEditing(false)
   }, [titleText, task.text, task.id, updateTask])
 
   const handleKeyDown = (e) => {
@@ -272,7 +276,7 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
     if (e.key === 'ArrowDown') { e.preventDefault(); saveTitle(); onMoveDown?.(); return }
 
     // Escape — revert and blur
-    if (e.key === 'Escape') { setTitleText(task.text); e.target.blur() }
+    if (e.key === 'Escape') { setTitleText(task.text); setEditing(false) }
   }
 
   const rowStyle = {
@@ -290,22 +294,35 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
       <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0, cursor: 'pointer' }}>
         <CheckIcon checked={false} />
       </div>
-      {/* Editable title */}
-      <input
-        ref={titleRef}
-        value={titleText}
-        onChange={e => setTitleText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={saveTitle}
-        placeholder="할일 입력..."
-        style={{
-          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
-          border: 'none', outline: 'none', padding: '2px 0',
-          fontFamily: 'inherit', background: 'transparent',
-          color: '#37352f', lineHeight: '19px', boxSizing: 'border-box',
-        }}
-      />
-      {task.dueDate && <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0, marginTop: 3 }}>{task.dueDate}</span>}
+      {/* Title: click=detail, double-click=edit */}
+      {editing ? (
+        <input
+          ref={titleRef}
+          value={titleText}
+          onChange={e => setTitleText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={saveTitle}
+          placeholder="할일 입력..."
+          style={{
+            flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
+            border: 'none', outline: 'none', padding: '2px 0',
+            fontFamily: 'inherit', background: 'transparent',
+            color: '#37352f', lineHeight: '19px', boxSizing: 'border-box',
+          }}
+        />
+      ) : (
+        <div
+          onClick={() => { if (!isDragging) openDetail(task) }}
+          onDoubleClick={(e) => { e.stopPropagation(); if (!isDragging) setEditing(true) }}
+          style={{
+            flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
+            padding: '2px 0', color: '#37352f', lineHeight: '19px',
+            cursor: 'pointer', minHeight: 19,
+          }}
+        >
+          {task.text}
+        </div>
+      )}
     </div>
   )
 })
