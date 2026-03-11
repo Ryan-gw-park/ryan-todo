@@ -1,12 +1,25 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import { parseDateFromText } from '../../utils/dateParser'
+import { subscribePush, unsubscribePush, isPushSubscribed } from '../../utils/webPush'
+import { getDb } from '../../utils/supabase'
 import OutlinerEditor from './OutlinerEditor'
+
+function getDefaultAlarmDatetime(dueDate) {
+  const d = dueDate ? new Date(dueDate + 'T09:00') : new Date()
+  if (!dueDate) {
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+  }
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export default function DetailPanel() {
   const { detailTask, closeDetail, tasks, projects, updateTask, deleteTask, toggleDone } = useStore()
   const isMobile = window.innerWidth < 768
+  const [allTopCollapsed, setAllTopCollapsed] = useState(undefined)
 
   const task = detailTask ? tasks.find(t => t.id === detailTask.id) : null
   if (!task) return null
@@ -101,6 +114,9 @@ export default function DetailPanel() {
             />
           </DetailRow>
 
+          {/* Alarm */}
+          <AlarmSection task={task} updateTask={updateTask} />
+
           {/* Status */}
           <DetailRow label="상태">
             {task.category === 'done'
@@ -111,14 +127,176 @@ export default function DetailPanel() {
 
           {/* Notes */}
           <div style={{ marginTop: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>📝 노트</span>
-              <span style={{ fontSize: 11, color: '#bbb' }}>프로젝트 뷰와 동기화</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+              <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>노트</span>
+              <button
+                onClick={() => setAllTopCollapsed(prev => prev === undefined ? true : !prev)}
+                title={allTopCollapsed ? '모든 항목 펼치기' : '모든 항목 접기'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 4, display: 'flex', flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = c.dot}
+                onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  {allTopCollapsed ? (
+                    <>
+                      <path d="M2 3h10M2 7h10M2 11h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                      <path d="M10 5l2-2-2-2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                    </>
+                  ) : (
+                    <>
+                      <path d="M2 3h10M2 7h6M2 11h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                      <path d="M12 7l-2 2-2-2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                    </>
+                  )}
+                </svg>
+              </button>
             </div>
-            <OutlinerEditor notes={task.notes} onChange={handleNotesChange} accentColor={c.dot} />
+            <OutlinerEditor notes={task.notes} onChange={handleNotesChange} accentColor={c.dot} allTopCollapsed={allTopCollapsed} />
           </div>
         </div>
       </div>
+    </>
+  )
+}
+
+function AlarmSection({ task, updateTask }) {
+  const alarm = task.alarm
+  const enabled = !!alarm?.enabled
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+
+  useEffect(() => {
+    isPushSubscribed().then(setPushSubscribed)
+  }, [])
+
+  const handlePushToggle = async () => {
+    const d = getDb()
+    if (!d) return
+    if (pushSubscribed) {
+      await unsubscribePush(d)
+      setPushSubscribed(false)
+    } else {
+      const sub = await subscribePush(d)
+      setPushSubscribed(!!sub)
+    }
+  }
+
+  const handleToggle = () => {
+    if (!enabled) {
+      // Turn ON
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        Notification.requestPermission()
+      }
+      const datetime = getDefaultAlarmDatetime(task.dueDate)
+      updateTask(task.id, {
+        alarm: { enabled: true, datetime, repeat: 'none', notified: false }
+      })
+    } else {
+      // Turn OFF
+      updateTask(task.id, {
+        alarm: { ...alarm, enabled: false }
+      })
+    }
+  }
+
+  const handleDatetimeChange = (e) => {
+    updateTask(task.id, {
+      alarm: { ...alarm, datetime: e.target.value, notified: false }
+    })
+  }
+
+  const handleRepeatChange = (repeat) => {
+    updateTask(task.id, {
+      alarm: { ...alarm, repeat, notified: false }
+    })
+  }
+
+  const handleDelete = () => {
+    updateTask(task.id, { alarm: null })
+  }
+
+  const permissionDenied = typeof Notification !== 'undefined' && Notification.permission === 'denied'
+
+  return (
+    <>
+      <DetailRow label="알람">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={handleToggle}
+            style={{
+              width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: enabled ? '#4CAF50' : '#ddd', position: 'relative', transition: 'background 0.2s',
+              padding: 0, flexShrink: 0,
+            }}
+          >
+            <div style={{
+              width: 16, height: 16, borderRadius: 8, background: 'white',
+              position: 'absolute', top: 2,
+              left: enabled ? 18 : 2, transition: 'left 0.2s',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            }} />
+          </button>
+          {enabled && (
+            <button
+              onClick={handleDelete}
+              style={{ fontSize: 11, color: '#e57373', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+            >
+              알람 삭제
+            </button>
+          )}
+        </div>
+      </DetailRow>
+      {permissionDenied && enabled && (
+        <div style={{ fontSize: 11, color: '#e57373', padding: '0 0 6px 80px' }}>
+          알림 권한이 차단되어 있습니다. 브라우저 설정에서 허용해 주세요.
+        </div>
+      )}
+      {enabled && (
+        <>
+          <DetailRow label="알람 시각">
+            <input
+              type="datetime-local"
+              value={alarm.datetime || ''}
+              onChange={handleDatetimeChange}
+              style={{ fontSize: 13, border: '1px solid #e0e0e0', borderRadius: 6, padding: '4px 10px', color: '#37352f', fontFamily: 'inherit' }}
+            />
+          </DetailRow>
+          <DetailRow label="반복">
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[
+                { key: 'none', label: '없음' },
+                { key: 'daily', label: '매일' },
+                { key: 'weekly', label: '매주' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => handleRepeatChange(opt.key)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    fontFamily: 'inherit', fontWeight: 500,
+                    border: alarm.repeat === opt.key ? '1.5px solid #37352f' : '1px solid #e0e0e0',
+                    background: alarm.repeat === opt.key ? '#f7f7f7' : 'white',
+                    color: '#37352f',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </DetailRow>
+          <div style={{ marginTop: 8, paddingLeft: 80 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', cursor: 'pointer' }}>
+              <input type="checkbox" checked={pushSubscribed} onChange={handlePushToggle} />
+              다른 기기에도 알림 받기
+              {pushSubscribed && (
+                <span style={{ opacity: 0.5 }}>✅ 이 기기 구독 중</span>
+              )}
+            </label>
+            <div style={{ marginTop: 4, opacity: 0.45, fontSize: 11 }}>
+              앱이 열려있는 기기에서 알람이 울리면 구독된 모든 기기에 알림이 전송됩니다.
+            </div>
+          </div>
+        </>
+      )}
     </>
   )
 }

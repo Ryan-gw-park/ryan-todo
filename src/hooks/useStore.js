@@ -2,12 +2,52 @@ import { create } from 'zustand'
 import { getDb } from '../utils/supabase'
 import { CATEGORIES } from '../utils/colors'
 
+/**
+ * @typedef {Object} TaskAlarm
+ * @property {boolean} enabled
+ * @property {string} datetime  - ISO 8601, e.g. "2025-03-15T09:00:00"
+ * @property {'none'|'daily'|'weekly'} repeat
+ * @property {boolean} notified - 이미 발송된 알람인지
+ */
+
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
 
 function db() {
   const d = getDb()
   if (!d) { console.error('[Ryan Todo] Supabase not connected'); return null }
   return d
+}
+
+// alarm 컬럼 존재 여부 캐시 (한 번 확인 후 재사용)
+let _alarmColChecked = false
+let _alarmColExists = true
+
+function taskToRow(t) {
+  const row = {
+    id: t.id, text: t.text, project_id: t.projectId, category: t.category,
+    done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
+    notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
+  }
+  if (_alarmColExists) row.alarm = t.alarm ?? null
+  return row
+}
+
+async function safeUpsertTask(d, t) {
+  const row = taskToRow(t)
+  const { error } = await d.from('tasks').upsert(row)
+  // alarm 컬럼이 없으면 alarm 필드를 빼고 재시도
+  if (error && !_alarmColChecked && row.alarm !== undefined) {
+    _alarmColChecked = true
+    _alarmColExists = false
+    const { alarm, ...rowWithout } = row
+    const retry = await d.from('tasks').upsert(rowWithout)
+    return retry
+  }
+  if (!error && !_alarmColChecked) {
+    _alarmColChecked = true
+    _alarmColExists = true
+  }
+  return { error }
 }
 
 function mapMemo(r) {
@@ -24,7 +64,7 @@ function mapTask(r) {
     id: r.id, text: r.text, projectId: r.project_id, category: r.category || 'backlog',
     done: r.done || false, dueDate: r.due_date || '', startDate: r.start_date || '',
     notes: r.notes || '', prevCategory: r.prev_category || '',
-    sortOrder: r.sort_order || 0,
+    sortOrder: r.sort_order || 0, alarm: r.alarm ?? null,
   }
 }
 
@@ -80,16 +120,12 @@ const useStore = create((set, get) => ({
 
   // ─── Task CRUD ───
   addTask: async (task) => {
-    const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', ...task }
+    const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', alarm: null, ...task }
     set(s => ({ tasks: [...s.tasks, t] }))
     const d = db()
     if (!d) { set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
-    const { error } = await d.from('tasks').upsert({
-      id: t.id, text: t.text, project_id: t.projectId, category: t.category,
-      done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
-      notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
-    })
+    const { error } = await safeUpsertTask(d, t)
     if (error) console.error('[Ryan Todo] addTask:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
     if (!error) get().showToast('추가됐습니다 ✓')
@@ -102,11 +138,7 @@ const useStore = create((set, get) => ({
     const d = db()
     if (!d) { set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
-    const { error } = await d.from('tasks').upsert({
-      id: t.id, text: t.text, project_id: t.projectId, category: t.category,
-      done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
-      notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
-    })
+    const { error } = await safeUpsertTask(d, t)
     if (error) console.error('[Ryan Todo] updateTask:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
   },
@@ -180,11 +212,7 @@ const useStore = create((set, get) => ({
     for (const u of updates) {
       const t = get().tasks.find(x => x.id === u.id)
       if (!t) continue
-      await d.from('tasks').upsert({
-        id: t.id, text: t.text, project_id: t.projectId, category: t.category,
-        done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
-        notes: t.notes, prev_category: t.prevCategory || null, sort_order: t.sortOrder,
-      })
+      await safeUpsertTask(d, t)
     }
     set({ syncStatus: 'ok' })
   },

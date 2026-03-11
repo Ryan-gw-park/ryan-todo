@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react'
 import {
   DndContext, DragOverlay, useDroppable,
   PointerSensor, TouchSensor, useSensors, useSensor, closestCenter,
@@ -10,20 +10,58 @@ import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
 import { CheckIcon } from '../shared/Icons'
 import { parseDateFromText } from '../../utils/dateParser'
+import { getNextAlarmTime } from '../../utils/alarm'
 
 export default function TodayView() {
   const { projects, tasks, moveTaskTo, reorderTasks } = useStore()
   const isMobile = window.innerWidth < 768
 
   const [activeId, setActiveId] = useState(null)
+  const [collapsed, setCollapsed] = useState({})
+  const allCollapsed = projects.every(p => collapsed[p.id])
+
+  const toggleAll = () => {
+    const newState = {}
+    projects.forEach(p => { newState[p.id] = !allCollapsed })
+    setCollapsed(newState)
+  }
+  const toggleProject = (pid) => setCollapsed(prev => ({ ...prev, [pid]: !prev[pid] }))
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
 
+  /* Auto-focus first input on keyboard tab switch */
+  useEffect(() => {
+    const handler = () => {
+      setTimeout(() => {
+        const el = document.querySelector('[data-view="today"] input[type="text"], [data-view="today"] input:not([type])')
+        el?.focus()
+      }, 50)
+    }
+    window.addEventListener('view-focus', handler)
+    return () => window.removeEventListener('view-focus', handler)
+  }, [])
+
   const greetingEmoji = () => { const h = new Date().getHours(); return h < 12 ? '☀️' : h < 18 ? '🌤' : '🌙' }
   const dd = new Date()
   const dateStr = `${dd.getFullYear()}년 ${dd.getMonth()+1}월 ${dd.getDate()}일 ${['일','월','화','수','목','금','토'][dd.getDay()]}요일`
+
+  const todayAlarms = useMemo(() => {
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+    return tasks
+      .filter((t) => {
+        if (!t.alarm?.enabled) return false
+        const next = getNextAlarmTime(t.alarm)
+        return next && next <= todayEnd
+      })
+      .sort((a, b) => {
+        const ta = getNextAlarmTime(a.alarm)
+        const tb = getNextAlarmTime(b.alarm)
+        return ta - tb
+      })
+  }, [tasks])
 
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
 
@@ -82,12 +120,41 @@ export default function TodayView() {
   }
 
   return (
-    <div style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
+    <div data-view="today" style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#37352f', margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
-          <p style={{ fontSize: 14, color: '#999', marginTop: 6 }}>{dateStr}</p>
+        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#37352f', margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
+            <p style={{ fontSize: 14, color: '#999', marginTop: 6 }}>{dateStr}</p>
+          </div>
+          <button
+            onClick={toggleAll}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#999', fontFamily: 'inherit', padding: '4px 0', whiteSpace: 'nowrap' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#37352f'}
+            onMouseLeave={e => e.currentTarget.style.color = '#999'}
+          >
+            {allCollapsed ? '전체 펼치기' : '전체 접기'}
+          </button>
         </div>
+        {todayAlarms.length > 0 && (
+          <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fffdf5', borderRadius: 10, border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#37352f', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>🔔</span> 오늘 예정된 알람
+            </div>
+            {todayAlarms.map((task) => {
+              const next = getNextAlarmTime(task.alarm)
+              return (
+                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', fontSize: 13 }}>
+                  <span style={{ color: '#e8a735', fontWeight: 600, fontSize: 12, minWidth: 52 }}>
+                    {next.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span style={{ color: '#37352f' }}>{task.text}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
             {projects.map(p => {
@@ -96,7 +163,7 @@ export default function TodayView() {
                 .filter(t => t.projectId === p.id && t.category === 'today')
                 .sort((a, b) => a.sortOrder - b.sortOrder)
               return (
-                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} />
+                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} />
               )
             })}
           </div>
@@ -111,7 +178,7 @@ export default function TodayView() {
 }
 
 /* ─── Project card with drop zone + keyboard navigation ─── */
-function ProjectCard({ project, color, todayTasks, activeId }) {
+function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse }) {
   const { addTask, updateTask, deleteTask, reorderTasks } = useStore()
   const { isOver, setNodeRef } = useDroppable({ id: `project:${project.id}` })
   const showHighlight = isOver && activeId
@@ -167,41 +234,44 @@ function ProjectCard({ project, color, todayTasks, activeId }) {
       transition: 'border 0.15s, background 0.15s',
       ...(showHighlight ? { background: color.header } : {}),
     }}>
-      <div style={{ background: color.header, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ background: color.header, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={onToggleCollapse}>
         <div style={{ width: 10, height: 10, borderRadius: 3, background: color.dot }} />
         <span style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{project.name}</span>
         <span style={{ fontSize: 11, color: color.text, background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '2px 8px', fontWeight: 600, marginLeft: 'auto' }}>{todayTasks.length}</span>
+        <span style={{ color: color.text, opacity: 0.5, fontSize: 12, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
       </div>
-      <div style={{ padding: '10px 16px' }}>
-        {todayTasks.length === 0 ? (
-          <div style={{ padding: '12px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#bbb', marginBottom: 8 }}>오늘 할 일이 없습니다</div>
-            <InlineAddSimple projectId={project.id} color={color} />
-          </div>
-        ) : (
-          <SortableContext items={todayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-            {todayTasks.map((tk, i) => (
-              <SortableTaskItem
-                key={tk.id}
-                ref={el => taskRefs.current[tk.id] = el}
-                task={tk}
-                color={color}
-                onMoveUp={() => {
-                  if (i > 0) taskRefs.current[todayTasks[i - 1].id]?.focusTitle('end')
-                }}
-                onMoveDown={() => {
-                  if (i < todayTasks.length - 1) taskRefs.current[todayTasks[i + 1].id]?.focusTitle('start')
-                }}
-                onSwapUp={() => handleSwap(i, -1)}
-                onSwapDown={() => handleSwap(i, 1)}
-                onTitleEnter={(afterText) => handleTitleEnter(i, afterText)}
-                onTitleBackspace={() => handleTitleBackspace(i)}
-              />
-            ))}
-            <InlineAddSimple projectId={project.id} color={color} />
-          </SortableContext>
-        )}
-      </div>
+      {!isCollapsed && (
+        <div style={{ padding: '10px 16px' }}>
+          {todayTasks.length === 0 ? (
+            <div style={{ padding: '12px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: '#bbb', marginBottom: 8 }}>오늘 할 일이 없습니다</div>
+              <InlineAddSimple projectId={project.id} color={color} />
+            </div>
+          ) : (
+            <SortableContext items={todayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+              {todayTasks.map((tk, i) => (
+                <SortableTaskItem
+                  key={tk.id}
+                  ref={el => taskRefs.current[tk.id] = el}
+                  task={tk}
+                  color={color}
+                  onMoveUp={() => {
+                    if (i > 0) taskRefs.current[todayTasks[i - 1].id]?.focusTitle('end')
+                  }}
+                  onMoveDown={() => {
+                    if (i < todayTasks.length - 1) taskRefs.current[todayTasks[i + 1].id]?.focusTitle('start')
+                  }}
+                  onSwapUp={() => handleSwap(i, -1)}
+                  onSwapDown={() => handleSwap(i, 1)}
+                  onTitleEnter={(afterText) => handleTitleEnter(i, afterText)}
+                  onTitleBackspace={() => handleTitleBackspace(i)}
+                />
+              ))}
+              <InlineAddSimple projectId={project.id} color={color} />
+            </SortableContext>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -211,21 +281,22 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
   { task, color, onMoveUp, onMoveDown, onSwapUp, onSwapDown, onTitleEnter, onTitleBackspace },
   ref
 ) {
-  const { toggleDone, updateTask, openDetail } = useStore()
+  const { toggleDone, updateTask, openDetail, deleteTask } = useStore()
+  const isMobile = window.innerWidth < 768
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: task.id })
 
   const titleRef = useRef(null)
   const [titleText, setTitleText] = useState(task.text)
-  const [editing, setEditing] = useState(false)
+  const [hovering, setHovering] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const longPressTimer = useRef(null)
 
   useEffect(() => { setTitleText(task.text) }, [task.text])
-  useEffect(() => { if (editing && titleRef.current) titleRef.current.focus() }, [editing])
 
   useImperativeHandle(ref, () => ({
     focusTitle: (pos = 'end') => {
-      setEditing(true)
       setTimeout(() => {
         const el = titleRef.current
         if (!el) return
@@ -246,7 +317,6 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
       updateTask(task.id, patch)
     }
     if (!trimmed) setTitleText(task.text)
-    setEditing(false)
   }, [titleText, task.text, task.id, updateTask])
 
   const handleKeyDown = (e) => {
@@ -276,12 +346,18 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
     if (e.key === 'ArrowDown') { e.preventDefault(); saveTitle(); onMoveDown?.(); return }
 
     // Escape — revert and blur
-    if (e.key === 'Escape') { setTitleText(task.text); setEditing(false) }
+    if (e.key === 'Escape') { setTitleText(task.text); e.target.blur() }
   }
+
+  const mobileHandlers = isMobile ? {
+    onTouchStart: () => { longPressTimer.current = setTimeout(() => setShowMenu(true), 500) },
+    onTouchEnd: () => clearTimeout(longPressTimer.current),
+    onTouchMove: () => clearTimeout(longPressTimer.current),
+  } : {}
 
   const rowStyle = {
     display: 'flex', alignItems: 'flex-start', gap: 8,
-    padding: '5px 4px', borderRadius: 6,
+    padding: '5px 4px', borderRadius: 6, position: 'relative',
     transition: transition || 'background 0.1s',
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.3 : 1,
@@ -289,40 +365,50 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
   }
 
   return (
-    <div ref={setNodeRef} style={rowStyle} {...listeners} {...attributes}>
+    <div
+      ref={setNodeRef} style={rowStyle}
+      {...(!isMobile ? listeners : {})} {...attributes}
+      onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}
+      {...mobileHandlers}
+    >
       {/* Checkbox */}
       <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0, cursor: 'pointer' }}>
         <CheckIcon checked={false} />
       </div>
-      {/* Title: click=detail, double-click=edit */}
-      {editing ? (
-        <input
-          ref={titleRef}
-          value={titleText}
-          onChange={e => setTitleText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={saveTitle}
-          placeholder="할일 입력..."
+      {/* Title: click=edit (always input for keyboard nav) */}
+      <input
+        ref={titleRef}
+        value={titleText}
+        onChange={e => setTitleText(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={saveTitle}
+        placeholder="할일 입력..."
+        style={{
+          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
+          border: 'none', outline: 'none', padding: '2px 0',
+          fontFamily: 'inherit', background: 'transparent',
+          color: '#37352f', lineHeight: '19px', boxSizing: 'border-box',
+        }}
+      />
+      {/* Detail open button — hover only (desktop) */}
+      {!isMobile && (
+        <button
+          onClick={e => { e.stopPropagation(); openDetail(task) }}
           style={{
-            flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
-            border: 'none', outline: 'none', padding: '2px 0',
-            fontFamily: 'inherit', background: 'transparent',
-            color: '#37352f', lineHeight: '19px', boxSizing: 'border-box',
+            position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)',
+            opacity: hovering ? 1 : 0, transition: 'opacity 0.15s',
+            width: 22, height: 22, borderRadius: 4, background: 'rgba(0,0,0,0.04)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#999', cursor: 'pointer', border: 'none', padding: 0, flexShrink: 0,
           }}
-        />
-      ) : (
-        <div
-          onClick={() => { if (!isDragging) openDetail(task) }}
-          onDoubleClick={(e) => { e.stopPropagation(); if (!isDragging) setEditing(true) }}
-          style={{
-            flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
-            padding: '2px 0', color: '#37352f', lineHeight: '19px',
-            cursor: 'pointer', minHeight: 19,
-          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; e.currentTarget.style.color = '#555' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; e.currentTarget.style.color = '#999' }}
         >
-          {task.text}
-        </div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
       )}
+      {/* Mobile context menu */}
+      {isMobile && showMenu && <MobileContextMenu task={task} onClose={() => setShowMenu(false)} openDetail={openDetail} deleteTask={deleteTask} />}
     </div>
   )
 })
@@ -366,6 +452,30 @@ function InlineAddSimple({ projectId, color }) {
         style={{ width: '100%', padding: '6px 8px', fontSize: 13, border: `1.5px solid ${color.dot}`, borderRadius: 6, outline: 'none', background: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
       />
     </div>
+  )
+}
+
+/* ─── Mobile context menu ─── */
+function MobileContextMenu({ task, onClose, openDetail, deleteTask }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} />
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
+        background: 'white', borderRadius: '16px 16px 0 0', padding: '8px 0 20px',
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.12)',
+      }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#ddd', margin: '0 auto 12px' }} />
+        <button onClick={() => { onClose(); openDetail(task) }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: 15, color: '#37352f', cursor: 'pointer', fontFamily: 'inherit' }}>
+          📄 상세 보기
+        </button>
+        <button onClick={() => { onClose(); if (confirm('삭제하시겠습니까?')) deleteTask(task.id) }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: 15, color: '#e53935', cursor: 'pointer', fontFamily: 'inherit' }}>
+          🗑 삭제
+        </button>
+      </div>
+    </>
   )
 }
 

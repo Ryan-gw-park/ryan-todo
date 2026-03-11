@@ -19,7 +19,12 @@ export default function TaskItem({ task, color, compact }) {
         }
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: compact ? 12 : 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none' }}>{task.text}</div>
+        <div style={{ fontSize: compact ? 12 : 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none' }}>
+          {task.text}
+          {task.alarm?.enabled && (
+            <span title={`알람: ${new Date(task.alarm.datetime).toLocaleString('ko-KR')}`} style={{ fontSize: 12, opacity: 0.6, marginLeft: 4 }} aria-label="알람 설정됨">🔔</span>
+          )}
+        </div>
         {!compact && task.dueDate && <div style={{ fontSize: 11, color: '#bbb', marginTop: 1 }}>{task.dueDate}</div>}
       </div>
     </div>

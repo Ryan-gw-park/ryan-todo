@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import useStore from './hooks/useStore'
+import { useAlarmEngine } from './hooks/useAlarmEngine'
 import { hasCreds, getDb } from './utils/supabase'
 import './styles/global.css'
 
@@ -21,6 +22,7 @@ import Toast from './components/shared/Toast'
 function isMobile() { return window.innerWidth < 768 }
 
 export default function App() {
+  useAlarmEngine()
   const [connected, setConnected] = useState(hasCreds())
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -33,6 +35,9 @@ export default function App() {
     return () => window.removeEventListener('resize', handler)
   }, [])
 
+  const ALLOWED_EMAIL = 'gunwoong.park@gmail.com'
+  const [authError, setAuthError] = useState('')
+
   // Auth state management
   useEffect(() => {
     if (!connected) { setAuthLoading(false); return }
@@ -41,13 +46,25 @@ export default function App() {
 
     // Check current session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s && s.user.email !== ALLOWED_EMAIL) {
+        supabase.auth.signOut()
+        setAuthError('접근 권한이 없습니다.')
+        setAuthLoading(false)
+        return
+      }
       setSession(s)
       setAuthLoading(false)
     })
 
-    // Subscribe to auth changes (magic link callback, logout, etc.)
+    // Subscribe to auth changes (Google OAuth callback, logout, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s) => {
+        if (s && s.user.email !== ALLOWED_EMAIL) {
+          supabase.auth.signOut()
+          setAuthError('접근 권한이 없습니다.')
+          return
+        }
+        setAuthError('')
         setSession(s)
       }
     )
@@ -66,13 +83,26 @@ export default function App() {
   }, [connected, session])
 
   // Keyboard shortcuts
+  const VIEW_ORDER = ['today', 'matrix', 'project', 'timeline', 'memory']
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') { closeDetail() }
+      // Ctrl+Shift+←/→ — switch tabs
+      if (e.ctrlKey && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault()
+        const idx = VIEW_ORDER.indexOf(currentView)
+        if (idx === -1) return
+        const next = e.key === 'ArrowLeft'
+          ? (idx - 1 + VIEW_ORDER.length) % VIEW_ORDER.length
+          : (idx + 1) % VIEW_ORDER.length
+        setView(VIEW_ORDER[next])
+        // Signal new view to auto-focus
+        setTimeout(() => window.dispatchEvent(new Event('view-focus')), 100)
+      }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [])
+  }, [currentView])
 
   // Step 1: Supabase connection setup
   if (!connected) {
@@ -93,7 +123,7 @@ export default function App() {
 
   // Step 3: Login required
   if (!session) {
-    return <LoginScreen />
+    return <LoginScreen authError={authError} />
   }
 
   // Step 4: Main app

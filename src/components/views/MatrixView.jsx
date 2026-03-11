@@ -16,6 +16,16 @@ export default function MatrixView() {
 
   const [doneCollapsed, setDoneCollapsed] = useState({})
   const [activeId, setActiveId] = useState(null)
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('matrix-collapsed') || '{}') } catch { return {} }
+  })
+  const toggleCollapse = (pid) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [pid]: !prev[pid] }
+      localStorage.setItem('matrix-collapsed', JSON.stringify(next))
+      return next
+    })
+  }
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
@@ -66,8 +76,19 @@ export default function MatrixView() {
 
   const N = projects.length
 
+  useEffect(() => {
+    const handler = () => {
+      setTimeout(() => {
+        const el = document.querySelector('[data-view="matrix"] input[type="text"], [data-view="matrix"] input:not([type])')
+        el?.focus()
+      }, 50)
+    }
+    window.addEventListener('view-focus', handler)
+    return () => window.removeEventListener('view-focus', handler)
+  }, [])
+
   return (
-    <div style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
+    <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -92,13 +113,31 @@ export default function MatrixView() {
                 {projects.map(p => {
                   const c = getColor(p.color)
                   const pt = tasks.filter(t => t.projectId === p.id)
+                  const isCol = collapsed[p.id]
                   return (
-                    <div key={p.id} style={{ flex: 1, minWidth: COL_MIN, background: c.header, borderRadius: '10px 10px 0 0', padding: isMobile ? '10px 10px' : '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 48, boxSizing: 'border-box', borderBottom: `2.5px solid ${c.dot}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: 3, background: c.dot, flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{p.name}</span>
-                      </div>
-                      <span style={{ fontSize: 11, color: c.text, background: 'rgba(255,255,255,0.55)', borderRadius: 10, padding: '1px 8px', fontWeight: 600, flexShrink: 0 }}>{pt.length}</span>
+                    <div key={p.id} onClick={() => toggleCollapse(p.id)} style={{
+                      flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
+                      background: c.header, borderRadius: '10px 10px 0 0',
+                      padding: isCol ? '12px 0' : (isMobile ? '10px 10px' : '12px 16px'),
+                      display: 'flex', alignItems: 'center', justifyContent: isCol ? 'center' : 'space-between',
+                      height: 48, boxSizing: 'border-box', borderBottom: `2.5px solid ${c.dot}`,
+                      cursor: 'pointer', transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
+                      overflow: 'hidden',
+                    }}>
+                      {isCol ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <div style={{ width: 10, height: 10, borderRadius: 3, background: c.dot }} />
+                          <span style={{ fontSize: 10, fontWeight: 600, color: c.text }}>{pt.length}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <div style={{ width: 10, height: 10, borderRadius: 3, background: c.dot, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{p.name}</span>
+                          </div>
+                          <span style={{ fontSize: 11, color: c.text, background: 'rgba(255,255,255,0.55)', borderRadius: 10, padding: '1px 8px', fontWeight: 600, flexShrink: 0 }}>{pt.length}</span>
+                        </>
+                      )}
                     </div>
                   )
                 })}
@@ -123,10 +162,11 @@ export default function MatrixView() {
 
                     {projects.map(p => {
                       const c = getColor(p.color)
+                      const isCol = collapsed[p.id]
                       const catTasks = tasks
                         .filter(t => t.projectId === p.id && t.category === cat.key)
                         .sort((a, b) => a.sortOrder - b.sortOrder)
-                      const isCollapsed = isDone && doneCollapsed[p.id] !== false && catTasks.length > 0
+                      const isDoneCollapsed = isDone && doneCollapsed[p.id] !== false && catTasks.length > 0
                       const cellRadius = isLast ? '0 0 10px 10px' : '0'
 
                       return (
@@ -136,39 +176,47 @@ export default function MatrixView() {
                           color={c}
                           activeId={activeId}
                           style={{
-                            flex: 1, minWidth: COL_MIN,
+                            flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
                             background: isDone ? '#f7f7f5' : c.card,
                             borderRadius: cellRadius,
                             borderLeft: '1px solid rgba(0,0,0,0.04)',
                             borderRight: '1px solid rgba(0,0,0,0.04)',
                             borderBottom: isLast ? '1px solid rgba(0,0,0,0.04)' : 'none',
                             borderTop: isFirst ? 'none' : '1px solid rgba(0,0,0,0.06)',
-                            padding: isMobile ? '8px 8px' : '10px 14px',
+                            padding: isCol ? '8px 4px' : (isMobile ? '8px 8px' : '10px 14px'),
                             minHeight: isDone ? 50 : 80,
+                            transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
+                            overflow: 'hidden',
                           }}
                         >
-                          <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: isDone ? '#ccc' : c.dot, flexShrink: 0 }} />
-                            <span style={{ fontSize: 11, fontWeight: 600, color: isDone ? '#aaa' : c.text, opacity: 0.7 }}>{cat.shortLabel}</span>
-                            <span style={{ fontSize: 10, color: isDone ? '#bbb' : c.dot, fontWeight: 600 }}>{catTasks.length}</span>
-                            {isDone && catTasks.length > 0 && (
-                              <button onClick={() => setDoneCollapsed(prev => ({ ...prev, [p.id]: !isCollapsed }))}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 10, fontFamily: 'inherit', padding: '0 4px' }}>
-                                {isCollapsed ? '펼치기' : '접기'}
-                              </button>
-                            )}
-                          </div>
-                          <div style={{ minHeight: 20 }}>
-                            {isDone && isCollapsed
-                              ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {catTasks.length}건</div>
-                              : (
-                                <SortableContext items={catTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                  {catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} />)}
-                                </SortableContext>
-                              )
-                            }
-                          </div>
-                          {!isDone && <InlineAdd projectId={p.id} category={cat.key} color={c} />}
+                          {isCol ? (
+                            <div style={{ fontSize: 10, color: isDone ? '#bbb' : c.dot, fontWeight: 600, textAlign: 'center' }}>{catTasks.length}</div>
+                          ) : (
+                            <>
+                              <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <div style={{ width: 4, height: 4, borderRadius: '50%', background: isDone ? '#ccc' : c.dot, flexShrink: 0 }} />
+                                <span style={{ fontSize: 11, fontWeight: 600, color: isDone ? '#aaa' : c.text, opacity: 0.7 }}>{cat.shortLabel}</span>
+                                <span style={{ fontSize: 10, color: isDone ? '#bbb' : c.dot, fontWeight: 600 }}>{catTasks.length}</span>
+                                {isDone && catTasks.length > 0 && (
+                                  <button onClick={() => setDoneCollapsed(prev => ({ ...prev, [p.id]: !isDoneCollapsed }))}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 10, fontFamily: 'inherit', padding: '0 4px' }}>
+                                    {isDoneCollapsed ? '펼치기' : '접기'}
+                                  </button>
+                                )}
+                              </div>
+                              <div style={{ minHeight: 20 }}>
+                                {isDone && isDoneCollapsed
+                                  ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {catTasks.length}건</div>
+                                  : (
+                                    <SortableContext items={catTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                      {catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} />)}
+                                    </SortableContext>
+                                  )
+                                }
+                              </div>
+                              {!isDone && <InlineAdd projectId={p.id} category={cat.key} color={c} />}
+                            </>
+                          )}
                         </CategoryDropZone>
                       )
                     })}
@@ -202,14 +250,18 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
   )
 }
 
-/* ─── Task card: whole card draggable, click text to edit inline ─── */
+/* ─── Task card: click=edit, hover ▶=detail, long-press=drag ─── */
 function MatrixCard({ task, color, isDone }) {
-  const { toggleDone, updateTask, openDetail } = useStore()
+  const { toggleDone, updateTask, openDetail, moveTaskTo, deleteTask } = useStore()
+  const isMobile = window.innerWidth < 768
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(task.text)
+  const [hovering, setHovering] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const inputRef = useRef(null)
+  const longPressTimer = useRef(null)
 
   useEffect(() => { setText(task.text) }, [task.text])
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus() }, [editing])
@@ -243,15 +295,26 @@ function MatrixCard({ task, color, isDone }) {
     opacity: isDone ? 0.5 : isDragging ? 0.3 : 1,
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     zIndex: isDragging ? 100 : undefined,
-    position: isDragging ? 'relative' : undefined,
+    position: 'relative',
     display: 'flex',
     alignItems: 'flex-start',
     gap: 6,
     cursor: isDragging ? 'grabbing' : 'default',
   }
 
+  const mobileHandlers = isMobile ? {
+    onTouchStart: () => { longPressTimer.current = setTimeout(() => setShowMenu(true), 500) },
+    onTouchEnd: () => clearTimeout(longPressTimer.current),
+    onTouchMove: () => clearTimeout(longPressTimer.current),
+  } : {}
+
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+    <div
+      ref={setNodeRef} style={style}
+      {...(!isMobile ? listeners : {})} {...attributes}
+      onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}
+      {...mobileHandlers}
+    >
       {/* Checkbox */}
       <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ paddingTop: 1, flexShrink: 0, cursor: 'pointer' }}>
         {isDone
@@ -261,7 +324,7 @@ function MatrixCard({ task, color, isDone }) {
           : <CheckIcon checked={false} size={14} />
         }
       </div>
-      {/* Text: inline edit or display */}
+      {/* Text: click=edit */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {editing ? (
           <input
@@ -274,15 +337,57 @@ function MatrixCard({ task, color, isDone }) {
           />
         ) : (
           <div
-            onClick={() => { if (!isDragging) openDetail(task) }}
-            onDoubleClick={(e) => { e.stopPropagation(); if (!isDragging) setEditing(true) }}
-            style={{ fontSize: 13, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: 'pointer', minHeight: 19 }}
+            onClick={() => { if (!isDragging) setEditing(true) }}
+            style={{ fontSize: 13, fontWeight: 500, lineHeight: '19px', color: isDone ? '#999' : '#37352f', textDecoration: isDone ? 'line-through' : 'none', cursor: 'text', minHeight: 19 }}
           >
             {task.text}
           </div>
         )}
       </div>
+      {/* Detail open button — hover only (desktop) */}
+      {!isMobile && (
+        <button
+          onClick={e => { e.stopPropagation(); openDetail(task) }}
+          style={{
+            position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+            opacity: hovering ? 1 : 0, transition: 'opacity 0.15s',
+            width: 22, height: 22, borderRadius: 4, background: 'rgba(0,0,0,0.04)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#999', cursor: 'pointer', border: 'none', padding: 0, flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; e.currentTarget.style.color = '#555' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; e.currentTarget.style.color = '#999' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+      )}
+      {/* Mobile context menu */}
+      {isMobile && showMenu && <MobileContextMenu task={task} onClose={() => setShowMenu(false)} openDetail={openDetail} deleteTask={deleteTask} />}
     </div>
+  )
+}
+
+/* ─── Mobile context menu ─── */
+function MobileContextMenu({ task, onClose, openDetail, deleteTask }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} />
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
+        background: 'white', borderRadius: '16px 16px 0 0', padding: '8px 0 20px',
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.12)',
+      }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#ddd', margin: '0 auto 12px' }} />
+        <button onClick={() => { onClose(); openDetail(task) }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: 15, color: '#37352f', cursor: 'pointer', fontFamily: 'inherit' }}>
+          📄 상세 보기
+        </button>
+        <button onClick={() => { onClose(); if (confirm('삭제하시겠습니까?')) deleteTask(task.id) }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: 15, color: '#e53935', cursor: 'pointer', fontFamily: 'inherit' }}>
+          🗑 삭제
+        </button>
+      </div>
+    </>
   )
 }
 

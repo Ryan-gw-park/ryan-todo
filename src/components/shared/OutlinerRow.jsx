@@ -1,21 +1,53 @@
+import { useRef, useCallback, useLayoutEffect } from 'react'
 import { getBulletStyle } from '../../utils/colors'
 import { OutdentIcon, IndentIcon, TrashIcon } from './Icons'
 
-export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onDelete, onChangeLevel, showPlaceholder }) {
+function autoResize(el) {
+  if (!el) return
+  el.style.height = '0'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onPaste, onDelete, onChangeLevel, showPlaceholder, hasChildren, isCollapsed, onToggleCollapse }) {
+  const localRef = useRef(null)
+
+  const setRef = useCallback((el) => {
+    localRef.current = el
+    if (typeof inputRef === 'function') inputRef(el)
+    else if (inputRef) inputRef.current = el
+    autoResize(el)
+  }, [inputRef])
+
+  useLayoutEffect(() => {
+    autoResize(localRef.current)
+  })
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, paddingLeft: node.level * 22, minHeight: 30 }} className="bullet-row">
-      <div style={{ width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <div style={getBulletStyle(node.level, accentColor)} />
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 22, minHeight: 30 }} className="bullet-row">
+      <div
+        onClick={hasChildren ? onToggleCollapse : undefined}
+        style={{ width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, height: 28, cursor: hasChildren ? 'pointer' : 'default' }}
+      >
+        {hasChildren ? (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+            <path d="M4.5 2.5l3.5 3.5-3.5 3.5" stroke={accentColor || '#999'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <div style={getBulletStyle(node.level, accentColor)} />
+        )}
       </div>
-      <input
-        ref={inputRef}
+      <textarea
+        ref={setRef}
         value={node.text}
-        onChange={e => onTextChange(idx, e.target.value)}
+        rows={1}
+        onChange={e => { onTextChange(idx, e.target.value); autoResize(e.target) }}
         onKeyDown={e => onKeyDown(e, idx)}
+        onPaste={e => onPaste?.(e, idx)}
+        onFocus={e => autoResize(e.target)}
         placeholder={showPlaceholder ? '노트를 입력하세요...' : ''}
-        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, lineHeight: '22px', padding: '3px 4px', fontFamily: 'inherit', color: '#37352f', boxSizing: 'border-box' }}
+        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, lineHeight: '22px', padding: '3px 4px', fontFamily: 'inherit', color: '#37352f', boxSizing: 'border-box', resize: 'none', overflow: 'hidden', display: 'block', fontWeight: hasChildren ? 500 : 400 }}
       />
-      <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0 }} className="bullet-actions">
+      <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0, height: 28, alignItems: 'center' }} className="bullet-actions">
         {node.level > 0 && (
           <button onClick={() => onChangeLevel(idx, -1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}>
             <OutdentIcon />

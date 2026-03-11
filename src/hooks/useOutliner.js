@@ -8,7 +8,7 @@ import { useRef, useCallback } from 'react'
  * @param {Object} opts - { onExitUp, onExitDown } boundary callbacks
  * @returns {{ refs, handleKeyDown, focus }}
  */
-export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown } = {}) {
+export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices } = {}) {
   const refs = useRef([])
   const nodesRef = useRef(nodes)
   nodesRef.current = nodes
@@ -16,6 +16,8 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown } = 
   exitUpRef.current = onExitUp
   const exitDownRef = useRef(onExitDown)
   exitDownRef.current = onExitDown
+  const visibleRef = useRef(visibleIndices)
+  visibleRef.current = visibleIndices
 
   /* ── Focus helper (runs after React commit) ── */
   const focus = useCallback((idx, pos = 'end') => {
@@ -91,21 +93,80 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown } = 
       focus(Math.max(0, idx - 1))
       return
     }
-    // ↑ — focus previous or exit
+    // ↑ — start → prev bullet end → prev bullet start → exit
     if (e.key === 'ArrowUp') {
       e.preventDefault()
-      if (idx > 0) { focus(idx - 1); return }
+      const el = e.target
+      if (el.selectionStart !== 0) {
+        // 현재 불릿 시작점으로 이동
+        el.setSelectionRange(0, 0)
+        return
+      }
+      // 이미 시작점 → 이전 불릿 끝점으로 이동
+      const vis = visibleRef.current
+      if (vis) {
+        const vPos = vis.indexOf(idx)
+        if (vPos > 0) { focus(vis[vPos - 1], 'end'); return }
+      } else if (idx > 0) { focus(idx - 1, 'end'); return }
       if (exitUpRef.current) exitUpRef.current()
       return
     }
-    // ↓ — focus next or exit
+    // ↓ — end → next bullet start → next bullet end → exit
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (idx < nodes.length - 1) { focus(idx + 1); return }
+      const el = e.target
+      if (el.selectionStart !== el.value.length) {
+        // 현재 불릿 끝점으로 이동
+        const len = el.value.length
+        el.setSelectionRange(len, len)
+        return
+      }
+      // 이미 끝점 → 다음 불릿 시작점으로 이동
+      const vis = visibleRef.current
+      if (vis) {
+        const vPos = vis.indexOf(idx)
+        if (vPos >= 0 && vPos < vis.length - 1) { focus(vis[vPos + 1], 'start'); return }
+      } else if (idx < nodes.length - 1) { focus(idx + 1, 'start'); return }
       if (exitDownRef.current) exitDownRef.current()
       return
     }
   }, [setNodes, focus])
 
-  return { refs, handleKeyDown, focus }
+  /* ── Paste handler — split multi-line text into separate nodes ── */
+  const handlePaste = useCallback((e, idx) => {
+    const text = e.clipboardData?.getData('text/plain')
+    if (!text || !text.includes('\n')) return // single-line → default behavior
+
+    e.preventDefault()
+    const nodes = nodesRef.current
+    const cursor = e.target.selectionStart
+    const selEnd = e.target.selectionEnd
+    const before = nodes[idx].text.slice(0, cursor)
+    const after = nodes[idx].text.slice(selEnd)
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
+    if (lines.length === 0) return
+
+    const n = [...nodes]
+    // First line merges with text before cursor
+    const newNodes = [{ ...n[idx], text: before + lines[0] }]
+    // Middle lines become new nodes at same level
+    for (let i = 1; i < lines.length; i++) {
+      newNodes.push({ text: lines[i], level: n[idx].level })
+    }
+    // Last new node gets the text after cursor appended
+    newNodes[newNodes.length - 1] = {
+      ...newNodes[newNodes.length - 1],
+      text: newNodes[newNodes.length - 1].text + after
+    }
+
+    n.splice(idx, 1, ...newNodes)
+    setNodes(n)
+    // Focus last pasted line, cursor at end of pasted text (before 'after')
+    const lastIdx = idx + newNodes.length - 1
+    const lastPos = newNodes[newNodes.length - 1].text.length - after.length
+    focus(lastIdx, lastPos)
+  }, [setNodes, focus])
+
+  return { refs, handleKeyDown, handlePaste, focus }
 }

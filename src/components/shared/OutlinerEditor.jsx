@@ -10,13 +10,14 @@ import { PlusIcon } from './Icons'
  *
  * Exposes via ref: { focusFirst(), focusLast() } for cross-component navigation.
  */
-const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, accentColor, onExitUp, onExitDown }, ref) {
+const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, accentColor, onExitUp, onExitDown, allTopCollapsed }, ref) {
   const [nodes, setNodes] = useState(() => {
     const parsed = parseNotes(notes)
     return parsed.length ? parsed : [{ text: '', level: 0 }]
   })
   const lastEmitted = useRef(notes || '')
   const pendingAdd = useRef(false)
+  const [collapsed, setCollapsed] = useState({}) // { [nodeIndex]: true }
 
   /* ── Sync from parent (external edits) ── */
   useEffect(() => {
@@ -36,8 +37,46 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
     }
   }, [nodes, onChange])
 
+  /* ── Apply allTopCollapsed from parent ── */
+  useEffect(() => {
+    if (allTopCollapsed === undefined) return
+    const next = {}
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].level === 0 && i + 1 < nodes.length && nodes[i + 1].level > 0) {
+        next[i] = allTopCollapsed
+      }
+    }
+    setCollapsed(prev => {
+      // Merge: only override top-level nodes, keep sub-level collapse states
+      const merged = { ...prev }
+      for (const k of Object.keys(next)) {
+        merged[k] = next[k]
+      }
+      return merged
+    })
+  }, [allTopCollapsed])
+
+  /* ── Determine which nodes have children and which are hidden ── */
+  const hasChildren = (idx) => {
+    return idx + 1 < nodes.length && nodes[idx + 1].level > nodes[idx].level
+  }
+
+  const visibleIndices = []
+  const hiddenSet = new Set()
+  for (let i = 0; i < nodes.length; i++) {
+    if (hiddenSet.has(i)) continue
+    visibleIndices.push(i)
+    if (collapsed[i] && hasChildren(i)) {
+      const parentLevel = nodes[i].level
+      for (let j = i + 1; j < nodes.length; j++) {
+        if (nodes[j].level > parentLevel) hiddenSet.add(j)
+        else break
+      }
+    }
+  }
+
   /* ── Outliner keyboard / focus ── */
-  const { refs, handleKeyDown, focus } = useOutliner(nodes, setNodes, { onExitUp, onExitDown })
+  const { refs, handleKeyDown, handlePaste, focus } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
 
   /* ── Expose focusFirst/focusLast for parent navigation ── */
   useImperativeHandle(ref, () => ({
@@ -82,20 +121,28 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
     setNodes(prev => [...prev, { text: '', level: 0 }])
   }, [])
 
+  const toggleCollapse = useCallback((idx) => {
+    setCollapsed(prev => ({ ...prev, [idx]: !prev[idx] }))
+  }, [])
+
   return (
-    <div style={{ background: '#fafafa', border: '1px solid #e8e8e8', borderRadius: 8, padding: '10px 6px', minHeight: 80 }}>
-      {nodes.map((node, i) => (
+    <div style={{ padding: '4px 0', minHeight: 40 }}>
+      {visibleIndices.map(i => (
         <OutlinerRow
           key={i}
-          node={node}
+          node={nodes[i]}
           idx={i}
           accentColor={accentColor}
           inputRef={el => refs.current[i] = el}
           onTextChange={handleTextChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onDelete={handleDelete}
           onChangeLevel={handleChangeLevel}
-          showPlaceholder={i === 0 && nodes.length === 1 && !nodes[0].text}
+          showPlaceholder={false}
+          hasChildren={hasChildren(i)}
+          isCollapsed={!!collapsed[i]}
+          onToggleCollapse={() => toggleCollapse(i)}
         />
       ))}
       <button
@@ -106,9 +153,6 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
       >
         <PlusIcon size={12} /> 추가
       </button>
-      <div style={{ fontSize: 10, color: '#c8c8c8', padding: '2px 20px 0' }}>
-        Tab 들여쓰기 · Shift+Tab 내어쓰기 · Enter 새 줄/분리 · Alt+Shift+↑↓ 이동
-      </div>
     </div>
   )
 })
