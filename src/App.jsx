@@ -26,7 +26,7 @@ export default function App() {
   const [connected, setConnected] = useState(hasCreds())
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const { currentView, setView, loadAll, closeDetail, detailTask, showProjectMgr } = useStore()
+  const { currentView, setView, loadAll, closeDetail, detailTask, showProjectMgr, setUserName, userName } = useStore()
   const [mobile, setMobile] = useState(isMobile())
 
   useEffect(() => {
@@ -53,6 +53,10 @@ export default function App() {
         return
       }
       setSession(s)
+      if (s) {
+        const meta = s.user.user_metadata
+        setUserName(meta?.full_name || meta?.name || s.user.email?.split('@')[0] || '')
+      }
       setAuthLoading(false)
     })
 
@@ -66,11 +70,20 @@ export default function App() {
         }
         setAuthError('')
         setSession(s)
+        if (s) {
+          const meta = s.user.user_metadata
+          setUserName(meta?.full_name || meta?.name || s.user.email?.split('@')[0] || '')
+        }
       }
     )
 
     return () => subscription.unsubscribe()
   }, [connected])
+
+  // Update browser tab title
+  useEffect(() => {
+    document.title = userName ? `${userName}'s Todo` : 'Todo'
+  }, [userName])
 
   // Load data when authenticated
   useEffect(() => {
@@ -114,7 +127,7 @@ export default function App() {
     return (
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: '#37352f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 13, fontWeight: 700 }}>R</div>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 700, fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", lineHeight: 1, paddingTop: 1 }}>R</div>
           <span style={{ fontSize: 14, color: '#999' }}>로딩 중...</span>
         </div>
       </div>

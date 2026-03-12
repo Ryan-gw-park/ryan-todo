@@ -15,12 +15,7 @@ export function useAlarmEngine() {
   }, [tasks])
 
   useEffect(() => {
-    // Service Worker 등록
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .catch((err) => console.warn('[SW] 등록 실패:', err))
-    }
+    // SW 등록은 main.jsx에서 처리 — 여기서는 ready만 사용
 
     // alarm이 활성화된 task가 있으면 권한 요청
     const hasActiveAlarm = tasksRef.current.some((t) => t.alarm?.enabled)

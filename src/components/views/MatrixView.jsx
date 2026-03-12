@@ -8,24 +8,16 @@ import { parseDateFromText } from '../../utils/dateParser'
 import InlineAdd from '../shared/InlineAdd'
 
 export default function MatrixView() {
-  const { projects, tasks, setShowProjectMgr, moveTaskTo, reorderTasks } = useStore()
+  const { projects, tasks, setShowProjectMgr, moveTaskTo, reorderTasks, collapseState, toggleCollapse: storeToggle } = useStore()
   const isMobile = window.innerWidth < 768
   const LW = isMobile ? 80 : 110
   const COL_GAP = 10
   const COL_MIN = isMobile ? 200 : 0
 
-  const [doneCollapsed, setDoneCollapsed] = useState({})
+  const doneCollapsed = collapseState.matrixDone || {}
   const [activeId, setActiveId] = useState(null)
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('matrix-collapsed') || '{}') } catch { return {} }
-  })
-  const toggleCollapse = (pid) => {
-    setCollapsed(prev => {
-      const next = { ...prev, [pid]: !prev[pid] }
-      localStorage.setItem('matrix-collapsed', JSON.stringify(next))
-      return next
-    })
-  }
+  const collapsed = collapseState.matrix || {}
+  const toggleCollapse = (pid) => storeToggle('matrix', pid)
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
@@ -198,7 +190,7 @@ export default function MatrixView() {
                                 <span style={{ fontSize: 11, fontWeight: 600, color: isDone ? '#aaa' : c.text, opacity: 0.7 }}>{cat.shortLabel}</span>
                                 <span style={{ fontSize: 10, color: isDone ? '#bbb' : c.dot, fontWeight: 600 }}>{catTasks.length}</span>
                                 {isDone && catTasks.length > 0 && (
-                                  <button onClick={() => setDoneCollapsed(prev => ({ ...prev, [p.id]: !isDoneCollapsed }))}
+                                  <button onClick={() => storeToggle('matrixDone', p.id)}
                                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 10, fontFamily: 'inherit', padding: '0 4px' }}>
                                     {isDoneCollapsed ? '펼치기' : '접기'}
                                   </button>
@@ -264,7 +256,14 @@ function MatrixCard({ task, color, isDone }) {
   const longPressTimer = useRef(null)
 
   useEffect(() => { setText(task.text) }, [task.text])
-  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus() }, [editing])
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      const el = inputRef.current
+      el.focus()
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+    }
+  }, [editing])
 
   const saveText = useCallback(() => {
     const trimmed = text.trim()
@@ -327,13 +326,14 @@ function MatrixCard({ task, color, isDone }) {
       {/* Text: click=edit */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {editing ? (
-          <input
+          <textarea
             ref={inputRef}
             value={text}
-            onChange={e => setText(e.target.value)}
+            onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
             onKeyDown={handleKeyDown}
             onBlur={saveText}
-            style={{ width: '100%', fontSize: 13, lineHeight: '19px', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box' }}
+            rows={1}
+            style={{ width: '100%', fontSize: 13, lineHeight: '19px', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit', background: 'transparent', color: '#37352f', boxSizing: 'border-box', resize: 'none', overflow: 'hidden' }}
           />
         ) : (
           <div

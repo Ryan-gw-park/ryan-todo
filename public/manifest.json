@@ -1,17 +1,19 @@
 {
   "name": "Ryan Todo",
-  "short_name": "Todo",
+  "short_name": "Ryan Todo",
+  "description": "Ryan's Task Management App",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#1E293B",
+  "orientation": "any",
   "icons": [
     { "src": "/icons/icon-16.png", "sizes": "16x16", "type": "image/png" },
     { "src": "/icons/icon-32.png", "sizes": "32x32", "type": "image/png" },
     { "src": "/icons/icon-64.png", "sizes": "64x64", "type": "image/png" },
     { "src": "/icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]

@@ -68,6 +68,35 @@ function mapTask(r) {
   }
 }
 
+// ─── Collapse state Supabase sync (debounced) ───
+let _collapseSaveTimer = null
+function _saveCollapseState(state) {
+  clearTimeout(_collapseSaveTimer)
+  _collapseSaveTimer = setTimeout(async () => {
+    const d = getDb()
+    if (!d) return
+    const { error } = await d.from('ui_state').upsert({
+      id: 'default',
+      collapse_state: state,
+      updated_at: new Date().toISOString(),
+    })
+    if (error) console.warn('[Ryan Todo] saveCollapseState:', error.message)
+  }, 500)
+}
+
+const _defaultCollapseState = {
+  today: {},          // projectId → boolean
+  matrix: {},         // projectId → boolean
+  matrixDone: {},     // projectId → boolean
+  timeline: {},       // projectId → boolean
+  projectExpanded: {},// taskId → boolean (false = collapsed)
+  projectSection: {}, // "projectId:catKey" → boolean (true = collapsed)
+  projectAllTop: {},  // taskId → boolean
+  memo: {},           // memoId → boolean (true = body collapsed)
+  memoAllTop: {},     // memoId → boolean
+  detailAllTop: {},   // taskId → boolean
+}
+
 const useStore = create((set, get) => ({
   projects: [],
   tasks: [],
@@ -77,6 +106,32 @@ const useStore = create((set, get) => ({
   detailTask: null,
   showProjectMgr: false,
   toast: null, // { msg, undoTaskId?, undoPrevCategory? }
+  userName: 'Ryan',
+  setUserName: (name) => set({ userName: name }),
+
+  // ─── Collapse State (synced to Supabase) ───
+  collapseState: { ..._defaultCollapseState },
+
+  toggleCollapse: (group, key) => {
+    const cs = { ...get().collapseState }
+    cs[group] = { ...(cs[group] || {}), [key]: !cs[group]?.[key] }
+    set({ collapseState: cs })
+    _saveCollapseState(cs)
+  },
+
+  setCollapseGroup: (group, value) => {
+    const cs = { ...get().collapseState }
+    cs[group] = { ...(cs[group] || {}), ...value }
+    set({ collapseState: cs })
+    _saveCollapseState(cs)
+  },
+
+  setCollapseValue: (group, key, value) => {
+    const cs = { ...get().collapseState }
+    cs[group] = { ...(cs[group] || {}), [key]: value }
+    set({ collapseState: cs })
+    _saveCollapseState(cs)
+  },
 
   setView: (v) => set({ currentView: v }),
   logout: async () => {
@@ -99,17 +154,29 @@ const useStore = create((set, get) => ({
     if (!d) { set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
     try {
-      const [pr, tr, mr] = await Promise.all([
+      const [pr, tr, mr, uiR] = await Promise.all([
         d.from('projects').select('*').order('sort_order'),
         d.from('tasks').select('*').order('sort_order'),
         d.from('memos').select('*').order('sort_order'),
+        d.from('ui_state').select('collapse_state').eq('id', 'default').maybeSingle(),
       ])
       if (pr.error) throw pr.error
       if (tr.error) throw tr.error
+
+      // Merge loaded collapse state with defaults
+      const loaded = uiR?.data?.collapse_state || {}
+      const cs = { ..._defaultCollapseState }
+      for (const key of Object.keys(cs)) {
+        if (loaded[key] && typeof loaded[key] === 'object') {
+          cs[key] = loaded[key]
+        }
+      }
+
       set({
         projects: pr.data.map(mapProject),
         tasks: tr.data.map(mapTask),
         memos: mr.error ? [] : mr.data.map(mapMemo),
+        collapseState: cs,
         syncStatus: 'ok',
       })
     } catch (e) {

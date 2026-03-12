@@ -4,14 +4,6 @@ import { COLOR_OPTIONS } from '../../utils/colors'
 import { PlusIcon, TrashIcon, ChevronIcon } from '../shared/Icons'
 import OutlinerEditor from '../shared/OutlinerEditor'
 
-/* ── localStorage helpers for memo collapse state ── */
-function loadMemoCollapsed() {
-  try { return JSON.parse(localStorage.getItem('memo-collapsed') || '{}') } catch { return {} }
-}
-function saveMemoCollapsed(state) {
-  localStorage.setItem('memo-collapsed', JSON.stringify(state))
-}
-
 const MemoCard = forwardRef(function MemoCard({ memo, onExitDown, onExitUp, bodyCollapsed, onToggleBody, allTopCollapsed, onToggleAllTop }, ref) {
   const { updateMemo, deleteMemo } = useStore()
   const [title, setTitle] = useState(memo.title)
@@ -193,31 +185,19 @@ const MemoCard = forwardRef(function MemoCard({ memo, onExitDown, onExitUp, body
 })
 
 export default function MemoryView() {
-  const { memos, addMemo } = useStore()
+  const { memos, addMemo, collapseState, toggleCollapse } = useStore()
   const isMobile = window.innerWidth < 768
   const cardRefs = useRef({})
 
-  // Persist memo body collapse state
-  const [memoCollapsed, setMemoCollapsed] = useState(loadMemoCollapsed)
+  const memoCollapsed = collapseState.memo || {}
   const toggleMemoBody = useCallback((memoId) => {
-    setMemoCollapsed(prev => {
-      const next = { ...prev, [memoId]: !prev[memoId] }
-      saveMemoCollapsed(next)
-      return next
-    })
-  }, [])
+    toggleCollapse('memo', memoId)
+  }, [toggleCollapse])
 
-  // Persist "all top-level collapsed" state per memo
-  const [allTopState, setAllTopState] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('memo-alltop-collapsed') || '{}') } catch { return {} }
-  })
+  const allTopState = collapseState.memoAllTop || {}
   const toggleAllTop = useCallback((memoId) => {
-    setAllTopState(prev => {
-      const next = { ...prev, [memoId]: !prev[memoId] }
-      localStorage.setItem('memo-alltop-collapsed', JSON.stringify(next))
-      return next
-    })
-  }, [])
+    toggleCollapse('memoAllTop', memoId)
+  }, [toggleCollapse])
 
   const handleAdd = useCallback(() => {
     const randomColor = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)].id

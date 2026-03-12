@@ -8,17 +8,19 @@ import OutlinerEditor from '../shared/OutlinerEditor'
 const NON_DONE_CATS = CATEGORIES.filter(c => c.key !== 'done')
 
 export default function ProjectView() {
-  const { projects, tasks, setShowProjectMgr } = useStore()
+  const { projects, tasks, setShowProjectMgr, collapseState, setCollapseValue } = useStore()
   const isMobile = window.innerWidth < 768
   const [activeProject, setActiveProject] = useState(projects[0]?.id || '')
-  const [expanded, setExpanded] = useState({})
+  const expanded = collapseState.projectExpanded || {}
   const categoryRefs = useRef({})
   const pendingFocusProject = useRef(null)
 
   useEffect(() => {
-    const exp = {}
-    tasks.forEach(t => { if (expanded[t.id] === undefined) exp[t.id] = true })
-    if (Object.keys(exp).length) setExpanded(p => ({ ...exp, ...p }))
+    const newExp = {}
+    tasks.forEach(t => { if (expanded[t.id] === undefined) newExp[t.id] = true })
+    if (Object.keys(newExp).length) {
+      for (const [k, v] of Object.entries(newExp)) setCollapseValue('projectExpanded', k, v)
+    }
   }, [tasks.length])
 
   /* Focus first task after project switch */
@@ -71,7 +73,7 @@ export default function ProjectView() {
   if (!p) return <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>프로젝트를 추가하세요</div>
 
   const c = getColor(p.color)
-  const toggleExpand = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
+  const toggleExpand = (id) => setCollapseValue('projectExpanded', id, !(expanded[id] !== false))
 
   /* Cross-category navigation: exit down from one → enter next. Returns true if focus moved. */
   const handleExitSectionDown = (catIndex) => {
@@ -140,12 +142,13 @@ export default function ProjectView() {
 
 /* ── Category section — manages inter-task navigation ── */
 const CategorySection = forwardRef(function CategorySection({ cat, catTasks, projectId, color, expanded, toggleExpand, onExitSectionDown, onExitSectionUp }, ref) {
-  const { addTask, updateTask, deleteTask } = useStore()
+  const { addTask, updateTask, deleteTask, collapseState, toggleCollapse } = useStore()
   const taskRefs = useRef({})
   const addBtnRef = useRef(null)
   const pendingFocusRef = useRef(null)
   const isDoneCat = cat.key === 'done'
-  const [sectionCollapsed, setSectionCollapsed] = useState(undefined)
+  const sectionKey = `${projectId}:${cat.key}`
+  const sectionCollapsed = collapseState.projectSection?.[sectionKey]
 
   /* Expose focusFirst / focusLast to parent for cross-category nav */
   useImperativeHandle(ref, () => ({
@@ -258,7 +261,7 @@ const CategorySection = forwardRef(function CategorySection({ cat, catTasks, pro
         <span style={{ fontSize: 11, color: isDoneCat ? '#aaa' : color.dot, background: isDoneCat ? '#f0f0f0' : color.header, borderRadius: 8, padding: '1px 8px', fontWeight: 600 }}>{catTasks.length}</span>
         {!isDoneCat && catTasks.length > 0 && (
           <button
-            onClick={() => setSectionCollapsed(prev => prev === undefined ? true : !prev)}
+            onClick={() => toggleCollapse('projectSection', sectionKey)}
             title={sectionCollapsed ? '모든 노트 펼치기' : '모든 노트 접기'}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 2, display: 'flex', marginLeft: 'auto' }}
             onMouseEnter={e => e.currentTarget.style.color = color.dot}
@@ -310,15 +313,15 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
   { task, color, expanded, toggleExpand, sectionCollapsed, onExitUp, onExitDown, onTitleEnter, onTitleBackspace, onSwapUp, onSwapDown },
   ref
 ) {
-  const { toggleDone, updateTask, deleteTask, openDetail } = useStore()
+  const { toggleDone, updateTask, deleteTask, openDetail, collapseState: cs, setCollapseValue: setCV } = useStore()
   const titleRef = useRef(null)
   const editorRef = useRef(null)
   const [titleText, setTitleText] = useState(task.text)
-  const [allTopCollapsed, setAllTopCollapsed] = useState(undefined)
+  const allTopCollapsed = cs.projectAllTop?.[task.id]
 
   // Sync section-level collapse to per-task allTopCollapsed
   useEffect(() => {
-    if (sectionCollapsed !== undefined) setAllTopCollapsed(sectionCollapsed)
+    if (sectionCollapsed !== undefined) setCV('projectAllTop', task.id, sectionCollapsed)
   }, [sectionCollapsed])
 
   const hasNotes = !!(task.notes && task.notes.trim())
@@ -469,7 +472,7 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
         {task.dueDate && <span style={{ fontSize: 11, color: '#ccc', fontWeight: 400, flexShrink: 0 }}>{task.dueDate}</span>}
         <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0 }} className="outliner-actions">
           <button
-            onClick={() => setAllTopCollapsed(prev => prev === undefined ? true : !prev)}
+            onClick={() => setCV('projectAllTop', task.id, !allTopCollapsed)}
             title={allTopCollapsed ? '모든 항목 펼치기' : '모든 항목 접기'}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 3, display: 'flex' }}
           >

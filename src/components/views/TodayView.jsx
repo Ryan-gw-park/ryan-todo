@@ -13,19 +13,19 @@ import { parseDateFromText } from '../../utils/dateParser'
 import { getNextAlarmTime } from '../../utils/alarm'
 
 export default function TodayView() {
-  const { projects, tasks, moveTaskTo, reorderTasks } = useStore()
+  const { projects, tasks, moveTaskTo, reorderTasks, collapseState, toggleCollapse, setCollapseGroup } = useStore()
   const isMobile = window.innerWidth < 768
 
   const [activeId, setActiveId] = useState(null)
-  const [collapsed, setCollapsed] = useState({})
+  const collapsed = collapseState.today || {}
   const allCollapsed = projects.every(p => collapsed[p.id])
 
   const toggleAll = () => {
     const newState = {}
     projects.forEach(p => { newState[p.id] = !allCollapsed })
-    setCollapsed(newState)
+    setCollapseGroup('today', newState)
   }
-  const toggleProject = (pid) => setCollapsed(prev => ({ ...prev, [pid]: !prev[pid] }))
+  const toggleProject = (pid) => toggleCollapse('today', pid)
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })

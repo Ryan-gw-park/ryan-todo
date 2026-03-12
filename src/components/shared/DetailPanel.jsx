@@ -17,15 +17,15 @@ function getDefaultAlarmDatetime(dueDate) {
 }
 
 export default function DetailPanel() {
-  const { detailTask, closeDetail, tasks, projects, updateTask, deleteTask, toggleDone } = useStore()
+  const { detailTask, closeDetail, tasks, projects, updateTask, deleteTask, toggleDone, collapseState, toggleCollapse } = useStore()
   const isMobile = window.innerWidth < 768
-  const [allTopCollapsed, setAllTopCollapsed] = useState(undefined)
 
   const task = detailTask ? tasks.find(t => t.id === detailTask.id) : null
   if (!task) return null
 
   const p = projects.find(pr => pr.id === task.projectId)
   const c = p ? getColor(p.color) : getColor('blue')
+  const allTopCollapsed = collapseState.detailAllTop?.[task.id]
 
   const debounceRef = useRef(null)
   const handleNotesChange = useCallback((newNotes) => {
@@ -130,7 +130,7 @@ export default function DetailPanel() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
               <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>노트</span>
               <button
-                onClick={() => setAllTopCollapsed(prev => prev === undefined ? true : !prev)}
+                onClick={() => toggleCollapse('detailAllTop', task.id)}
                 title={allTopCollapsed ? '모든 항목 펼치기' : '모든 항목 접기'}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 4, display: 'flex', flexShrink: 0 }}
                 onMouseEnter={e => e.currentTarget.style.color = c.dot}

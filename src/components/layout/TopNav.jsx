@@ -10,14 +10,14 @@ const VIEWS = [
 ]
 
 export default function TopNav() {
-  const { currentView, setView, setShowProjectMgr, logout } = useStore()
+  const { currentView, setView, setShowProjectMgr, logout, userName } = useStore()
 
   return (
     <div style={{ borderBottom: '1px solid #f0f0f0', background: 'white', position: 'sticky', top: 0, zIndex: 50 }} className="desktop-nav">
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 48px', display: 'flex', alignItems: 'center', height: 52 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 32 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: '#37352f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 13, fontWeight: 700 }}>R</div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#37352f' }}>Ryan Todo</span>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 700, fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", lineHeight: 1, paddingTop: 1, flexShrink: 0 }}>{userName ? userName[0].toUpperCase() : 'R'}</div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#37352f' }}>{userName ? `${userName}'s Todo` : 'Todo'}</span>
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
           {VIEWS.map(v => (
@@ -37,7 +37,7 @@ export default function TopNav() {
             style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e8e8e8', background: '#f5f5f5', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#999', fontFamily: 'inherit', marginLeft: 4 }}
             onMouseEnter={e => e.currentTarget.style.background = '#eee'}
             onMouseLeave={e => e.currentTarget.style.background = '#f5f5f5'}
-          >G</button>
+          >{userName ? userName[0].toUpperCase() : '?'}</button>
         </div>
       </div>
     </div>

@@ -99,14 +99,14 @@ const SCALES = [
 ]
 
 export default function TimelineView() {
-  const { projects, tasks, openDetail, updateTask, reorderTasks, moveTaskTo } = useStore()
+  const { projects, tasks, openDetail, updateTask, reorderTasks, moveTaskTo, collapseState, toggleCollapse: storeToggle } = useStore()
   const isMobile = window.innerWidth < 768
   const panelW = isMobile ? LEFT_PANEL_MOBILE : LEFT_PANEL
 
   const today = useMemo(() => new Date(), [])
   const [baseDate, setBaseDate] = useState(() => startOfMonth(today))
   const [scale, setScale] = useState('month')
-  const [collapsed, setCollapsed] = useState({})
+  const collapsed = collapseState.timeline || {}
   const gridRef = useRef(null)
   const [activeId, setActiveId] = useState(null)
 
@@ -282,7 +282,7 @@ export default function TimelineView() {
                   <ProjectDropZone key={project.id} id={`project:${project.id}`} isOver={false}>
                     {/* Project header */}
                     <div
-                      onClick={() => setCollapsed(p => ({ ...p, [project.id]: !isCollapsed }))}
+                      onClick={() => storeToggle('timeline', project.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 4px', cursor: 'pointer', height: ROW_H, boxSizing: 'border-box', borderBottom: '1px solid #f0f0f0' }}
                     >
                       <span style={{ fontSize: 10, color: '#bbb', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0 }}>▾</span>
