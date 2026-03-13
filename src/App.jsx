@@ -1,33 +1,114 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import useStore from './hooks/useStore'
 import { useAlarmEngine } from './hooks/useAlarmEngine'
 import { hasCreds, getDb } from './utils/supabase'
 import './styles/global.css'
 
+// 즉시 필요한 것만 정적 import
 import SetupScreen from './components/shared/SetupScreen'
 import LoginScreen from './components/shared/LoginScreen'
 import TopNav from './components/layout/TopNav'
 import MobileTopBar from './components/layout/MobileTopBar'
-import BottomNav from './components/layout/BottomNav'
 import FAB from './components/layout/FAB'
-import TodayView from './components/views/TodayView'
-import MatrixView from './components/views/MatrixView'
-import ProjectView from './components/views/ProjectView'
-import TimelineView from './components/views/TimelineView'
-import MemoryView from './components/views/MemoryView'
-import DetailPanel from './components/shared/DetailPanel'
-import ProjectManager from './components/shared/ProjectManager'
 import Toast from './components/shared/Toast'
+import { ViewSkeleton, LoadingSpinner } from './components/shared/Skeleton'
+import { SyncProviderWrapper } from './sync/SyncContext'
+
+// React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
+const TodayView = lazy(() => import('./components/views/TodayView'))
+const MatrixView = lazy(() => import('./components/views/MatrixView'))
+const ProjectView = lazy(() => import('./components/views/ProjectView'))
+const TimelineView = lazy(() => import('./components/views/TimelineView'))
+const MemoryView = lazy(() => import('./components/views/MemoryView'))
+const TeamMatrixView = lazy(() => import('./components/matrix/TeamMatrixView'))
+const TeamSettings = lazy(() => import('./components/team/TeamSettings'))
+const Onboarding = lazy(() => import('./components/team/Onboarding'))
+const InviteAccept = lazy(() => import('./components/team/InviteAccept'))
+const NotificationPanel = lazy(() => import('./components/shared/NotificationPanel'))
+const DetailPanel = lazy(() => import('./components/shared/DetailPanel'))
+const MyProfile = lazy(() => import('./components/shared/MyProfile'))
+const ModeSelect = lazy(() => import('./components/team/ModeSelect'))
+const ProjectManager = lazy(() => import('./components/shared/ProjectManager'))
+const HelpPage = lazy(() => import('./components/shared/HelpPage'))
 
 function isMobile() { return window.innerWidth < 768 }
+
+// Main app shell
+function AppShell({ mobile }) {
+  const { currentView, setView, closeDetail, detailTask, showProjectMgr } = useStore()
+  const showNotificationPanel = useStore(s => s.showNotificationPanel)
+
+  // 뷰 초기화만 — loadAll은 App에서 이미 실행됨
+  useEffect(() => {
+    setView(mobile ? 'today' : 'matrix')
+  }, [])
+
+  // Idle 프리로드 — 첫 화면 후 유휴 시간에 다른 뷰 미리 로드
+  useEffect(() => {
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
+    idle(() => {
+      import('./components/views/TodayView')
+      import('./components/views/ProjectView')
+      import('./components/views/TimelineView')
+      import('./components/views/MemoryView')
+    })
+  }, [])
+
+  // Keyboard shortcuts
+  const VIEW_ORDER = ['today', 'matrix', 'project', 'timeline', 'memory']
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') { closeDetail() }
+      if (e.ctrlKey && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault()
+        const idx = VIEW_ORDER.indexOf(currentView)
+        if (idx === -1) return
+        const next = e.key === 'ArrowLeft'
+          ? (idx - 1 + VIEW_ORDER.length) % VIEW_ORDER.length
+          : (idx + 1) % VIEW_ORDER.length
+        setView(VIEW_ORDER[next])
+        setTimeout(() => window.dispatchEvent(new Event('view-focus')), 100)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [currentView])
+
+  // Loop-20: 팀 모드에서 매트릭스 뷰 분기
+  const teamId = useStore(s => s.currentTeamId)
+  const views = { today: TodayView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView }
+  const ViewComponent = views[currentView] || TodayView
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#fff' }}>
+      <TopNav />
+      <MobileTopBar />
+
+      <div style={{ paddingBottom: mobile ? 100 : 0 }}>
+        <Suspense fallback={<ViewSkeleton />}>
+          <ViewComponent />
+        </Suspense>
+      </div>
+
+      <FAB />
+
+      {detailTask && <Suspense fallback={null}><DetailPanel /></Suspense>}
+      {showNotificationPanel && <Suspense fallback={null}><NotificationPanel /></Suspense>}
+      {showProjectMgr && <Suspense fallback={null}><ProjectManager /></Suspense>}
+      <Toast />
+    </div>
+  )
+}
 
 export default function App() {
   useAlarmEngine()
   const [connected, setConnected] = useState(hasCreds())
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const { currentView, setView, loadAll, closeDetail, detailTask, showProjectMgr, setUserName, userName } = useStore()
+  const { setUserName, userName, initTeamState, myTeams, currentTeamId, modeSelected, teamLoading, onboardingSkipped } = useStore()
   const [mobile, setMobile] = useState(isMobile())
+  const location = useLocation()
 
   useEffect(() => {
     const handler = () => setMobile(isMobile())
@@ -35,7 +116,6 @@ export default function App() {
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  const ALLOWED_EMAIL = 'gunwoong.park@gmail.com'
   const [authError, setAuthError] = useState('')
 
   // Auth state management
@@ -46,12 +126,6 @@ export default function App() {
 
     // Check current session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (s && s.user.email !== ALLOWED_EMAIL) {
-        supabase.auth.signOut()
-        setAuthError('접근 권한이 없습니다.')
-        setAuthLoading(false)
-        return
-      }
       setSession(s)
       if (s) {
         const meta = s.user.user_metadata
@@ -60,14 +134,9 @@ export default function App() {
       setAuthLoading(false)
     })
 
-    // Subscribe to auth changes (Google OAuth callback, logout, etc.)
+    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s) => {
-        if (s && s.user.email !== ALLOWED_EMAIL) {
-          supabase.auth.signOut()
-          setAuthError('접근 권한이 없습니다.')
-          return
-        }
         setAuthError('')
         setSession(s)
         if (s) {
@@ -85,37 +154,14 @@ export default function App() {
     document.title = userName ? `${userName}'s Todo` : 'Todo'
   }, [userName])
 
-  // Load data when authenticated
+  // Load team state + data when authenticated (병렬화: initTeamState 완료 후 loadAll)
   useEffect(() => {
     if (connected && session) {
-      setView(mobile ? 'today' : 'matrix')
-      loadAll()
-      const interval = setInterval(loadAll, 60000)
-      return () => clearInterval(interval)
+      initTeamState().then(() => {
+        useStore.getState().loadAll()
+      })
     }
   }, [connected, session])
-
-  // Keyboard shortcuts
-  const VIEW_ORDER = ['today', 'matrix', 'project', 'timeline', 'memory']
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'Escape') { closeDetail() }
-      // Ctrl+Shift+←/→ — switch tabs
-      if (e.ctrlKey && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-        e.preventDefault()
-        const idx = VIEW_ORDER.indexOf(currentView)
-        if (idx === -1) return
-        const next = e.key === 'ArrowLeft'
-          ? (idx - 1 + VIEW_ORDER.length) % VIEW_ORDER.length
-          : (idx + 1) % VIEW_ORDER.length
-        setView(VIEW_ORDER[next])
-        // Signal new view to auto-focus
-        setTimeout(() => window.dispatchEvent(new Event('view-focus')), 100)
-      }
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [currentView])
 
   // Step 1: Supabase connection setup
   if (!connected) {
@@ -124,40 +170,53 @@ export default function App() {
 
   // Step 2: Auth loading
   if (authLoading) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 700, fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", lineHeight: 1, paddingTop: 1 }}>R</div>
-          <span style={{ fontSize: 14, color: '#999' }}>로딩 중...</span>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
-  // Step 3: Login required
+  // Step 3: Login required — save invite path for post-login redirect
   if (!session) {
+    if (location.pathname.startsWith('/invite/')) {
+      sessionStorage.setItem('pendingInvite', location.pathname)
+      localStorage.setItem('pendingInvite', location.pathname)
+    }
     return <LoginScreen authError={authError} />
   }
 
-  // Step 4: Main app
-  const views = { today: TodayView, matrix: MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView }
-  const ViewComponent = views[currentView] || TodayView
+  // Step 4: After login, redirect to pending invite if exists
+  const pendingInvite = sessionStorage.getItem('pendingInvite') || localStorage.getItem('pendingInvite')
+  if (pendingInvite) {
+    sessionStorage.removeItem('pendingInvite')
+    localStorage.removeItem('pendingInvite')
+    return <Navigate to={pendingInvite} replace />
+  }
 
+  // Step 5: Wait for team state to load
+  if (teamLoading) {
+    return <LoadingSpinner />
+  }
+
+  // Step 6: Onboarding — no teams and not skipped
+  if (myTeams.length === 0 && !onboardingSkipped && !location.pathname.startsWith('/invite') && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />
+  }
+
+  // Step 6.5: Mode select — has teams but none selected
+  const specialRoutes = ['/invite', '/onboarding', '/profile', '/team/settings', '/mode-select', '/help']
+  const isSpecialRoute = specialRoutes.some(r => location.pathname.startsWith(r))
+  if (myTeams.length > 0 && !currentTeamId && !modeSelected && !isSpecialRoute && location.pathname !== '/mode-select') {
+    return <Navigate to="/mode-select" replace />
+  }
+
+  // Step 7: Authenticated routes
   return (
-    <div style={{ minHeight: '100vh', background: '#fff' }}>
-      <TopNav />
-      <MobileTopBar />
-
-      <div style={{ paddingBottom: mobile ? 100 : 0 }}>
-        <ViewComponent />
-      </div>
-
-      <BottomNav />
-      <FAB />
-
-      {detailTask && <DetailPanel />}
-      {showProjectMgr && <ProjectManager />}
-      <Toast />
-    </div>
+    <Routes>
+      <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
+      <Route path="/mode-select" element={<Suspense fallback={<LoadingSpinner />}><ModeSelect /></Suspense>} />
+      <Route path="/invite/:token" element={<Suspense fallback={<LoadingSpinner />}><InviteAccept /></Suspense>} />
+      <Route path="/team/settings" element={<Suspense fallback={<LoadingSpinner />}><TeamSettings /></Suspense>} />
+      <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><MyProfile /></Suspense>} />
+      <Route path="/help" element={<Suspense fallback={<LoadingSpinner />}><HelpPage /></Suspense>} />
+      <Route path="/*" element={<SyncProviderWrapper><AppShell mobile={mobile} /></SyncProviderWrapper>} />
+    </Routes>
   )
 }

@@ -4,6 +4,8 @@ import useOutliner from '../../hooks/useOutliner'
 import OutlinerRow from './OutlinerRow'
 import { PlusIcon } from './Icons'
 
+const MAX_LEVEL = 9
+
 /**
  * Shared bullet-note editor used by DetailPanel, MemoryView, and ProjectView.
  * Manages its own node state; syncs with parent via notes/onChange props.
@@ -18,6 +20,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   const lastEmitted = useRef(notes || '')
   const pendingAdd = useRef(false)
   const [collapsed, setCollapsed] = useState({}) // { [nodeIndex]: true }
+  const [selectedSet, setSelectedSet] = useState(new Set())
 
   /* ── Sync from parent (external edits) ── */
   useEffect(() => {
@@ -47,7 +50,6 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
       }
     }
     setCollapsed(prev => {
-      // Merge: only override top-level nodes, keep sub-level collapse states
       const merged = { ...prev }
       for (const k of Object.keys(next)) {
         merged[k] = next[k]
@@ -76,7 +78,19 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   }
 
   /* ── Outliner keyboard / focus ── */
-  const { refs, handleKeyDown, handlePaste, focus } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
+  const { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
+
+  /* ── Wire selection change callback ── */
+  useEffect(() => {
+    onSelectionChange.current = (sel) => {
+      if (!sel) { setSelectedSet(new Set()); return }
+      const [a, b] = sel
+      const min = Math.min(a, b), max = Math.max(a, b)
+      const s = new Set()
+      for (let i = min; i <= max; i++) s.add(i)
+      setSelectedSet(s)
+    }
+  }, [onSelectionChange])
 
   /* ── Expose focusFirst/focusLast for parent navigation ── */
   useImperativeHandle(ref, () => ({
@@ -109,7 +123,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   const handleChangeLevel = useCallback((idx, d) => {
     setNodes(prev => {
       const n = [...prev]
-      const nl = Math.max(0, Math.min(3, n[idx].level + d))
+      const nl = Math.max(0, Math.min(MAX_LEVEL, n[idx].level + d))
       if (d > 0 && idx > 0 && nl > n[idx - 1].level + 1) return prev
       n[idx] = { ...n[idx], level: nl }
       return n
@@ -124,6 +138,28 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   const toggleCollapse = useCallback((idx) => {
     setCollapsed(prev => ({ ...prev, [idx]: !prev[idx] }))
   }, [])
+
+  /* ── Mouse selection ── */
+  const handleRowMouseDown = useCallback((e, idx) => {
+    if (e.shiftKey) {
+      e.preventDefault()
+      const sel = selectionRef.current
+      const anchor = sel ? sel[0] : idx
+      if (anchor === idx) {
+        clearSelection()
+      } else {
+        const min = Math.min(anchor, idx), max = Math.max(anchor, idx)
+        const s = new Set()
+        for (let i = min; i <= max; i++) s.add(i)
+        selectionRef.current = [anchor, idx]
+        setSelectedSet(s)
+      }
+    } else {
+      if (selectedSet.size > 0) {
+        clearSelection()
+      }
+    }
+  }, [selectedSet, clearSelection, selectionRef])
 
   return (
     <div style={{ padding: '4px 0', minHeight: 40 }}>
@@ -143,6 +179,8 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
           hasChildren={hasChildren(i)}
           isCollapsed={!!collapsed[i]}
           onToggleCollapse={() => toggleCollapse(i)}
+          selected={selectedSet.has(i)}
+          onMouseDown={(e) => handleRowMouseDown(e, i)}
         />
       ))}
       <button

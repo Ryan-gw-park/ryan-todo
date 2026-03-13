@@ -1,0 +1,150 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import useStore from '../../hooks/useStore'
+import useInvitation from '../../hooks/useInvitation'
+
+const T = {
+  card: '#ffffff', cardBorder: '#e8e8e8', text: '#1a1a1a',
+  textSub: '#888', textMuted: '#adb5bd', accent: '#2c5282',
+}
+
+const btnStyle = {
+  padding: '12px', width: '100%', fontSize: 14, fontWeight: 500,
+  borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+}
+
+export default function InviteAccept() {
+  const { token } = useParams()
+  const navigate = useNavigate()
+  const { userName, initTeamState } = useStore()
+
+  const [teamInfo, setTeamInfo] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [accepting, setAccepting] = useState(false)
+  const [result, setResult] = useState(null)
+  const [displayName, setDisplayName] = useState('')
+
+  // Load team info
+  useEffect(() => {
+    if (!token) return
+    useInvitation.getTeamByInvite(token).then(info => {
+      setTeamInfo(info)
+      setLoading(false)
+    })
+  }, [token])
+
+  // Pre-fill display name
+  useEffect(() => {
+    if (userName) setDisplayName(userName)
+  }, [userName])
+
+  const handleAccept = async () => {
+    setAccepting(true)
+    const res = await useInvitation.acceptInvite(token, displayName.trim() || undefined)
+    setResult(res)
+    if (res.success) {
+      await initTeamState()
+      // Auto-select the team
+      if (res.teamId) {
+        useStore.getState().setTeam(res.teamId)
+      }
+    }
+    setAccepting(false)
+  }
+
+  const handleDecline = async () => {
+    await useInvitation.declineInvite(token)
+    navigate('/', { replace: true })
+  }
+
+  const handleGoHome = () => navigate('/', { replace: true })
+
+  // Loading
+  if (loading) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+        <span style={{ fontSize: 14, color: '#999' }}>초대 정보를 확인하는 중...</span>
+      </div>
+    )
+  }
+
+  // Invalid token
+  if (!teamInfo) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+        <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
+          <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`, padding: '40px 32px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>😕</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: T.text }}>유효하지 않은 초대</h3>
+            <p style={{ color: T.textSub, fontSize: 14, margin: '0 0 24px' }}>초대 링크가 만료되었거나 유효하지 않습니다.</p>
+            <button onClick={handleGoHome} style={{ ...btnStyle, background: T.text, color: '#fff' }}>홈으로</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Result screen
+  if (result) {
+    const isPending = result.pending
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+        <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
+          <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`, padding: '40px 32px', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>{result.success ? (isPending ? '⏳' : '🎉') : '❌'}</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: T.text }}>
+              {result.success
+                ? (isPending ? '승인 대기 중' : '팀에 참가했습니다!')
+                : '참가 실패'}
+            </h3>
+            <p style={{ color: T.textSub, fontSize: 14, margin: '0 0 24px' }}>
+              {result.message || (result.success ? `${teamInfo.name} 팀에 참가했습니다.` : result.error)}
+            </p>
+            <button onClick={handleGoHome} style={{ ...btnStyle, background: T.text, color: '#fff' }}>
+              {result.success && !isPending ? '시작하기' : '홈으로'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Accept screen
+  return (
+    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+      <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
+        <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`, padding: '40px 32px', textAlign: 'center' }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12, background: '#37352f',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontSize: 22, fontWeight: 700, margin: '0 auto 16px',
+          }}>{(teamInfo.name || 'T')[0].toUpperCase()}</div>
+          <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: T.text }}>{teamInfo.name}</h3>
+          {teamInfo.description && <p style={{ color: T.textSub, fontSize: 13, margin: '0 0 20px' }}>{teamInfo.description}</p>}
+          {!teamInfo.description && <div style={{ marginBottom: 20 }} />}
+
+          <label style={{ fontSize: 12, color: T.textSub, fontWeight: 600, textAlign: 'left', display: 'block', marginBottom: 4 }}>표시 이름</label>
+          <input
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            placeholder="팀에서 사용할 이름"
+            style={{
+              width: '100%', padding: '10px 12px', border: `1px solid ${T.cardBorder}`,
+              borderRadius: 6, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit',
+              outline: 'none', marginBottom: 20, textAlign: 'center',
+            }}
+          />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={handleAccept} disabled={accepting} style={{ ...btnStyle, background: T.text, color: '#fff', opacity: accepting ? 0.6 : 1 }}>
+              {accepting ? '참가 중...' : '팀 참가하기'}
+            </button>
+            <button onClick={handleDecline} style={{ ...btnStyle, background: '#fff', color: T.text, border: `1px solid ${T.cardBorder}` }}>
+              거절
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

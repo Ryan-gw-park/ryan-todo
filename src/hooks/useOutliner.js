@@ -1,12 +1,18 @@
 import { useRef, useCallback } from 'react'
 
+const MAX_LEVEL = 9
+const MAX_UNDO = 50
+
 /**
  * Shared outliner keyboard/focus logic.
  *
- * @param {Array} nodes - current [{text, level}, ...]
- * @param {Function} setNodes - state setter (accepts new array)
- * @param {Object} opts - { onExitUp, onExitDown } boundary callbacks
- * @returns {{ refs, handleKeyDown, focus }}
+ * Features:
+ * - Arrow / Enter / Backspace navigation
+ * - Tab / Shift+Tab indent (with children follow)
+ * - Shift+Arrow block selection + bulk indent
+ * - Ctrl+Z undo
+ * - Alt+Shift+Arrow reorder
+ * - Paste multi-line
  */
 export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices } = {}) {
   const refs = useRef([])
@@ -19,6 +25,21 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
   const visibleRef = useRef(visibleIndices)
   visibleRef.current = visibleIndices
 
+  // Selection state: [anchorIdx, focusIdx] or null
+  const selectionRef = useRef(null)
+  const onSelectionChange = useRef(null) // set by OutlinerEditor
+
+  // Undo stack
+  const undoStack = useRef([])
+
+  const pushUndo = useCallback(() => {
+    const snap = JSON.stringify(nodesRef.current)
+    const stack = undoStack.current
+    if (stack.length > 0 && stack[stack.length - 1] === snap) return
+    stack.push(snap)
+    if (stack.length > MAX_UNDO) stack.shift()
+  }, [])
+
   /* ── Focus helper (runs after React commit) ── */
   const focus = useCallback((idx, pos = 'end') => {
     setTimeout(() => {
@@ -30,33 +51,145 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
     }, 30)
   }, [])
 
+  /* ── Selection helpers ── */
+  const getSelection = () => selectionRef.current
+  const setSelection = (sel) => {
+    selectionRef.current = sel
+    if (onSelectionChange.current) onSelectionChange.current(sel)
+  }
+  const clearSelection = () => setSelection(null)
+
+  const getSelectedRange = () => {
+    const sel = selectionRef.current
+    if (!sel) return null
+    const [a, b] = sel
+    return [Math.min(a, b), Math.max(a, b)]
+  }
+
+  /* ── Get children range of a node (for subtree operations) ── */
+  const getChildrenEnd = (nodes, idx) => {
+    const parentLevel = nodes[idx].level
+    let end = idx
+    for (let j = idx + 1; j < nodes.length; j++) {
+      if (nodes[j].level > parentLevel) end = j
+      else break
+    }
+    return end
+  }
+
   /* ── Keyboard handler ── */
   const handleKeyDown = useCallback((e, idx) => {
     const nodes = nodesRef.current
 
-    // Alt+Shift+↑ — swap with above
+    // Ctrl+Z — undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault()
+      const stack = undoStack.current
+      if (stack.length === 0) return
+      const prev = JSON.parse(stack.pop())
+      setNodes(prev)
+      focus(Math.min(idx, prev.length - 1))
+      return
+    }
+
+    // Shift+Arrow — block selection
+    if (e.shiftKey && !e.altKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault()
+      const sel = getSelection()
+      if (!sel) {
+        // Start selection from current
+        const nextIdx = e.key === 'ArrowUp' ? Math.max(0, idx - 1) : Math.min(nodes.length - 1, idx + 1)
+        if (nextIdx !== idx) {
+          setSelection([idx, nextIdx])
+          focus(nextIdx)
+        }
+      } else {
+        // Extend selection
+        const [anchor, foc] = sel
+        const nextFoc = e.key === 'ArrowUp' ? Math.max(0, foc - 1) : Math.min(nodes.length - 1, foc + 1)
+        if (anchor === nextFoc) {
+          clearSelection()
+        } else {
+          setSelection([anchor, nextFoc])
+        }
+        focus(nextFoc)
+      }
+      return
+    }
+
+    // Tab / Shift+Tab — indent/outdent (with selection or subtree support)
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      pushUndo()
+      const d = e.shiftKey ? -1 : 1
+      const sel = getSelectedRange()
+
+      if (sel) {
+        // Bulk indent selected range
+        const [start, end] = sel
+        const n = [...nodes]
+        let changed = false
+        for (let i = start; i <= end; i++) {
+          const nl = Math.max(0, Math.min(MAX_LEVEL, n[i].level + d))
+          if (d > 0 && i > 0 && nl > n[i - 1].level + 1) continue
+          if (nl !== n[i].level) { n[i] = { ...n[i], level: nl }; changed = true }
+        }
+        if (changed) setNodes(n)
+        return
+      }
+
+      // Single node: move with children
+      const childEnd = getChildrenEnd(nodes, idx)
+      const n = [...nodes]
+      let changed = false
+      for (let i = idx; i <= childEnd; i++) {
+        const nl = Math.max(0, Math.min(MAX_LEVEL, n[i].level + d))
+        if (d > 0 && i === idx && idx > 0 && nl > n[idx - 1].level + 1) return
+        if (nl !== n[i].level) { n[i] = { ...n[i], level: nl }; changed = true }
+      }
+      if (changed) setNodes(n)
+      return
+    }
+
+    // Clear selection on non-shift/non-ctrl key
+    if (!e.shiftKey && !e.ctrlKey && !e.metaKey && e.key !== 'Tab') {
+      if (getSelection()) clearSelection()
+    }
+
+    // Alt+Shift+↑ — swap with above (including children)
     if (e.altKey && e.shiftKey && e.key === 'ArrowUp') {
       e.preventDefault()
       if (idx === 0) return
+      pushUndo()
+      const childEnd = getChildrenEnd(nodes, idx)
+      const block = nodes.slice(idx, childEnd + 1)
       const n = [...nodes]
-      ;[n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]
+      n.splice(idx, block.length)
+      const insertAt = Math.max(0, idx - 1)
+      n.splice(insertAt, 0, ...block)
       setNodes(n)
-      focus(idx - 1)
+      focus(insertAt)
       return
     }
-    // Alt+Shift+↓ — swap with below
+    // Alt+Shift+↓ — swap with below (including children)
     if (e.altKey && e.shiftKey && e.key === 'ArrowDown') {
       e.preventDefault()
-      if (idx >= nodes.length - 1) return
+      const childEnd = getChildrenEnd(nodes, idx)
+      if (childEnd >= nodes.length - 1) return
+      pushUndo()
+      const block = nodes.slice(idx, childEnd + 1)
       const n = [...nodes]
-      ;[n[idx], n[idx + 1]] = [n[idx + 1], n[idx]]
+      n.splice(idx, block.length)
+      const insertAt = idx + 1
+      n.splice(insertAt, 0, ...block)
       setNodes(n)
-      focus(idx + 1)
+      focus(insertAt)
       return
     }
     // Enter — split at cursor / delete empty
     if (e.key === 'Enter') {
       e.preventDefault()
+      pushUndo()
       const cursor = e.target.selectionStart
       const before = nodes[idx].text.slice(0, cursor)
       const after = nodes[idx].text.slice(cursor)
@@ -74,21 +207,11 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       focus(idx + 1, 'start')
       return
     }
-    // Tab / Shift+Tab — indent / outdent
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const d = e.shiftKey ? -1 : 1
-      const nl = Math.max(0, Math.min(3, nodes[idx].level + d))
-      if (d > 0 && idx > 0 && nl > nodes[idx - 1].level + 1) return
-      const n = [...nodes]
-      n[idx] = { ...n[idx], level: nl }
-      setNodes(n)
-      return
-    }
     // Backspace on empty — delete + focus previous
     if (e.key === 'Backspace' && nodes[idx].text === '') {
       e.preventDefault()
       if (nodes.length <= 1) return
+      pushUndo()
       setNodes(nodes.filter((_, j) => j !== idx))
       focus(Math.max(0, idx - 1))
       return
@@ -98,11 +221,9 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       e.preventDefault()
       const el = e.target
       if (el.selectionStart !== 0) {
-        // 현재 불릿 시작점으로 이동
         el.setSelectionRange(0, 0)
         return
       }
-      // 이미 시작점 → 이전 불릿 끝점으로 이동
       const vis = visibleRef.current
       if (vis) {
         const vPos = vis.indexOf(idx)
@@ -116,12 +237,10 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       e.preventDefault()
       const el = e.target
       if (el.selectionStart !== el.value.length) {
-        // 현재 불릿 끝점으로 이동
         const len = el.value.length
         el.setSelectionRange(len, len)
         return
       }
-      // 이미 끝점 → 다음 불릿 시작점으로 이동
       const vis = visibleRef.current
       if (vis) {
         const vPos = vis.indexOf(idx)
@@ -130,7 +249,12 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       if (exitDownRef.current) exitDownRef.current()
       return
     }
-  }, [setNodes, focus])
+
+    // Any other character input → push undo (throttled by snap comparison)
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+      pushUndo()
+    }
+  }, [setNodes, focus, pushUndo])
 
   /* ── Paste handler — split multi-line text into separate nodes ── */
   const handlePaste = useCallback((e, idx) => {
@@ -138,6 +262,7 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
     if (!text || !text.includes('\n')) return // single-line → default behavior
 
     e.preventDefault()
+    pushUndo()
     const nodes = nodesRef.current
     const cursor = e.target.selectionStart
     const selEnd = e.target.selectionEnd
@@ -148,13 +273,10 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
     if (lines.length === 0) return
 
     const n = [...nodes]
-    // First line merges with text before cursor
     const newNodes = [{ ...n[idx], text: before + lines[0] }]
-    // Middle lines become new nodes at same level
     for (let i = 1; i < lines.length; i++) {
       newNodes.push({ text: lines[i], level: n[idx].level })
     }
-    // Last new node gets the text after cursor appended
     newNodes[newNodes.length - 1] = {
       ...newNodes[newNodes.length - 1],
       text: newNodes[newNodes.length - 1].text + after
@@ -162,11 +284,10 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
 
     n.splice(idx, 1, ...newNodes)
     setNodes(n)
-    // Focus last pasted line, cursor at end of pasted text (before 'after')
     const lastIdx = idx + newNodes.length - 1
     const lastPos = newNodes[newNodes.length - 1].text.length - after.length
     focus(lastIdx, lastPos)
-  }, [setNodes, focus])
+  }, [setNodes, focus, pushUndo])
 
-  return { refs, handleKeyDown, handlePaste, focus }
+  return { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection }
 }

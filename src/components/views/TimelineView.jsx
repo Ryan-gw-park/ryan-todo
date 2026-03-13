@@ -4,6 +4,9 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
+import useTeamMembers from '../../hooks/useTeamMembers'
+import ProjectFilter from '../shared/ProjectFilter'
+import useProjectFilter from '../../hooks/useProjectFilter'
 
 /* ─── Date helpers ─── */
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
@@ -99,7 +102,8 @@ const SCALES = [
 ]
 
 export default function TimelineView() {
-  const { projects, tasks, openDetail, updateTask, reorderTasks, moveTaskTo, collapseState, toggleCollapse: storeToggle } = useStore()
+  const { projects, tasks, openDetail, updateTask, reorderTasks, moveTaskTo, collapseState, toggleCollapse: storeToggle, currentTeamId } = useStore()
+  const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
   const panelW = isMobile ? LEFT_PANEL_MOBILE : LEFT_PANEL
 
@@ -109,6 +113,17 @@ export default function TimelineView() {
   const collapsed = collapseState.timeline || {}
   const gridRef = useRef(null)
   const [activeId, setActiveId] = useState(null)
+
+  // ★ Loop-21: 팀원 이름 조회 (팀 모드일 때)
+  const [memberMap, setMemberMap] = useState({})
+  useEffect(() => {
+    if (!currentTeamId) return
+    useTeamMembers.getMembers(currentTeamId).then(members => {
+      const map = {}
+      members.forEach(m => { map[m.userId] = m.displayName })
+      setMemberMap(map)
+    })
+  }, [currentTeamId])
 
   // DnD sensors
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
@@ -149,14 +164,14 @@ export default function TimelineView() {
 
   /* ─── Data ─── */
   const projectRows = useMemo(() => {
-    return projects.map(p => {
+    return filteredProjects.map(p => {
       const c = getColor(p.color)
-      const projectTasks = tasks
+      const projectTasks = filteredTasks
         .filter(t => t.projectId === p.id && t.category !== 'done')
         .sort((a, b) => a.sortOrder - b.sortOrder)
       return { project: p, color: c, tasks: projectTasks }
     })
-  }, [projects, tasks])
+  }, [filteredProjects, filteredTasks])
 
   /* ─── DnD handlers ─── */
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
@@ -242,25 +257,34 @@ export default function TimelineView() {
     <div style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         {/* ── Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: isMobile ? '0 16px' : 0, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>타임라인</h1>
+              <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{periodLabel}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <ProjectFilter />
+              <div style={{ display: 'flex', gap: 4 }}>
+              {SCALES.map(s => (
+                <button key={s.key} onClick={() => setScale(s.key)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                    fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.1s',
+                    background: scale === s.key ? '#37352f' : 'white',
+                    color: scale === s.key ? 'white' : '#666',
+                    border: scale === s.key ? 'none' : '1px solid #e0e0e0',
+                  }}
+                >{s.label}</button>
+              ))}
+              </div>
+            </div>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={() => navigate(-1)} style={navBtnStyle}>◀ {prevLabel}</button>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#37352f', margin: 0, minWidth: 160, textAlign: 'center' }}>{periodLabel}</h1>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#37352f', margin: 0, minWidth: 140, textAlign: 'center' }}>{periodLabel}</h2>
             <button onClick={() => navigate(1)} style={navBtnStyle}>{nextLabel} ▶</button>
             <button onClick={goToday} style={{ ...navBtnStyle, background: '#ef4444', color: 'white', border: 'none', fontWeight: 600 }}>오늘</button>
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {SCALES.map(s => (
-              <button key={s.key} onClick={() => setScale(s.key)}
-                style={{
-                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                  fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.1s',
-                  background: scale === s.key ? '#37352f' : 'white',
-                  color: scale === s.key ? 'white' : '#666',
-                  border: scale === s.key ? 'none' : '1px solid #e0e0e0',
-                }}
-              >{s.label}</button>
-            ))}
           </div>
         </div>
 
@@ -293,7 +317,7 @@ export default function TimelineView() {
                     {!isCollapsed && (
                       <SortableContext items={pts.map(t => t.id)} strategy={verticalListSortingStrategy}>
                         {pts.map(task => (
-                          <SortableTaskRow key={task.id} task={task} openDetail={openDetail} rowH={ROW_H} isDragging={activeId === task.id} />
+                          <SortableTaskRow key={task.id} task={task} openDetail={openDetail} rowH={ROW_H} isDragging={activeId === task.id} assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null} />
                         ))}
                       </SortableContext>
                     )}
@@ -389,6 +413,9 @@ export default function TimelineView() {
         {!projects.length && (
           <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>프로젝트를 추가하면 타임라인이 표시됩니다</div>
         )}
+        {projects.length > 0 && filteredProjects.length === 0 && (
+          <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>해당 필터에 맞는 프로젝트가 없습니다</div>
+        )}
       </div>
     </div>
   )
@@ -409,7 +436,7 @@ function ProjectDropZone({ id, children }) {
 }
 
 /* ─── Sortable task row in left panel ─── */
-function SortableTaskRow({ task, openDetail, rowH, isDragging }) {
+function SortableTaskRow({ task, openDetail, rowH, isDragging, assigneeName }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -418,6 +445,7 @@ function SortableTaskRow({ task, openDetail, rowH, isDragging }) {
     height: rowH,
     display: 'flex',
     alignItems: 'center',
+    gap: 4,
     cursor: 'grab',
     boxSizing: 'border-box',
     opacity: isDragging ? 0.3 : 1,
@@ -430,7 +458,8 @@ function SortableTaskRow({ task, openDetail, rowH, isDragging }) {
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = 'rgba(0,0,0,0.02)' }}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
-      <span style={{ fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</span>
+      <span style={{ fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{task.text}</span>
+      {assigneeName && <span style={{ fontSize: 9, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
     </div>
   )
 }

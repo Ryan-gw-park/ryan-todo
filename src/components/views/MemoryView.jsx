@@ -244,10 +244,10 @@ export default function MemoryView() {
     <div data-view="memory" style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#37352f', margin: 0 }}>노트</h1>
-            <span style={{ fontSize: 11, color: '#bbb' }}>Alt+N 새 노트</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>노트</h1>
+            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>Alt+N 새 노트</p>
           </div>
           <button onClick={handleAdd}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: '1px solid #e8e8e8', background: 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 500, color: '#37352f', transition: 'all 0.15s' }}

@@ -11,18 +11,42 @@ import { getColor } from '../../utils/colors'
 import { CheckIcon } from '../shared/Icons'
 import { parseDateFromText } from '../../utils/dateParser'
 import { getNextAlarmTime } from '../../utils/alarm'
+import ProjectFilter from '../shared/ProjectFilter'
+import useProjectFilter from '../../hooks/useProjectFilter'
+import useTeamMembers from '../../hooks/useTeamMembers'
+
+const HIGHLIGHT_COLORS = {
+  red:    { bg: '#E53E3E' },
+  orange: { bg: '#DD6B20' },
+  yellow: { bg: '#D69E2E' },
+  blue:   { bg: '#3182CE' },
+  green:  { bg: '#38A169' },
+  purple: { bg: '#805AD5' },
+}
 
 export default function TodayView() {
-  const { projects, tasks, moveTaskTo, reorderTasks, collapseState, toggleCollapse, setCollapseGroup } = useStore()
+  const { projects, tasks, moveTaskTo, reorderTasks, collapseState, toggleCollapse, setCollapseGroup, currentTeamId } = useStore()
+  const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
 
   const [activeId, setActiveId] = useState(null)
+
+  // ★ Loop-21: 팀원 이름 조회 (팀 모드일 때)
+  const [memberMap, setMemberMap] = useState({})
+  useEffect(() => {
+    if (!currentTeamId) return
+    useTeamMembers.getMembers(currentTeamId).then(members => {
+      const map = {}
+      members.forEach(m => { map[m.userId] = m.displayName })
+      setMemberMap(map)
+    })
+  }, [currentTeamId])
   const collapsed = collapseState.today || {}
-  const allCollapsed = projects.every(p => collapsed[p.id])
+  const allCollapsed = filteredProjects.every(p => collapsed[p.id])
 
   const toggleAll = () => {
     const newState = {}
-    projects.forEach(p => { newState[p.id] = !allCollapsed })
+    filteredProjects.forEach(p => { newState[p.id] = !allCollapsed })
     setCollapseGroup('today', newState)
   }
   const toggleProject = (pid) => toggleCollapse('today', pid)
@@ -122,12 +146,14 @@ export default function TodayView() {
   return (
     <div data-view="today" style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
-        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#37352f', margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
-            <p style={{ fontSize: 14, color: '#999', marginTop: 6 }}>{dateStr}</p>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
+            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
           </div>
-          <button
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ProjectFilter />
+            <button
             onClick={toggleAll}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#999', fontFamily: 'inherit', padding: '4px 0', whiteSpace: 'nowrap' }}
             onMouseEnter={e => e.currentTarget.style.color = '#37352f'}
@@ -135,6 +161,7 @@ export default function TodayView() {
           >
             {allCollapsed ? '전체 펼치기' : '전체 접기'}
           </button>
+          </div>
         </div>
         {todayAlarms.length > 0 && (
           <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fffdf5', borderRadius: 10, border: '1px solid rgba(0,0,0,0.06)' }}>
@@ -157,13 +184,13 @@ export default function TodayView() {
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
-            {projects.map(p => {
+            {filteredProjects.map(p => {
               const c = getColor(p.color)
               const todayTasks = tasks
                 .filter(t => t.projectId === p.id && t.category === 'today')
                 .sort((a, b) => a.sortOrder - b.sortOrder)
               return (
-                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} />
+                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} memberMap={memberMap} />
               )
             })}
           </div>
@@ -178,7 +205,7 @@ export default function TodayView() {
 }
 
 /* ─── Project card with drop zone + keyboard navigation ─── */
-function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse }) {
+function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse, memberMap }) {
   const { addTask, updateTask, deleteTask, reorderTasks } = useStore()
   const { isOver, setNodeRef } = useDroppable({ id: `project:${project.id}` })
   const showHighlight = isOver && activeId
@@ -255,6 +282,7 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
                   ref={el => taskRefs.current[tk.id] = el}
                   task={tk}
                   color={color}
+                  memberMap={memberMap}
                   onMoveUp={() => {
                     if (i > 0) taskRefs.current[todayTasks[i - 1].id]?.focusTitle('end')
                   }}
@@ -278,10 +306,11 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
 
 /* ─── Sortable + editable task item ─── */
 const SortableTaskItem = forwardRef(function SortableTaskItem(
-  { task, color, onMoveUp, onMoveDown, onSwapUp, onSwapDown, onTitleEnter, onTitleBackspace },
+  { task, color, memberMap, onMoveUp, onMoveDown, onSwapUp, onSwapDown, onTitleEnter, onTitleBackspace },
   ref
 ) {
-  const { toggleDone, updateTask, openDetail, deleteTask } = useStore()
+  const { toggleDone, updateTask, openDetail, deleteTask, currentTeamId } = useStore()
+  const assigneeName = currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null
   const isMobile = window.innerWidth < 768
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -290,6 +319,10 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
   const titleRef = useRef(null)
   const [titleText, setTitleText] = useState(task.text)
   const [hovering, setHovering] = useState(false)
+
+  // ★ Loop-21: Highlight color — 팀 모드: 개인별, 개인 모드: tasks 직접
+  const hlColorKey = useStore.getState().getHighlightColor(task.id)
+  const hlColor = hlColorKey && HIGHLIGHT_COLORS[hlColorKey]
   const [showMenu, setShowMenu] = useState(false)
   const longPressTimer = useRef(null)
 
@@ -357,11 +390,15 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
 
   const rowStyle = {
     display: 'flex', alignItems: 'flex-start', gap: 8,
-    padding: '5px 4px', borderRadius: 6, position: 'relative',
+    padding: hlColor ? '6px 8px' : '5px 4px',
+    borderRadius: hlColor ? 8 : 6,
+    marginBottom: hlColor ? 3 : 0,
+    position: 'relative',
     transition: transition || 'background 0.1s',
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.3 : 1,
-    background: isDragging ? 'rgba(0,0,0,0.02)' : 'transparent',
+    background: isDragging ? 'rgba(0,0,0,0.02)' : hlColor ? hlColor.bg : 'transparent',
+    ...(hlColor ? { color: '#fff' } : {}),
   }
 
   return (
@@ -387,9 +424,11 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
           flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
           border: 'none', outline: 'none', padding: '2px 0',
           fontFamily: 'inherit', background: 'transparent',
-          color: '#37352f', lineHeight: '19px', boxSizing: 'border-box',
+          color: hlColor ? '#fff' : '#37352f', lineHeight: '19px', boxSizing: 'border-box',
         }}
       />
+      {/* ★ Loop-21: 담당자 이름 — 팀 모드, 배정 할일만 */}
+      {assigneeName && <span style={{ fontSize: 10, color: hlColor ? 'rgba(255,255,255,0.8)' : '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
       {/* Detail open button — hover only (desktop) */}
       {!isMobile && (
         <button

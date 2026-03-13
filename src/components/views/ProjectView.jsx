@@ -2,18 +2,40 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import { parseDateFromText } from '../../utils/dateParser'
-import { SettingsIcon, PlusIcon, ChevronIcon, CheckIcon, UndoIcon, TrashIcon } from '../shared/Icons'
+import { PlusIcon, ChevronIcon, CheckIcon, UndoIcon, TrashIcon } from '../shared/Icons'
 import OutlinerEditor from '../shared/OutlinerEditor'
+import ProjectFilter from '../shared/ProjectFilter'
+import useProjectFilter from '../../hooks/useProjectFilter'
+import useTeamMembers from '../../hooks/useTeamMembers'
 
 const NON_DONE_CATS = CATEGORIES.filter(c => c.key !== 'done')
 
 export default function ProjectView() {
-  const { projects, tasks, setShowProjectMgr, collapseState, setCollapseValue } = useStore()
+  const { projects, tasks, collapseState, setCollapseValue, currentTeamId } = useStore()
+  const { filteredProjects } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
-  const [activeProject, setActiveProject] = useState(projects[0]?.id || '')
+  const [activeProject, setActiveProject] = useState(filteredProjects[0]?.id || '')
+
+  // ★ Loop-21: 팀원 이름 조회 (팀 모드일 때)
+  const [memberMap, setMemberMap] = useState({})
+  useEffect(() => {
+    if (!currentTeamId) return
+    useTeamMembers.getMembers(currentTeamId).then(members => {
+      const map = {}
+      members.forEach(m => { map[m.userId] = m.displayName })
+      setMemberMap(map)
+    })
+  }, [currentTeamId])
   const expanded = collapseState.projectExpanded || {}
   const categoryRefs = useRef({})
   const pendingFocusProject = useRef(null)
+
+  // Auto-switch active tab when hidden by filter
+  useEffect(() => {
+    if (filteredProjects.length > 0 && !filteredProjects.find(pr => pr.id === activeProject)) {
+      setActiveProject(filteredProjects[0].id)
+    }
+  }, [filteredProjects, activeProject])
 
   useEffect(() => {
     const newExp = {}
@@ -56,21 +78,38 @@ export default function ProjectView() {
     const handler = (e) => {
       if (e.ctrlKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault()
-        const idx = projects.findIndex(pr => pr.id === activeProject)
+        const idx = filteredProjects.findIndex(pr => pr.id === activeProject)
         if (idx === -1) return
         const next = e.key === 'ArrowLeft'
-          ? (idx - 1 + projects.length) % projects.length
-          : (idx + 1) % projects.length
-        pendingFocusProject.current = projects[next].id
-        setActiveProject(projects[next].id)
+          ? (idx - 1 + filteredProjects.length) % filteredProjects.length
+          : (idx + 1) % filteredProjects.length
+        pendingFocusProject.current = filteredProjects[next].id
+        setActiveProject(filteredProjects[next].id)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [activeProject, projects])
+  }, [activeProject, filteredProjects])
 
-  const p = projects.find(pr => pr.id === activeProject) || projects[0]
-  if (!p) return <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>프로젝트를 추가하세요</div>
+  const p = filteredProjects.find(pr => pr.id === activeProject) || filteredProjects[0]
+
+  // No projects match current filter — show structure with filter so user can navigate back
+  if (!p) return (
+    <div style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
+      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>프로젝트</h1>
+            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>↑↓ 이동 · Enter 새 항목 · Tab 레벨 · Ctrl+←/→ 프로젝트 이동</p>
+          </div>
+          <ProjectFilter />
+        </div>
+        <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>
+          {projects.length === 0 ? '프로젝트를 추가하세요' : '해당 필터에 맞는 프로젝트가 없습니다'}
+        </div>
+      </div>
+    </div>
+  )
 
   const c = getColor(p.color)
   const toggleExpand = (id) => setCollapseValue('projectExpanded', id, !(expanded[id] !== false))
@@ -95,27 +134,59 @@ export default function ProjectView() {
   return (
     <div style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 800, margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>프로젝트</h1>
+            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>↑↓ 이동 · Enter 새 항목 · Tab 레벨 · Ctrl+←/→ 프로젝트 이동</p>
+          </div>
+          <ProjectFilter />
+        </div>
+
         {/* Project chips */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 28, overflowX: 'auto', paddingBottom: 4, alignItems: 'center' }}>
-          {projects.map(pr => {
-            const pc = getColor(pr.color)
-            const isAct = pr.id === activeProject
+          {(() => {
+            const teamPs = currentTeamId ? filteredProjects.filter(pr => pr.teamId === currentTeamId) : filteredProjects
+            const personalPs = currentTeamId ? filteredProjects.filter(pr => !pr.teamId) : []
+            const showDivider = currentTeamId && teamPs.length > 0 && personalPs.length > 0
             return (
-              <button key={pr.id} onClick={() => setActiveProject(pr.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: isAct ? `1.5px solid ${pc.dot}` : '1px solid #e8e8e8', background: isAct ? pc.header : 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: isAct ? 600 : 400, color: isAct ? pc.text : '#888', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: pc.dot }} />{pr.name}
-              </button>
+              <>
+                {teamPs.map(pr => {
+                  const pc = getColor(pr.color)
+                  const isAct = pr.id === activeProject
+                  return (
+                    <button key={pr.id} onClick={() => setActiveProject(pr.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: isAct ? `1.5px solid ${pc.dot}` : '1px solid #e8e8e8', background: isAct ? pc.header : 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: isAct ? 600 : 400, color: isAct ? pc.text : '#888', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: pc.dot }} />{pr.name}
+                    </button>
+                  )
+                })}
+                {showDivider && (
+                  <>
+                    <div style={{ width: 1, height: 24, background: '#e0e0e0', flexShrink: 0, margin: '0 2px' }} />
+                    <span style={{ fontSize: 10, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>개인</span>
+                  </>
+                )}
+                {personalPs.map(pr => {
+                  const pc = getColor(pr.color)
+                  const isAct = pr.id === activeProject
+                  return (
+                    <button key={pr.id} onClick={() => setActiveProject(pr.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: isAct ? `1.5px solid ${pc.dot}` : '1px solid #e8e8e8', background: isAct ? pc.header : 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: isAct ? 600 : 400, color: isAct ? pc.text : '#888', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: pc.dot }} />{pr.name}
+                    </button>
+                  )
+                })}
+              </>
             )
-          })}
-          <button onClick={() => setShowProjectMgr(true)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #e8e8e8', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#bbb' }}><SettingsIcon /></button>
+          })()}
         </div>
 
         {/* Project header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <div style={{ width: 14, height: 14, borderRadius: 4, background: c.dot }} />
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#37352f', margin: 0 }}>{p.name}</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#37352f', margin: 0 }}>{p.name}</h1>
         </div>
-        <p style={{ fontSize: 13, color: '#bbb', marginBottom: 28, paddingLeft: 26 }}>↑↓ 자유 이동 · Enter 새 항목/분리 · Tab 레벨 · Alt+Shift+↑↓ 순서 이동 · Ctrl+←/→ 프로젝트 이동</p>
 
         {/* Category sections */}
         {CATEGORIES.map((cat, ci) => {
@@ -130,6 +201,7 @@ export default function ProjectView() {
               color={c}
               expanded={expanded}
               toggleExpand={toggleExpand}
+              memberMap={memberMap}
               onExitSectionDown={() => handleExitSectionDown(ci)}
               onExitSectionUp={() => handleExitSectionUp(ci)}
             />
@@ -141,7 +213,7 @@ export default function ProjectView() {
 }
 
 /* ── Category section — manages inter-task navigation ── */
-const CategorySection = forwardRef(function CategorySection({ cat, catTasks, projectId, color, expanded, toggleExpand, onExitSectionDown, onExitSectionUp }, ref) {
+const CategorySection = forwardRef(function CategorySection({ cat, catTasks, projectId, color, expanded, toggleExpand, memberMap, onExitSectionDown, onExitSectionUp }, ref) {
   const { addTask, updateTask, deleteTask, collapseState, toggleCollapse } = useStore()
   const taskRefs = useRef({})
   const addBtnRef = useRef(null)
@@ -293,6 +365,7 @@ const CategorySection = forwardRef(function CategorySection({ cat, catTasks, pro
             color={color}
             expanded={expanded}
             toggleExpand={toggleExpand}
+            memberMap={memberMap}
             sectionCollapsed={sectionCollapsed}
             onExitUp={() => handleTaskExitUp(i)}
             onExitDown={() => handleTaskExitDown(i)}
@@ -310,10 +383,11 @@ const CategorySection = forwardRef(function CategorySection({ cat, catTasks, pro
 
 /* ── Task node — always-editable title + outliner notes ── */
 const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
-  { task, color, expanded, toggleExpand, sectionCollapsed, onExitUp, onExitDown, onTitleEnter, onTitleBackspace, onSwapUp, onSwapDown },
+  { task, color, expanded, toggleExpand, memberMap, sectionCollapsed, onExitUp, onExitDown, onTitleEnter, onTitleBackspace, onSwapUp, onSwapDown },
   ref
 ) {
-  const { toggleDone, updateTask, deleteTask, openDetail, collapseState: cs, setCollapseValue: setCV } = useStore()
+  const { toggleDone, updateTask, deleteTask, openDetail, collapseState: cs, setCollapseValue: setCV, currentTeamId: teamId } = useStore()
+  const assigneeName = teamId && task.assigneeId ? memberMap[task.assigneeId] : null
   const titleRef = useRef(null)
   const editorRef = useRef(null)
   const [titleText, setTitleText] = useState(task.text)
@@ -469,6 +543,7 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
           placeholder="할일 입력..."
           style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, border: 'none', outline: 'none', padding: '2px 6px', fontFamily: 'inherit', background: 'transparent', color: '#37352f', lineHeight: '22px', boxSizing: 'border-box' }}
         />
+        {assigneeName && <span style={{ fontSize: 10, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
         {task.dueDate && <span style={{ fontSize: 11, color: '#ccc', fontWeight: 400, flexShrink: 0 }}>{task.dueDate}</span>}
         <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0 }} className="outliner-actions">
           <button

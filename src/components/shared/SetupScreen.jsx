@@ -27,7 +27,7 @@ export default function SetupScreen({ onConnect }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
       <div style={{ width: 'min(440px, 92vw)', padding: 36 }}>
         <div style={{ width: 24, height: 24, borderRadius: 6, background: '#37352f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 13, fontWeight: 700, marginBottom: 16 }}>R</div>
-        <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 5 }}>Ryan Todo 설정</div>
+        <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 5 }}>Ryan's Todo 설정</div>
         <div style={{ fontSize: 12, color: 'rgba(55,53,47,.65)', marginBottom: 22, lineHeight: 1.6 }}>
           Supabase 연결 정보를 입력해주세요.
         </div>

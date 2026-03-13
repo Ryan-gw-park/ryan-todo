@@ -31,6 +31,8 @@ export const BULLET_STYLES = [
   (c) => ({ width: 5, height: 5, borderRadius: 1, border: `1.5px solid ${c || '#ccc'}`, background: 'transparent' }),
 ]
 
+// Level 5+ returns null → OutlinerRow renders "-" text instead
 export function getBulletStyle(level, color) {
-  return BULLET_STYLES[level % BULLET_STYLES.length](color)
+  if (level >= 4) return null
+  return BULLET_STYLES[level](color)
 }

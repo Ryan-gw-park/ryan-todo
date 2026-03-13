@@ -7,8 +7,17 @@ import { CacheFirst, StaleWhileRevalidate, NetworkFirst } from 'workbox-strategi
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { ExpirationPlugin } from 'workbox-expiration'
 
+import { createHandlerBoundToURL } from 'workbox-precaching'
+
 // Precache: VitePWA replaces self.__WB_MANIFEST with actual file list at build time
 precacheAndRoute(self.__WB_MANIFEST)
+
+// HTML Navigation → 프리캐시된 index.html 사용 (오프라인/캐시 만료 시 앱 셸 즉시 표시)
+const navigationHandler = createHandlerBoundToURL('/index.html')
+const navigationRoute = new NavigationRoute(navigationHandler, {
+  denylist: [/^\/api\//, /^\/supabase\//],
+})
+registerRoute(navigationRoute)
 
 // JS/CSS/Font → Cache First
 registerRoute(
@@ -39,7 +48,7 @@ registerRoute(
   ({ url }) => url.hostname.includes('supabase'),
   new NetworkFirst({
     cacheName: 'api-cache',
-    networkTimeoutSeconds: 5,
+    networkTimeoutSeconds: 3,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 }),

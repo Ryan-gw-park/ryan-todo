@@ -3,7 +3,7 @@ import useStore from '../../hooks/useStore'
 import { PlusIcon } from './Icons'
 import { parseDateFromText } from '../../utils/dateParser'
 
-export default function InlineAdd({ projectId, category, color }) {
+export default function InlineAdd({ projectId, category, color, extraFields }) {
   const { addTask } = useStore()
   const [active, setActive] = useState(false)
   const [text, setText] = useState('')
@@ -14,7 +14,7 @@ export default function InlineAdd({ projectId, category, color }) {
   const handleAdd = () => {
     if (!text.trim()) return
     const { startDate, dueDate } = parseDateFromText(text.trim())
-    addTask({ text: text.trim(), projectId, category, startDate, dueDate })
+    addTask({ text: text.trim(), projectId, category, startDate, dueDate, ...extraFields })
     setText('')
   }
 

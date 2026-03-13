@@ -14,6 +14,26 @@ body {
   to { transform: translateX(0); }
 }
 
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 @keyframes toastIn {
   from { transform: translateX(-50%) translateY(20px); opacity: 0; }
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -34,7 +54,7 @@ body {
 /* Responsive visibility */
 .desktop-nav { display: none !important; }
 .mobile-topbar { display: flex !important; }
-.mobile-bottomnav { display: flex !important; }
+.mobile-bottomnav { display: none !important; }
 .mobile-fab { display: flex !important; }
 
 @media (min-width: 768px) {
@@ -47,4 +67,5 @@ body {
 /* Prevent iOS zoom on inputs */
 @media (max-width: 767px) {
   input, textarea, select { font-size: 16px !important; }
+  .help-toc { display: none !important; }
 }

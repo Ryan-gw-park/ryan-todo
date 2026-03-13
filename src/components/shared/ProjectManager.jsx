@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import useStore from '../../hooks/useStore'
 import { COLOR_OPTIONS, getColor } from '../../utils/colors'
 import { PlusIcon, GripIcon, EditIcon, TrashIcon } from './Icons'
+import { getCachedUserId } from '../../hooks/useStore'
 
 export default function ProjectManager() {
-  const { projects, setShowProjectMgr, addProject, updateProject, deleteProject, reorderProjects, logout } = useStore()
+  const { projects, setShowProjectMgr, addProject, updateProject, deleteProject, reorderProjects, logout, currentTeamId, myRole } = useStore()
   const isMobile = window.innerWidth < 768
 
   const [editingId, setEditingId] = useState(null)
@@ -13,6 +14,7 @@ export default function ProjectManager() {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('blue')
+  const [newScope, setNewScope] = useState('team')
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [dragIdx, setDragIdx] = useState(null)
   const [dragOverIdx, setDragOverIdx] = useState(null)
@@ -24,7 +26,12 @@ export default function ProjectManager() {
 
   const startEdit = (p) => { setEditingId(p.id); setEditName(p.name); setEditColor(p.color) }
   const saveEdit = () => { if (editName.trim()) updateProject(editingId, { name: editName.trim(), color: editColor }); setEditingId(null) }
-  const handleAdd = () => { if (newName.trim()) { addProject(newName.trim(), newColor); setNewName(''); setNewColor('blue'); setAdding(false) } }
+  const handleAdd = () => {
+    if (newName.trim()) {
+      addProject(newName.trim(), newColor, currentTeamId ? newScope : undefined)
+      setNewName(''); setNewColor('blue'); setNewScope('team'); setAdding(false)
+    }
+  }
 
   const handleDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move' }
   const handleDragOver = (e, idx) => { e.preventDefault(); setDragOverIdx(idx) }
@@ -66,6 +73,10 @@ export default function ProjectManager() {
                         <button key={co.id} onClick={() => setEditColor(co.id)} style={{ width: 24, height: 24, borderRadius: 6, background: co.dot, border: editColor === co.id ? '2.5px solid #37352f' : '2px solid transparent', cursor: 'pointer', transition: 'border 0.1s' }} />
                       ))}
                     </div>
+                    {/* ★ Loop-21: 소속 읽기전용 표시 (변경 불가) */}
+                    {currentTeamId && (
+                      <div style={{ fontSize: 11, color: '#999' }}>소속: {p.teamId ? '팀 프로젝트' : '개인 프로젝트'} (변경 불가)</div>
+                    )}
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={saveEdit} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: 'none', background: '#37352f', color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>저장</button>
                       <button onClick={() => setEditingId(null)} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
@@ -75,15 +86,26 @@ export default function ProjectManager() {
                   <>
                     <div style={{ width: 12, height: 12, borderRadius: 3, background: c.dot, flexShrink: 0 }} />
                     <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#37352f' }}>{p.name}</span>
-                    <button onClick={() => startEdit(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 4, display: 'flex' }}><EditIcon /></button>
-                    {confirmDelete === p.id ? (
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => { deleteProject(p.id); setConfirmDelete(null) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontFamily: 'inherit' }}>삭제</button>
-                        <button onClick={() => setConfirmDelete(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setConfirmDelete(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 4, display: 'flex' }}><TrashIcon /></button>
+                    {/* ★ Loop-21: 팀/개인 뱃지 (팀 모드일 때만) */}
+                    {currentTeamId && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, flexShrink: 0, background: p.teamId ? '#e6f4ea' : '#f3e8fd', color: p.teamId ? '#1e7e34' : '#7c3aed' }}>
+                        {p.teamId ? '팀' : '개인'}
+                      </span>
                     )}
+                    <button onClick={() => startEdit(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 4, display: 'flex' }}><EditIcon /></button>
+                    {/* ★ Loop-21: 삭제 권한 — 팀 프로젝트: 팀장만, 개인: 본인만 */}
+                    {(() => {
+                      const canDelete = p.teamId ? myRole === 'owner' : (!currentTeamId || p.userId === getCachedUserId())
+                      if (!canDelete) return null
+                      return confirmDelete === p.id ? (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => { deleteProject(p.id); setConfirmDelete(null) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontFamily: 'inherit' }}>삭제</button>
+                          <button onClick={() => setConfirmDelete(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDelete(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dbb', padding: 4, display: 'flex' }}><TrashIcon /></button>
+                      )
+                    })()}
                   </>
                 )}
               </div>
@@ -100,6 +122,13 @@ export default function ProjectManager() {
                   <button key={co.id} onClick={() => setNewColor(co.id)} style={{ width: 24, height: 24, borderRadius: 6, background: co.dot, border: newColor === co.id ? '2.5px solid #37352f' : '2px solid transparent', cursor: 'pointer' }} />
                 ))}
               </div>
+              {/* ★ Loop-21: 팀/개인 소속 선택 (팀 모드일 때만) */}
+              {currentTeamId && (
+                <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                  <button onClick={() => setNewScope('team')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, border: newScope === 'team' ? '1.5px solid #1e7e34' : '1px solid #ddd', background: newScope === 'team' ? '#e6f4ea' : 'white', color: newScope === 'team' ? '#1e7e34' : '#888' }}>팀 프로젝트</button>
+                  <button onClick={() => setNewScope('personal')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, border: newScope === 'personal' ? '1.5px solid #7c3aed' : '1px solid #ddd', background: newScope === 'personal' ? '#f3e8fd' : 'white', color: newScope === 'personal' ? '#7c3aed' : '#888' }}>개인 프로젝트</button>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 6 }}>
                 <button onClick={handleAdd} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: 'none', background: '#37352f', color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>추가</button>
                 <button onClick={() => { setAdding(false); setNewName('') }} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>

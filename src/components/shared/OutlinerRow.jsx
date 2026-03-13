@@ -2,13 +2,15 @@ import { useRef, useCallback, useLayoutEffect } from 'react'
 import { getBulletStyle } from '../../utils/colors'
 import { OutdentIcon, IndentIcon, TrashIcon } from './Icons'
 
+const MAX_LEVEL = 9
+
 function autoResize(el) {
   if (!el) return
   el.style.height = '0'
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onPaste, onDelete, onChangeLevel, showPlaceholder, hasChildren, isCollapsed, onToggleCollapse }) {
+export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onPaste, onDelete, onChangeLevel, showPlaceholder, hasChildren, isCollapsed, onToggleCollapse, selected, onMouseDown }) {
   const localRef = useRef(null)
 
   const setRef = useCallback((el) => {
@@ -22,8 +24,18 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
     autoResize(localRef.current)
   })
 
+  const bulletStyle = getBulletStyle(node.level, accentColor)
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 22, minHeight: 30 }} className="bullet-row">
+    <div
+      onMouseDown={onMouseDown}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 22, minHeight: 30,
+        background: selected ? 'rgba(55, 53, 47, 0.06)' : 'transparent',
+        borderRadius: selected ? 3 : 0,
+      }}
+      className="bullet-row"
+    >
       <div
         onClick={hasChildren ? onToggleCollapse : undefined}
         style={{ width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, height: 28, cursor: hasChildren ? 'pointer' : 'default' }}
@@ -32,8 +44,10 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
             <path d="M4.5 2.5l3.5 3.5-3.5 3.5" stroke={accentColor || '#999'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
+        ) : bulletStyle ? (
+          <div style={bulletStyle} />
         ) : (
-          <div style={getBulletStyle(node.level, accentColor)} />
+          <span style={{ fontSize: 12, color: accentColor || '#999', fontWeight: 500, lineHeight: 1 }}>-</span>
         )}
       </div>
       <textarea
@@ -53,7 +67,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
             <OutdentIcon />
           </button>
         )}
-        {node.level < 3 && idx > 0 && (
+        {node.level < MAX_LEVEL && idx > 0 && (
           <button onClick={() => onChangeLevel(idx, 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}>
             <IndentIcon />
           </button>
