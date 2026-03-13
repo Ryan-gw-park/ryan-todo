@@ -13,7 +13,6 @@ import { parseDateFromText } from '../../utils/dateParser'
 import { getNextAlarmTime } from '../../utils/alarm'
 import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
-import useTeamMembers from '../../hooks/useTeamMembers'
 
 const HIGHLIGHT_COLORS = {
   red:    { bg: '#E53E3E' },
@@ -25,22 +24,11 @@ const HIGHLIGHT_COLORS = {
 }
 
 export default function TodayView() {
-  const { projects, tasks, moveTaskTo, reorderTasks, collapseState, toggleCollapse, setCollapseGroup, currentTeamId } = useStore()
+  const { projects, tasks, moveTaskTo, reorderTasks, collapseState, toggleCollapse, setCollapseGroup } = useStore()
   const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
 
   const [activeId, setActiveId] = useState(null)
-
-  // ★ Loop-21: 팀원 이름 조회 (팀 모드일 때)
-  const [memberMap, setMemberMap] = useState({})
-  useEffect(() => {
-    if (!currentTeamId) return
-    useTeamMembers.getMembers(currentTeamId).then(members => {
-      const map = {}
-      members.forEach(m => { map[m.userId] = m.displayName })
-      setMemberMap(map)
-    })
-  }, [currentTeamId])
   const collapsed = collapseState.today || {}
   const allCollapsed = filteredProjects.every(p => collapsed[p.id])
 
@@ -146,12 +134,12 @@ export default function TodayView() {
   return (
     <div data-view="today" style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
-        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
+        <div className="today-header" style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="today-greeting">
             <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
             <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="today-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ProjectFilter />
             <button
             onClick={toggleAll}
@@ -190,7 +178,7 @@ export default function TodayView() {
                 .filter(t => t.projectId === p.id && t.category === 'today')
                 .sort((a, b) => a.sortOrder - b.sortOrder)
               return (
-                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} memberMap={memberMap} />
+                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} />
               )
             })}
           </div>
@@ -205,10 +193,11 @@ export default function TodayView() {
 }
 
 /* ─── Project card with drop zone + keyboard navigation ─── */
-function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse, memberMap }) {
+function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse }) {
   const { addTask, updateTask, deleteTask, reorderTasks } = useStore()
   const { isOver, setNodeRef } = useDroppable({ id: `project:${project.id}` })
   const showHighlight = isOver && activeId
+  const isMobile = window.innerWidth < 768
 
   const taskRefs = useRef({})
   const pendingFocusRef = useRef(null)
@@ -263,7 +252,7 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
     }}>
       <div style={{ background: color.header, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={onToggleCollapse}>
         <div style={{ width: 10, height: 10, borderRadius: 3, background: color.dot }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{project.name}</span>
+        <span style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: color.text }}>{project.name}</span>
         <span style={{ fontSize: 11, color: color.text, background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '2px 8px', fontWeight: 600, marginLeft: 'auto' }}>{todayTasks.length}</span>
         <span style={{ color: color.text, opacity: 0.5, fontSize: 12, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
       </div>
@@ -282,7 +271,6 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
                   ref={el => taskRefs.current[tk.id] = el}
                   task={tk}
                   color={color}
-                  memberMap={memberMap}
                   onMoveUp={() => {
                     if (i > 0) taskRefs.current[todayTasks[i - 1].id]?.focusTitle('end')
                   }}
@@ -306,12 +294,13 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
 
 /* ─── Sortable + editable task item ─── */
 const SortableTaskItem = forwardRef(function SortableTaskItem(
-  { task, color, memberMap, onMoveUp, onMoveDown, onSwapUp, onSwapDown, onTitleEnter, onTitleBackspace },
+  { task, color, onMoveUp, onMoveDown, onSwapUp, onSwapDown, onTitleEnter, onTitleBackspace },
   ref
 ) {
-  const { toggleDone, updateTask, openDetail, deleteTask, currentTeamId } = useStore()
-  const assigneeName = currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null
+  const { toggleDone, updateTask, openDetail, deleteTask } = useStore()
   const isMobile = window.innerWidth < 768
+  // 할일 제목: 데스크탑 14px, 모바일 13px
+  const taskFontSize = isMobile ? 13 : 14
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: task.id })
@@ -390,9 +379,9 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
 
   const rowStyle = {
     display: 'flex', alignItems: 'flex-start', gap: 8,
-    padding: hlColor ? '6px 8px' : '5px 4px',
-    borderRadius: hlColor ? 8 : 6,
-    marginBottom: hlColor ? 3 : 0,
+    padding: '5px 8px',
+    borderRadius: 6,
+    marginBottom: 1,
     position: 'relative',
     transition: transition || 'background 0.1s',
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -415,20 +404,19 @@ const SortableTaskItem = forwardRef(function SortableTaskItem(
       {/* Title: click=edit (always input for keyboard nav) */}
       <input
         ref={titleRef}
+        data-task-title
         value={titleText}
         onChange={e => setTitleText(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={saveTitle}
         placeholder="할일 입력..."
         style={{
-          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
+          flex: 1, minWidth: 0, fontSize: taskFontSize,
           border: 'none', outline: 'none', padding: '2px 0',
           fontFamily: 'inherit', background: 'transparent',
           color: hlColor ? '#fff' : '#37352f', lineHeight: '19px', boxSizing: 'border-box',
         }}
       />
-      {/* ★ Loop-21: 담당자 이름 — 팀 모드, 배정 할일만 */}
-      {assigneeName && <span style={{ fontSize: 10, color: hlColor ? 'rgba(255,255,255,0.8)' : '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
       {/* Detail open button — hover only (desktop) */}
       {!isMobile && (
         <button

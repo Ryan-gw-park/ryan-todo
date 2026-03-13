@@ -27,6 +27,8 @@ function relativeTime(dateStr) {
 export default function CommentSection({ taskId }) {
   const teamId = useStore(s => s.currentTeamId)
   const myRole = useStore(s => s.myRole)
+  const collapseState = useStore(s => s.collapseState)
+  const toggleCollapse = useStore(s => s.toggleCollapse)
   const [comments, setComments] = useState([])
   const [input, setInput] = useState('')
   const [editingId, setEditingId] = useState(null)
@@ -34,6 +36,7 @@ export default function CommentSection({ taskId }) {
   const [loading, setLoading] = useState(false)
   const [myUserId, setMyUserId] = useState(null)
   const commentRefreshTrigger = useStore(s => s.commentRefreshTrigger)
+  const isCollapsed = collapseState.comments?.[taskId]
 
   // 현재 유저 ID 가져오기
   useEffect(() => {
@@ -94,12 +97,20 @@ export default function CommentSection({ taskId }) {
   return (
     <div style={{ borderTop: '1px solid #ece8e1', marginTop: 8, paddingTop: 14 }}>
       {/* 헤더 */}
-      <div style={{ fontSize: 12, color: '#999', fontWeight: 500, marginBottom: 12 }}>
-        댓글 {comments.length > 0 && <span>({comments.length})</span>}
+      <div
+        onClick={() => toggleCollapse('comments', taskId)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', marginBottom: isCollapsed ? 0 : 12 }}
+      >
+        <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>
+          댓글 {comments.length > 0 && <span>({comments.length})</span>}
+        </span>
+        <span style={{ color: '#ccc', fontSize: 12, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
       </div>
 
-      {/* 댓글 목록 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+      {/* 댓글 목록 + 입력 */}
+      {!isCollapsed && (
+        <>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
         {comments.map(c => {
           const isMine = c.authorId === myUserId
           const initial = (c.authorName || '?')[0].toUpperCase()
@@ -172,6 +183,8 @@ export default function CommentSection({ taskId }) {
           }}
         >등록</button>
       </div>
+      </>
+      )}
     </div>
   )
 }

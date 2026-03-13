@@ -2,7 +2,7 @@ import useStore from '../../hooks/useStore'
 import { ViewIcons } from '../shared/Icons'
 
 const TABS = [
-  { id: 'today', label: '오늘할일', icon: ViewIcons.today },
+  { id: 'today', label: '오늘 할일', icon: ViewIcons.today },
   { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
   { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },

@@ -2,6 +2,16 @@ import { create } from 'zustand'
 import { getDb } from '../utils/supabase'
 import { CATEGORIES } from '../utils/colors'
 
+// ─── Select 컬럼 최적화 ───
+// tasks: alarm, deleted_at 컬럼은 DB에 없을 수 있으므로 select('*') 유지 (기존 fallback 로직 활용)
+const TASK_COLUMNS = '*'
+const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id'
+const MEMO_COLUMNS = 'id, title, notes, color, sort_order, created_at, updated_at'
+
+// ─── 스냅샷 키 ───
+const SNAPSHOT_KEY = 'ryan-todo-snapshot'
+const SNAPSHOT_MAX_AGE = 24 * 60 * 60 * 1000 // 24시간
+
 /**
  * @typedef {Object} TaskAlarm
  * @property {boolean} enabled
@@ -128,6 +138,7 @@ function _saveCollapseState(state) {
 
 const _defaultCollapseState = {
   today: {},          // projectId → boolean
+  allTasks: {},       // projectId → boolean (모바일 모든 할일 뷰)
   matrix: {},         // projectId → boolean
   matrixDone: {},     // projectId → boolean
   timeline: {},       // projectId → boolean
@@ -176,9 +187,38 @@ const useStore = create((set, get) => ({
   },
 
   setView: (v) => set({ currentView: v }),
+
+  // ─── 스냅샷 복원용 setter ───
+  setTasks: (tasks) => set({ tasks }),
+  setProjects: (projects) => set({ projects }),
+  setMemos: (memos) => set({ memos }),
+
+  // ─── 스냅샷 복원 (App 초기화 시 호출) ───
+  restoreSnapshot: () => {
+    try {
+      const cached = localStorage.getItem(SNAPSHOT_KEY)
+      if (!cached) return false
+      const snapshot = JSON.parse(cached)
+      // 24시간 이내 + 같은 팀 스냅샷만 사용
+      const teamId = get().currentTeamId
+      if (Date.now() - snapshot.timestamp > SNAPSHOT_MAX_AGE) return false
+      if (snapshot.teamId !== teamId) return false
+      set({
+        tasks: snapshot.tasks || [],
+        projects: snapshot.projects || [],
+        memos: snapshot.memos || [],
+      })
+      return true
+    } catch (e) {
+      return false
+    }
+  },
+
   logout: async () => {
     const d = db()
     if (d) await d.auth.signOut()
+    // 스냅샷 삭제
+    localStorage.removeItem(SNAPSHOT_KEY)
   },
   openDetail: (task) => set({ detailTask: task, showNotificationPanel: false }),
   closeDetail: () => set({ detailTask: null }),
@@ -198,8 +238,8 @@ const useStore = create((set, get) => ({
     try {
       const teamId = get().currentTeamId
 
-      // Loop-20: 팀 모드 필터 — tasks 쿼리 분기
-      let tasksQuery = d.from('tasks').select('*')
+      // Loop-20: 팀 모드 필터 — tasks 쿼리 분기 (select 최적화)
+      let tasksQuery = d.from('tasks').select(TASK_COLUMNS)
       if (_deletedAtColExists) tasksQuery = tasksQuery.is('deleted_at', null)
       tasksQuery = tasksQuery.order('sort_order')
       if (teamId) {
@@ -217,8 +257,8 @@ const useStore = create((set, get) => ({
         tasksQuery = tasksQuery.eq('scope', 'private')
       }
 
-      // Loop-20 보완: 팀 모드 프로젝트 필터 — 팀 프로젝트 + 본인 개인 프로젝트
-      let projectsQuery = d.from('projects').select('*').order('sort_order')
+      // Loop-20 보완: 팀 모드 프로젝트 필터 — 팀 프로젝트 + 본인 개인 프로젝트 (select 최적화)
+      let projectsQuery = d.from('projects').select(PROJECT_COLUMNS).order('sort_order')
       if (teamId) {
         const uid = _cachedUserId || (await d.auth.getUser()).data?.user?.id
         if (uid) {
@@ -229,7 +269,7 @@ const useStore = create((set, get) => ({
       const [pr, trResult, mr, uiR] = await Promise.all([
         projectsQuery,
         tasksQuery,
-        d.from('memos').select('*').order('sort_order'),
+        d.from('memos').select(MEMO_COLUMNS).order('sort_order'),
         d.from('ui_state').select('collapse_state').eq('id', 'default').maybeSingle(),
       ])
       if (pr.error) throw pr.error
@@ -239,7 +279,7 @@ const useStore = create((set, get) => ({
       if (tr.error && !_deletedAtColChecked && _deletedAtColExists) {
         _deletedAtColChecked = true
         _deletedAtColExists = false
-        let retryQuery = d.from('tasks').select('*').order('sort_order')
+        let retryQuery = d.from('tasks').select(TASK_COLUMNS).order('sort_order')
         if (teamId) {
           const uid = _cachedUserId
           if (uid) {
@@ -267,13 +307,25 @@ const useStore = create((set, get) => ({
         }
       }
 
+      const projects = pr.data.map(mapProject)
+      const tasks = tr.data.map(mapTask)
+      const memos = mr.error ? [] : mr.data.map(mapMemo)
+
       set({
-        projects: pr.data.map(mapProject),
-        tasks: tr.data.map(mapTask),
-        memos: mr.error ? [] : mr.data.map(mapMemo),
+        projects,
+        tasks,
+        memos,
         collapseState: cs,
         syncStatus: 'ok',
       })
+
+      // 스냅샷 저장 (PWA 로딩 속도 개선)
+      try {
+        const snapshot = { tasks, projects, memos, teamId, timestamp: Date.now() }
+        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
+      } catch (e) {
+        // localStorage 용량 초과 시 무시
+      }
 
       // 팀 모드: 개인별 강조 색상 로드
       if (teamId) {
@@ -466,14 +518,13 @@ const useStore = create((set, get) => ({
   },
 
   reorderProjects: async (newList) => {
-    const reordered = newList.map((p, i) => ({ ...p, sortOrder: i }))
-    set({ projects: reordered, syncStatus: 'syncing' })
-    const d = db()
-    if (!d) { set({ syncStatus: 'error' }); return }
-    const rows = reordered.map(p => ({ id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder, team_id: p.teamId || null, user_id: p.userId || null }))
-    const { error } = await d.from('projects').upsert(rows)
-    if (error) console.error('[Ryan Todo] reorderProjects:', error)
-    set({ syncStatus: error ? 'error' : 'ok' })
+    // 로컬 순서 저장 (DB 업데이트 안 함 → 개인별 적용)
+    const orderMap = {}
+    newList.forEach((p, i) => { orderMap[p.id] = i })
+    const { localProjectOrder } = get()
+    const merged = { ...localProjectOrder, ...orderMap }
+    set({ localProjectOrder: merged })
+    localStorage.setItem('localProjectOrder', JSON.stringify(merged))
   },
 
   // ─── Memo CRUD ───
@@ -515,6 +566,41 @@ const useStore = create((set, get) => ({
   // ─── Project Filter (Loop-20.2) ───
   projectFilter: 'all',  // 'all' | 'team' | 'personal'
   setProjectFilter: (filter) => set({ projectFilter: filter }),
+
+  // ─── Project Section Order (팀/개인 섹션 순서) ───
+  projectSectionOrder: JSON.parse(localStorage.getItem('projectSectionOrder') || '["team","personal"]'),
+  setProjectSectionOrder: (order) => {
+    set({ projectSectionOrder: order })
+    localStorage.setItem('projectSectionOrder', JSON.stringify(order))
+  },
+
+  // ─── Local Project Order (개인별 프로젝트 순서) ───
+  // { [projectId]: sortOrder } 형태로 저장
+  localProjectOrder: JSON.parse(localStorage.getItem('localProjectOrder') || '{}'),
+  setLocalProjectOrder: (orderMap) => {
+    set({ localProjectOrder: orderMap })
+    localStorage.setItem('localProjectOrder', JSON.stringify(orderMap))
+  },
+
+  // 로컬 순서 적용된 프로젝트 정렬
+  sortProjectsLocally: (projectList) => {
+    const { localProjectOrder } = get()
+    return [...projectList].sort((a, b) => {
+      const orderA = localProjectOrder[a.id] ?? a.sortOrder ?? 0
+      const orderB = localProjectOrder[b.id] ?? b.sortOrder ?? 0
+      return orderA - orderB
+    })
+  },
+
+  // 섹션별로 정렬된 프로젝트 목록 반환
+  getOrderedProjects: () => {
+    const { projects, projectSectionOrder, currentTeamId, sortProjectsLocally } = get()
+    if (!currentTeamId) return sortProjectsLocally(projects) // 개인 모드
+    const teamPs = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId))
+    const personalPs = sortProjectsLocally(projects.filter(p => !p.teamId))
+    const sections = { team: teamPs, personal: personalPs }
+    return [...(sections[projectSectionOrder[0]] || []), ...(sections[projectSectionOrder[1]] || [])]
+  },
 
   // ─── Sync (Loop-23) ───
   commentRefreshTrigger: 0,
@@ -633,7 +719,7 @@ const useStore = create((set, get) => ({
 
   modeSelected: !!localStorage.getItem('currentTeamId') || !!localStorage.getItem('modeSelected'),
 
-  setTeam: (teamId) => {
+  setTeam: async (teamId) => {
     const team = get().myTeams.find(t => t.id === teamId)
     set({
       currentTeamId: teamId || null,
@@ -647,6 +733,8 @@ const useStore = create((set, get) => ({
       localStorage.removeItem('currentTeamId')
       localStorage.setItem('modeSelected', 'true')
     }
+    // 팀 변경 시 해당 팀의 데이터 로드
+    await get().loadAll()
   },
 
   setMyTeams: (teams) => set({ myTeams: teams }),

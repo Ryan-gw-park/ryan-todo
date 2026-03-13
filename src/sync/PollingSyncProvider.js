@@ -52,9 +52,9 @@ export default class PollingSyncProvider {
             `team_id.eq.${this.teamId},and(scope.eq.private,created_by.eq.${this.userId})`
           )
         }
-        // notifications: filter by user (own notifications only)
+        // notifications: filter by target user (own notifications only)
         if (table === 'notifications') {
-          query = query.eq('user_id', this.userId)
+          query = query.eq('target_user_id', this.userId)
         }
 
         const { data, error } = await query

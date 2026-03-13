@@ -12,6 +12,9 @@ function autoResize(el) {
 
 export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onPaste, onDelete, onChangeLevel, showPlaceholder, hasChildren, isCollapsed, onToggleCollapse, selected, onMouseDown }) {
   const localRef = useRef(null)
+  const isMobile = window.innerWidth < 768
+  // 불릿포인트: 데스크탑 14px, 모바일 13px (할일 제목과 동일)
+  const fontSize = isMobile ? 13 : 14
 
   const setRef = useCallback((el) => {
     localRef.current = el
@@ -52,6 +55,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
       </div>
       <textarea
         ref={setRef}
+        data-task-title
         value={node.text}
         rows={1}
         onChange={e => { onTextChange(idx, e.target.value); autoResize(e.target) }}
@@ -59,7 +63,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
         onPaste={e => onPaste?.(e, idx)}
         onFocus={e => autoResize(e.target)}
         placeholder={showPlaceholder ? '노트를 입력하세요...' : ''}
-        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, lineHeight: '22px', padding: '3px 4px', fontFamily: 'inherit', color: '#37352f', boxSizing: 'border-box', resize: 'none', overflow: 'hidden', display: 'block', fontWeight: hasChildren ? 500 : 400 }}
+        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize, lineHeight: isMobile ? '20px' : '22px', padding: '3px 4px', fontFamily: 'inherit', color: '#37352f', boxSizing: 'border-box', resize: 'none', overflow: 'hidden', display: 'block', fontWeight: 400 }}
       />
       <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0, height: 28, alignItems: 'center' }} className="bullet-actions">
         {node.level > 0 && (

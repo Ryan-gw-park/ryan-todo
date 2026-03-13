@@ -5,7 +5,8 @@ import useNotifications from '../../hooks/useNotifications'
 import MobileDrawer from './MobileDrawer'
 
 const VIEW_NAMES = {
-  today: '오늘할일',
+  today: '오늘 할일',
+  allTasks: '모든 할일',
   matrix: '매트릭스',
   project: '프로젝트',
   timeline: '타임라인',

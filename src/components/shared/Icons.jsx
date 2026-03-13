@@ -1,5 +1,5 @@
-export const CheckIcon = ({ checked, size = 18, onClick }) => (
-  <div onClick={onClick} style={{ width: size, height: size, borderRadius: 4, border: checked ? 'none' : '1.5px solid #d0d0d0', background: checked ? '#2383e2' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s' }}>
+export const CheckIcon = ({ checked, size = 18, onClick, color }) => (
+  <div onClick={onClick} style={{ width: size, height: size, borderRadius: 4, border: checked ? 'none' : `1.5px solid ${color || '#d0d0d0'}`, background: checked ? '#2383e2' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s' }}>
     {checked && <svg width={size*0.67} height={size*0.67} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
   </div>
 )

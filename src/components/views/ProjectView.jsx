@@ -30,6 +30,16 @@ export default function ProjectView() {
   const categoryRefs = useRef({})
   const pendingFocusProject = useRef(null)
 
+  // 뷰 진입 시 항상 가장 왼쪽 프로젝트 선택 (화면 렌더링 순서 기준: 팀 → 개인)
+  useEffect(() => {
+    if (filteredProjects.length > 0) {
+      const teamPs = currentTeamId ? filteredProjects.filter(pr => pr.teamId === currentTeamId) : filteredProjects
+      const personalPs = currentTeamId ? filteredProjects.filter(pr => !pr.teamId) : []
+      const leftmost = teamPs[0] || personalPs[0]
+      if (leftmost) setActiveProject(leftmost.id)
+    }
+  }, []) // 마운트 시에만 실행
+
   // Auto-switch active tab when hidden by filter
   useEffect(() => {
     if (filteredProjects.length > 0 && !filteredProjects.find(pr => pr.id === activeProject)) {
@@ -135,16 +145,18 @@ export default function ProjectView() {
     <div style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 800, margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
+        <div className="today-header" style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="today-greeting">
             <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>프로젝트</h1>
             <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>↑↓ 이동 · Enter 새 항목 · Tab 레벨 · Ctrl+←/→ 프로젝트 이동</p>
           </div>
-          <ProjectFilter />
+          <div className="today-toolbar">
+            <ProjectFilter />
+          </div>
         </div>
 
         {/* Project chips */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 28, overflowX: 'auto', paddingBottom: 4, alignItems: 'center' }}>
+        <div className="project-tab-bar" style={{ display: 'flex', gap: 6, marginBottom: 28, overflowX: 'auto', paddingBottom: 4, alignItems: 'center' }}>
           {(() => {
             const teamPs = currentTeamId ? filteredProjects.filter(pr => pr.teamId === currentTeamId) : filteredProjects
             const personalPs = currentTeamId ? filteredProjects.filter(pr => !pr.teamId) : []
@@ -221,6 +233,7 @@ const CategorySection = forwardRef(function CategorySection({ cat, catTasks, pro
   const isDoneCat = cat.key === 'done'
   const sectionKey = `${projectId}:${cat.key}`
   const sectionCollapsed = collapseState.projectSection?.[sectionKey]
+  const isMobile = window.innerWidth < 768
 
   /* Expose focusFirst / focusLast to parent for cross-category nav */
   useImperativeHandle(ref, () => ({
@@ -328,8 +341,8 @@ const CategorySection = forwardRef(function CategorySection({ cat, catTasks, pro
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `2px solid ${isDoneCat ? '#e0e0e0' : color.dot}20`, marginBottom: 8 }}>
-        <span style={{ fontSize: 15 }}>{cat.emoji}</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: isDoneCat ? '#999' : '#37352f' }}>{cat.label}</span>
+        <span style={{ fontSize: isMobile ? 13 : 14 }}>{cat.emoji}</span>
+        <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: isDoneCat ? '#999' : '#37352f' }}>{cat.label}</span>
         <span style={{ fontSize: 11, color: isDoneCat ? '#aaa' : color.dot, background: isDoneCat ? '#f0f0f0' : color.header, borderRadius: 8, padding: '1px 8px', fontWeight: 600 }}>{catTasks.length}</span>
         {!isDoneCat && catTasks.length > 0 && (
           <button
@@ -388,6 +401,9 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
 ) {
   const { toggleDone, updateTask, deleteTask, openDetail, collapseState: cs, setCollapseValue: setCV, currentTeamId: teamId } = useStore()
   const assigneeName = teamId && task.assigneeId ? memberMap[task.assigneeId] : null
+  const isMobile = window.innerWidth < 768
+  // 할일 제목: 데스크탑 14px, 모바일 13px
+  const taskFontSize = isMobile ? 13 : 14
   const titleRef = useRef(null)
   const editorRef = useRef(null)
   const [titleText, setTitleText] = useState(task.text)
@@ -513,7 +529,7 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
           <div onClick={e => { e.stopPropagation(); toggleDone(task.id) }} style={{ flexShrink: 0, display: 'flex' }}>
             <div style={{ width: 16, height: 16, borderRadius: 4, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#66bb6a' }}><UndoIcon /></div>
           </div>
-          <div onClick={() => openDetail(task)} style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: '#bbb', textDecoration: 'line-through', cursor: 'pointer', padding: '2px 6px', lineHeight: '22px' }}>
+          <div onClick={() => openDetail(task)} style={{ flex: 1, minWidth: 0, fontSize: taskFontSize, fontWeight: 600, color: '#bbb', textDecoration: 'line-through', cursor: 'pointer', padding: '2px 6px', lineHeight: '22px' }}>
             {task.text}{task.dueDate && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 8, fontWeight: 400 }}>{task.dueDate}</span>}
           </div>
           <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0 }} className="outliner-actions">
@@ -536,14 +552,15 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
         </div>
         <input
           ref={titleRef}
+          data-task-title
           value={titleText}
           onChange={e => setTitleText(e.target.value)}
           onKeyDown={handleTitleKeyDown}
           onBlur={saveTitle}
           placeholder="할일 입력..."
-          style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, border: 'none', outline: 'none', padding: '2px 6px', fontFamily: 'inherit', background: 'transparent', color: '#37352f', lineHeight: '22px', boxSizing: 'border-box' }}
+          style={{ flex: 1, minWidth: 0, fontSize: taskFontSize, fontWeight: 600, border: 'none', outline: 'none', padding: '2px 6px', fontFamily: 'inherit', background: 'transparent', color: '#37352f', lineHeight: '22px', boxSizing: 'border-box' }}
         />
-        {assigneeName && <span style={{ fontSize: 10, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
+        {assigneeName && <span style={{ fontSize: 11, color: '#aaa', fontWeight: 500, flexShrink: 0 }}>{assigneeName}</span>}
         {task.dueDate && <span style={{ fontSize: 11, color: '#ccc', fontWeight: 400, flexShrink: 0 }}>{task.dueDate}</span>}
         <div style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0 }} className="outliner-actions">
           <button
@@ -593,6 +610,9 @@ const AddTaskButton = forwardRef(function AddTaskButton({ projectId, category, c
   const [adding, setAdding] = useState(false)
   const [text, setText] = useState('')
   const inputRef = useRef(null)
+  const isMobile = window.innerWidth < 768
+  // 할일 제목: 데스크탑 14px, 모바일 13px
+  const taskFontSize = isMobile ? 13 : 14
 
   useImperativeHandle(ref, () => ({
     activate: () => {
@@ -632,11 +652,11 @@ const AddTaskButton = forwardRef(function AddTaskButton({ projectId, category, c
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', marginLeft: 20 }}>
       <div style={{ width: 6, height: 6, borderRadius: '50%', background: color.dot }} />
-      <input ref={inputRef} value={text} onChange={e => setText(e.target.value)}
+      <input ref={inputRef} data-task-title value={text} onChange={e => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => { if (text.trim()) handleAdd(); else setAdding(false) }}
         placeholder="새 할일 입력..."
-        style={{ flex: 1, fontSize: 14, fontWeight: 500, border: 'none', borderBottom: `2px solid ${color.dot}`, outline: 'none', padding: '4px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f' }} />
+        style={{ flex: 1, fontSize: taskFontSize, fontWeight: 600, border: 'none', borderBottom: `2px solid ${color.dot}`, outline: 'none', padding: '4px 0', fontFamily: 'inherit', background: 'transparent', color: '#37352f' }} />
     </div>
   )
 })

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import useStore from '../../hooks/useStore'
 import useInvitation from '../../hooks/useInvitation'
+import useTeam from '../../hooks/useTeam'
 
 const T = {
   card: '#ffffff', cardBorder: '#e8e8e8', text: '#1a1a1a',
@@ -43,6 +44,8 @@ export default function InviteAccept() {
     const res = await useInvitation.acceptInvite(token, displayName.trim() || undefined)
     setResult(res)
     if (res.success) {
+      // 신규 사용자용 개인 프로젝트 + 할일 생성
+      await useTeam.createInitialPersonalData()
       await initTeamState()
       // Auto-select the team
       if (res.teamId) {

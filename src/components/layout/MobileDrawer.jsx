@@ -3,10 +3,9 @@ import useStore from '../../hooks/useStore'
 import { ViewIcons } from '../shared/Icons'
 
 const TABS = [
-  { id: 'today', label: '오늘할일', icon: ViewIcons.today },
-  { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
+  { id: 'today', label: '오늘 할일', icon: ViewIcons.today },
+  { id: 'allTasks', label: '모든 할일', icon: '📋' },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
-  { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },
   { id: 'memory', label: '노트', icon: ViewIcons.memory },
 ]
 
@@ -19,7 +18,7 @@ const menuBtnStyle = {
 
 export default function MobileDrawer({ open, onClose }) {
   const navigate = useNavigate()
-  const { currentView, setView, userName, loadAll } = useStore()
+  const { currentView, setView, userName } = useStore()
   const teamId = useStore(s => s.currentTeamId)
   const myTeams = useStore(s => s.myTeams)
   const setTeam = useStore(s => s.setTeam)
@@ -118,7 +117,7 @@ export default function MobileDrawer({ open, onClose }) {
               {myTeams.map(team => (
                 <button
                   key={team.id}
-                  onClick={() => { setTeam(team.id); onClose(); loadAll() }}
+                  onClick={() => { setTeam(team.id); onClose() }}
                   style={{
                     width: '100%', padding: '8px 0', background: 'none', border: 'none',
                     textAlign: 'left', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
@@ -137,7 +136,7 @@ export default function MobileDrawer({ open, onClose }) {
                 </button>
               ))}
               <button
-                onClick={() => { setTeam(null); onClose(); loadAll() }}
+                onClick={() => { setTeam(null); onClose() }}
                 style={{
                   width: '100%', padding: '8px 0', background: 'none', border: 'none',
                   textAlign: 'left', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',

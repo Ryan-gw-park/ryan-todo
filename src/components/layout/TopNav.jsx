@@ -4,9 +4,11 @@ import useStore from '../../hooks/useStore'
 import { PlusIcon, ViewIcons } from '../shared/Icons'
 import TeamSwitcher from '../team/TeamSwitcher'
 import useNotifications from '../../hooks/useNotifications'
+import MobileAddSheet from './MobileAddSheet'
 
 const VIEWS = [
-  { id: 'today', label: '오늘할일', icon: ViewIcons.today },
+  { id: 'today', label: '오늘 할일', icon: ViewIcons.today },
+  { id: 'allTasks', label: '전체 할일', icon: '📋' },
   { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
   { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },
@@ -21,6 +23,7 @@ export default function TopNav() {
   const showNotificationPanel = useStore(s => s.showNotificationPanel)
   const refreshTrigger = useStore(s => s.notificationRefreshTrigger)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   // Loop-23: SyncProvider trigger 기반 뱃지 갱신 (30초 폴링 제거)
   useEffect(() => {
@@ -75,7 +78,7 @@ export default function TopNav() {
             </button>
           )}
           <TeamSwitcher />
-          <button onClick={() => useStore.getState().setView('today')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: 'none', fontFamily: 'inherit', background: '#37352f', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}><PlusIcon /> 새 할일</button>
+          <button onClick={() => setShowAddModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, border: 'none', fontFamily: 'inherit', background: '#37352f', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}><PlusIcon /> 새 할일</button>
           <button onClick={() => navigate('/profile')} title="내 정보"
             style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e8e8e8', background: '#f5f5f5', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#999', fontFamily: 'inherit', marginLeft: 4 }}
             onMouseEnter={e => e.currentTarget.style.background = '#eee'}
@@ -83,6 +86,7 @@ export default function TopNav() {
           >{userName ? userName[0].toUpperCase() : '?'}</button>
         </div>
       </div>
+      {showAddModal && <MobileAddSheet onClose={() => setShowAddModal(false)} />}
     </div>
   )
 }

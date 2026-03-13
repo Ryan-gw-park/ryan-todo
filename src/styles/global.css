@@ -44,6 +44,11 @@ body {
   to { transform: translateX(-50%) translateY(10px); opacity: 0; }
 }
 
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -64,8 +69,33 @@ body {
   .mobile-fab { display: none !important; }
 }
 
-/* Prevent iOS zoom on inputs */
+/* Prevent iOS zoom on inputs (exclude task title inputs and modal inputs) */
 @media (max-width: 767px) {
-  input, textarea, select { font-size: 16px !important; }
+  input:not([data-task-title]):not([data-modal-input]), textarea:not([data-task-title]), select:not([data-modal-input]) { font-size: 16px !important; }
   .help-toc { display: none !important; }
+
+  /* 오늘할일 뷰 헤더 — 필터와 인사말 분리 */
+  .today-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+  .today-header .today-greeting h1 {
+    font-size: 18px !important;
+  }
+  .today-header .today-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  /* 프로젝트 탭 바 가로 스크롤 */
+  .project-tab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .project-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
 }

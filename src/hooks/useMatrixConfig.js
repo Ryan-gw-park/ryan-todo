@@ -54,9 +54,10 @@ const useMatrixConfig = {
       })
     }
 
-    // 남은 할일 + 완료
-    rows.push({ user_id: userId, team_id: teamId, section: 'remaining', label: '남은 할일', row_type: 'remaining', sort_order: order++ })
-    rows.push({ user_id: userId, team_id: teamId, section: 'completed', label: '완료', row_type: 'completed', sort_order: order++ })
+    // 남은 할일/완료 섹션
+    rows.push({ user_id: userId, team_id: teamId, section: 'bottom', label: '남은 할일/완료', row_type: 'section_header', sort_order: order++ })
+    rows.push({ user_id: userId, team_id: teamId, section: 'remaining', label: '남은 할일', row_type: 'remaining', parent_section: 'bottom', sort_order: order++ })
+    rows.push({ user_id: userId, team_id: teamId, section: 'completed', label: '완료', row_type: 'completed', parent_section: 'bottom', sort_order: order++ })
 
     const { data, error } = await d.from('matrix_row_config').insert(rows).select()
     if (error) { console.error('[Ryan Todo] initConfig:', error); return [] }

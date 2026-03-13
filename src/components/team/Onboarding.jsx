@@ -61,6 +61,8 @@ export default function Onboarding() {
     setLoading(true)
     const team = await useTeam.createTeam(teamName.trim(), teamDesc.trim())
     if (team) {
+      // 팀 생성자용 초기 데이터 생성 (팀 프로젝트 3개 + 개인 프로젝트 1개)
+      await useTeam.createInitialTeamOwnerData(team.id)
       await initTeamState()
       navigate('/', { replace: true })
     } else {
@@ -77,7 +79,9 @@ export default function Onboarding() {
     navigate(`/invite/${token}`, { replace: true })
   }
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // 개인 모드 사용자도 개인 프로젝트 + 할일 생성
+    await useTeam.createInitialPersonalData()
     skipOnboarding()
     navigate('/', { replace: true })
   }

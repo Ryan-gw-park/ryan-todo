@@ -17,6 +17,7 @@ import { SyncProviderWrapper } from './sync/SyncContext'
 
 // React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
 const TodayView = lazy(() => import('./components/views/TodayView'))
+const AllTasksView = lazy(() => import('./components/views/AllTasksView'))
 const MatrixView = lazy(() => import('./components/views/MatrixView'))
 const ProjectView = lazy(() => import('./components/views/ProjectView'))
 const TimelineView = lazy(() => import('./components/views/TimelineView'))
@@ -77,8 +78,15 @@ function AppShell({ mobile }) {
 
   // Loop-20: 팀 모드에서 매트릭스 뷰 분기
   const teamId = useStore(s => s.currentTeamId)
-  const views = { today: TodayView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView }
+  const views = { today: TodayView, allTasks: AllTasksView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView }
   const ViewComponent = views[currentView] || TodayView
+
+  // 모바일에서 matrix/timeline 접근 시 today로 리다이렉트
+  useEffect(() => {
+    if (mobile && (currentView === 'matrix' || currentView === 'timeline')) {
+      setView('today')
+    }
+  }, [currentView, mobile])
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff' }}>
@@ -154,11 +162,17 @@ export default function App() {
     document.title = userName ? `${userName}'s Todo` : 'Todo'
   }, [userName])
 
-  // Load team state + data when authenticated (병렬화: initTeamState 완료 후 loadAll)
+  // Load team state + data when authenticated (스냅샷 우선 → 백그라운드 갱신)
   useEffect(() => {
     if (connected && session) {
       initTeamState().then(() => {
+        // 1단계: 스냅샷 복원 시도 (즉시 렌더)
+        const restored = useStore.getState().restoreSnapshot()
+        // 2단계: 최신 데이터 로딩 (백그라운드 or 포그라운드)
         useStore.getState().loadAll()
+        if (restored) {
+          console.log('[Ryan Todo] Snapshot restored, refreshing in background')
+        }
       })
     }
   }, [connected, session])
