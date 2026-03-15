@@ -162,6 +162,10 @@ const useStore = create((set, get) => ({
   userName: 'Ryan',
   setUserName: (name) => set({ userName: name }),
 
+  // ─── 스냅샷 상태 (iOS PWA 콜드 스타트 최적화) ───
+  snapshotTeamId: null,
+  snapshotRestored: false,
+
   // ─── Collapse State (synced to Supabase) ───
   collapseState: { ..._defaultCollapseState },
 
@@ -193,20 +197,20 @@ const useStore = create((set, get) => ({
   setProjects: (projects) => set({ projects }),
   setMemos: (memos) => set({ memos }),
 
-  // ─── 스냅샷 복원 (App 초기화 시 호출) ───
+  // ─── 스냅샷 복원 (App 초기화 시 호출 — Auth 전에 실행 가능) ───
   restoreSnapshot: () => {
     try {
       const cached = localStorage.getItem(SNAPSHOT_KEY)
       if (!cached) return false
       const snapshot = JSON.parse(cached)
-      // 24시간 이내 + 같은 팀 스냅샷만 사용
-      const teamId = get().currentTeamId
+      // 24시간 이내만 사용 (teamId 검증은 Auth 완료 후 지연 검증)
       if (Date.now() - snapshot.timestamp > SNAPSHOT_MAX_AGE) return false
-      if (snapshot.teamId !== teamId) return false
       set({
         tasks: snapshot.tasks || [],
         projects: snapshot.projects || [],
         memos: snapshot.memos || [],
+        snapshotTeamId: snapshot.teamId || null,
+        snapshotRestored: true,
       })
       return true
     } catch (e) {
@@ -214,11 +218,23 @@ const useStore = create((set, get) => ({
     }
   },
 
+  // ─── 스냅샷 초기화 (Auth 실패 또는 로그아웃 시 호출) ───
+  clearSnapshot: () => {
+    set({
+      snapshotRestored: false,
+      snapshotTeamId: null,
+      tasks: [],
+      projects: [],
+      memos: [],
+    })
+    try { localStorage.removeItem(SNAPSHOT_KEY) } catch (e) {}
+  },
+
   logout: async () => {
     const d = db()
     if (d) await d.auth.signOut()
     // 스냅샷 삭제
-    localStorage.removeItem(SNAPSHOT_KEY)
+    get().clearSnapshot()
   },
   openDetail: (task) => set({ detailTask: task, showNotificationPanel: false }),
   closeDetail: () => set({ detailTask: null }),

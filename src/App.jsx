@@ -115,6 +115,7 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const { setUserName, userName, initTeamState, myTeams, currentTeamId, modeSelected, teamLoading, onboardingSkipped } = useStore()
+  const snapshotRestored = useStore(s => s.snapshotRestored)
   const [mobile, setMobile] = useState(isMobile())
   const location = useLocation()
 
@@ -122,6 +123,11 @@ export default function App() {
     const handler = () => setMobile(isMobile())
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  // ── iOS PWA 콜드 스타트 최적화: 마운트 즉시 스냅샷 복원 (Auth 전) ──
+  useEffect(() => {
+    useStore.getState().restoreSnapshot()
   }, [])
 
   const [authError, setAuthError] = useState('')
@@ -162,32 +168,59 @@ export default function App() {
     document.title = userName ? `${userName}'s Todo` : 'Todo'
   }, [userName])
 
-  // Load team state + data when authenticated (스냅샷 우선 → 백그라운드 갱신)
+  // Load team state + data when authenticated (스냅샷은 이미 복원됨 → 백그라운드 갱신)
   useEffect(() => {
     if (connected && session) {
       initTeamState().then(() => {
-        // 1단계: 스냅샷 복원 시도 (즉시 렌더)
-        const restored = useStore.getState().restoreSnapshot()
-        // 2단계: 최신 데이터 로딩 (백그라운드 or 포그라운드)
-        useStore.getState().loadAll()
-        if (restored) {
-          console.log('[Ryan Todo] Snapshot restored, refreshing in background')
+        // 스냅샷의 teamId와 실제 teamId가 다르면 스냅샷 데이터 무효화
+        const { snapshotTeamId, snapshotRestored } = useStore.getState()
+        const actualTeamId = useStore.getState().currentTeamId
+        if (snapshotRestored && snapshotTeamId !== null && snapshotTeamId !== actualTeamId) {
+          // teamId 불일치 → 스냅샷 데이터 비우고 loadAll()에서 다시 채움
+          useStore.getState().setTasks([])
+          useStore.getState().setProjects([])
+          useStore.getState().setMemos([])
         }
+        // 최신 데이터 로딩
+        useStore.getState().loadAll()
       })
     }
   }, [connected, session])
+
+  // Auth 실패 시 스냅샷 화면에서 로그인으로 전환
+  useEffect(() => {
+    if (!authLoading && !session && snapshotRestored) {
+      useStore.getState().clearSnapshot()
+    }
+  }, [authLoading, session, snapshotRestored])
 
   // Step 1: Supabase connection setup
   if (!connected) {
     return <SetupScreen onConnect={() => setConnected(true)} />
   }
 
-  // Step 2: Auth loading
+  // Step 2: 스냅샷이 복원되어 있으면 Auth/Team 로딩 중에도 AppShell 표시 (iOS PWA 최적화)
+  // Auth 실패 시 위 useEffect에서 clearSnapshot() 호출 → snapshotRestored=false → 로그인 화면
+  if (snapshotRestored) {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
+        <Route path="/mode-select" element={<Suspense fallback={<LoadingSpinner />}><ModeSelect /></Suspense>} />
+        <Route path="/invite/:token" element={<Suspense fallback={<LoadingSpinner />}><InviteAccept /></Suspense>} />
+        <Route path="/team/settings" element={<Suspense fallback={<LoadingSpinner />}><TeamSettings /></Suspense>} />
+        <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><MyProfile /></Suspense>} />
+        <Route path="/help" element={<Suspense fallback={<LoadingSpinner />}><HelpPage /></Suspense>} />
+        <Route path="/*" element={<SyncProviderWrapper><AppShell mobile={mobile} /></SyncProviderWrapper>} />
+      </Routes>
+    )
+  }
+
+  // Step 3: Auth loading (스냅샷 없는 경우)
   if (authLoading) {
     return <LoadingSpinner />
   }
 
-  // Step 3: Login required — save invite path for post-login redirect
+  // Step 4: Login required — save invite path for post-login redirect
   if (!session) {
     if (location.pathname.startsWith('/invite/')) {
       sessionStorage.setItem('pendingInvite', location.pathname)
@@ -196,7 +229,7 @@ export default function App() {
     return <LoginScreen authError={authError} />
   }
 
-  // Step 4: After login, redirect to pending invite if exists
+  // Step 5: After login, redirect to pending invite if exists
   const pendingInvite = sessionStorage.getItem('pendingInvite') || localStorage.getItem('pendingInvite')
   if (pendingInvite) {
     sessionStorage.removeItem('pendingInvite')
@@ -204,24 +237,24 @@ export default function App() {
     return <Navigate to={pendingInvite} replace />
   }
 
-  // Step 5: Wait for team state to load
+  // Step 6: Wait for team state to load
   if (teamLoading) {
     return <LoadingSpinner />
   }
 
-  // Step 6: Onboarding — no teams and not skipped
+  // Step 7: Onboarding — no teams and not skipped
   if (myTeams.length === 0 && !onboardingSkipped && !location.pathname.startsWith('/invite') && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />
   }
 
-  // Step 6.5: Mode select — has teams but none selected
+  // Step 8: Mode select — has teams but none selected
   const specialRoutes = ['/invite', '/onboarding', '/profile', '/team/settings', '/mode-select', '/help']
   const isSpecialRoute = specialRoutes.some(r => location.pathname.startsWith(r))
   if (myTeams.length > 0 && !currentTeamId && !modeSelected && !isSpecialRoute && location.pathname !== '/mode-select') {
     return <Navigate to="/mode-select" replace />
   }
 
-  // Step 7: Authenticated routes
+  // Step 9: Authenticated routes (스냅샷 없는 정상 흐름)
   return (
     <Routes>
       <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
