@@ -8,6 +8,7 @@ import OutlinerEditor from './OutlinerEditor'
 import AssigneeSelector from './AssigneeSelector'
 import ColorPicker from './ColorPicker'
 import CommentSection from './CommentSection'
+import DeliverableSelector from './DeliverableSelector'
 
 function getDefaultAlarmDatetime(dueDate) {
   const d = dueDate ? new Date(dueDate + 'T09:00') : new Date()
@@ -37,6 +38,28 @@ export default function DetailPanel() {
   const p = projects.find(pr => pr.id === task.projectId)
   const c = p ? getColor(p.color) : getColor('blue')
   const allTopCollapsed = collapseState.detailAllTop?.[task.id]
+
+  // 마일스톤 이름 조회 (읽기전용)
+  const [milestoneName, setMilestoneName] = useState(null)
+  useEffect(() => {
+    if (!task?.keyMilestoneId) {
+      setMilestoneName(null)
+      return
+    }
+    getDb()
+      ?.from('key_milestones')
+      .select('title')
+      .eq('id', task.keyMilestoneId)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[DetailPanel] milestone query failed:', error.message)
+          setMilestoneName(null)
+          return
+        }
+        setMilestoneName(data?.title || null)
+      })
+  }, [task?.keyMilestoneId])
 
   const debounceRef = useRef(null)
   const handleNotesChange = useCallback((newNotes) => {
@@ -112,6 +135,27 @@ export default function DetailPanel() {
               {p?.name}
             </span>
           </DetailRow>
+
+          {/* 마일스톤 표시 (읽기전용) */}
+          {task.keyMilestoneId && milestoneName && (
+            <DetailRow label="마일스톤">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2C2C2A' }}>
+                <span style={{ color: '#1D9E75', fontSize: 10 }}>◆</span>
+                <span>{milestoneName}</span>
+              </div>
+            </DetailRow>
+          )}
+
+          {/* 결과물 선택 */}
+          {task.projectId && (
+            <DetailRow label="결과물">
+              <DeliverableSelector
+                projectId={task.projectId}
+                value={task.deliverableId}
+                onChange={(deliverableId) => canEdit && updateTask(task.id, { deliverableId })}
+              />
+            </DetailRow>
+          )}
 
           {/* Category */}
           <DetailRow label="카테고리">

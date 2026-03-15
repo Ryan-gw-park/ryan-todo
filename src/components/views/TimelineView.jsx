@@ -260,8 +260,8 @@ export default function TimelineView() {
         <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
-              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>타임라인</h1>
-              <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{periodLabel}</p>
+              <h1 style={{ fontSize: 27, fontWeight: 700, color: '#37352f', margin: 0 }}>타임라인</h1>
+              <p style={{ fontSize: 15, color: '#999', marginTop: 4 }}>{periodLabel}</p>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <ProjectFilter />
@@ -269,7 +269,7 @@ export default function TimelineView() {
               {SCALES.map(s => (
                 <button key={s.key} onClick={() => setScale(s.key)}
                   style={{
-                    padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                    padding: '5px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500,
                     fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.1s',
                     background: scale === s.key ? '#37352f' : 'white',
                     color: scale === s.key ? 'white' : '#666',
@@ -282,7 +282,7 @@ export default function TimelineView() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={() => navigate(-1)} style={navBtnStyle}>◀ {prevLabel}</button>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#37352f', margin: 0, minWidth: 140, textAlign: 'center' }}>{periodLabel}</h2>
+            <h2 style={{ fontSize: 19, fontWeight: 700, color: '#37352f', margin: 0, minWidth: 140, textAlign: 'center' }}>{periodLabel}</h2>
             <button onClick={() => navigate(1)} style={navBtnStyle}>{nextLabel} ▶</button>
             <button onClick={goToday} style={{ ...navBtnStyle, background: '#ef4444', color: 'white', border: 'none', fontWeight: 600 }}>오늘</button>
           </div>
@@ -297,7 +297,7 @@ export default function TimelineView() {
               {scale !== 'month' && <div style={{ height: 24 }} />}
               {/* Date header spacer */}
               <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-                <span style={{ fontSize: 11, color: '#999', fontWeight: 500 }}>프로젝트 / 할일</span>
+                <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>프로젝트 / 할일</span>
               </div>
               {/* Project rows */}
               {projectRows.map(({ project, color, tasks: pts }) => {
@@ -309,9 +309,9 @@ export default function TimelineView() {
                       onClick={() => storeToggle('timeline', project.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 4px', cursor: 'pointer', height: ROW_H, boxSizing: 'border-box', borderBottom: '1px solid #f0f0f0' }}
                     >
-                      <span style={{ fontSize: 10, color: '#bbb', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0 }}>▾</span>
+                      <span style={{ fontSize: 11, color: '#bbb', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0 }}>▾</span>
                       <div style={{ width: 8, height: 8, borderRadius: 2, background: color.dot, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: color.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
                     </div>
                     {/* Tasks */}
                     {!isCollapsed && (
@@ -351,7 +351,7 @@ export default function TimelineView() {
                     return (
                       <div key={i} style={{
                         width: colW, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: scale === 'month' ? 11 : 9, fontWeight: isToday ? 700 : 400,
+                        fontSize: scale === 'month' ? 12 : 10, fontWeight: isToday ? 700 : 400,
                         color: isToday ? '#ef4444' : col.isWeekend ? '#ccc' : '#999',
                         position: 'relative', overflow: 'visible',
                         background: scale !== 'month' && col.band === 1 ? 'rgba(0,0,0,0.02)' : 'transparent',
@@ -411,10 +411,10 @@ export default function TimelineView() {
         </DndContext>
 
         {!projects.length && (
-          <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>프로젝트를 추가하면 타임라인이 표시됩니다</div>
+          <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 14 }}>프로젝트를 추가하면 타임라인이 표시됩니다</div>
         )}
         {projects.length > 0 && filteredProjects.length === 0 && (
-          <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>해당 필터에 맞는 프로젝트가 없습니다</div>
+          <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 14 }}>해당 필터에 맞는 프로젝트가 없습니다</div>
         )}
       </div>
     </div>
@@ -458,8 +458,8 @@ function SortableTaskRow({ task, openDetail, rowH, isDragging, assigneeName }) {
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = 'rgba(0,0,0,0.02)' }}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
-      <span style={{ fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{task.text}</span>
-      {assigneeName && <span style={{ fontSize: 9, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
+      <span style={{ fontSize: 13, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{task.text}</span>
+      {assigneeName && <span style={{ fontSize: 10, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
     </div>
   )
 }
@@ -472,7 +472,7 @@ function TaskDragOverlay({ task }) {
       background: 'white', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
       border: '1px solid #e0e0e0', cursor: 'grabbing', width: 160,
     }}>
-      <span style={{ fontSize: 12, color: '#37352f', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</span>
+      <span style={{ fontSize: 13, color: '#37352f', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</span>
     </div>
   )
 }
@@ -657,7 +657,7 @@ function TaskRow({ task, color, columns, colW, scale, todayCol, dateToCol, rowH,
       >
         <div style={{ width: 4, height: '100%', cursor: 'col-resize', flexShrink: 0 }} />
         <span style={{
-          fontSize: 11, fontWeight: 500, color: color.text,
+          fontSize: 12, fontWeight: 500, color: color.text,
           padding: '0 4px',
           whiteSpace: 'nowrap', pointerEvents: 'none',
         }}>
@@ -671,6 +671,6 @@ function TaskRow({ task, color, columns, colW, scale, todayCol, dateToCol, rowH,
 
 const navBtnStyle = {
   padding: '5px 12px', borderRadius: 6, border: '1px solid #e0e0e0',
-  background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 500,
+  background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 500,
   fontFamily: 'inherit', color: '#666', transition: 'all 0.1s',
 }

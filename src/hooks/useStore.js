@@ -66,6 +66,9 @@ function taskToRow(t) {
     created_by: t.createdBy || null,
     highlight_color: t.highlightColor || null,
     updated_at: new Date().toISOString(),
+    // ↓ Loop-26: Key Milestone 연결 ↓
+    key_milestone_id: t.keyMilestoneId || null,
+    deliverable_id: t.deliverableId || null,
   }
   if (_alarmColExists) row.alarm = t.alarm ?? null
   return row
@@ -117,6 +120,9 @@ function mapTask(r) {
     highlightColor: r.highlight_color || null,
     updatedAt: r.updated_at || null,
     deletedAt: r.deleted_at || null,
+    // ↓ Loop-26: Key Milestone 연결 ↓
+    keyMilestoneId: r.key_milestone_id || null,
+    deliverableId: r.deliverable_id || null,
   }
 }
 
@@ -494,7 +500,16 @@ const useStore = create((set, get) => ({
   },
 
   updateProject: async (id, patch) => {
-    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) }))
+    // 소속 변경 차단 — 이 필드들은 업데이트에서 절대 제외
+    const {
+      teamId, userId,          // camelCase (프론트)
+      team_id, user_id,        // snake_case (DB)
+      created_by, createdBy,   // 생성자도 변경 불가
+      id: _id,                 // id도 변경 불가
+      ...safePatch
+    } = patch
+
+    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...safePatch } : p) }))
     const p = get().projects.find(x => x.id === id)
     if (!p) return
     const d = db()
@@ -507,6 +522,28 @@ const useStore = create((set, get) => ({
   },
 
   deleteProject: async (id) => {
+    const project = get().projects.find(p => p.id === id)
+    if (!project) return
+
+    // 팀 프로젝트: 팀장만 삭제 가능
+    const teamId = get().currentTeamId
+    if (project.teamId && teamId) {
+      const myRole = get().myRole
+      if (myRole !== 'owner') {
+        console.warn('[deleteProject] 팀 프로젝트 삭제는 팀장만 가능합니다')
+        return
+      }
+    }
+
+    // 개인 프로젝트: 본인 소유인지 확인
+    if (!project.teamId) {
+      const userId = _cachedUserId || (await getCurrentUserId())
+      if (project.userId && project.userId !== userId) {
+        console.warn('[deleteProject] 다른 사용자의 개인 프로젝트는 삭제할 수 없습니다')
+        return
+      }
+    }
+
     const d = db()
     // Loop-23: 연관 tasks soft delete (fallback to hard delete)
     const taskIds = get().tasks.filter(t => t.projectId === id).map(t => t.id)
@@ -726,6 +763,10 @@ const useStore = create((set, get) => ({
     ...(s.showNotificationPanel ? {} : { detailTask: null }),
   })),
 
+  // ─── Sidebar Collapse ───
+  sidebarCollapsed: false,
+  toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
   // ─── Team State (Loop-19) ───
   currentTeamId: null,
   myTeams: [],
@@ -802,6 +843,20 @@ const useStore = create((set, get) => ({
     localStorage.setItem('onboardingSkipped', 'true')
     set({ onboardingSkipped: true })
   },
+
+  // ─── Project Layer (Loop-26.2) ───
+  selectedProjectId: null,
+  projectLayerTab: 'milestone',     // 'milestone' | 'tasks' | 'ptimeline'
+  projectTimelineMode: 'gantt',     // 'gantt' | 'detail'
+
+  enterProjectLayer: (projectId) => set({
+    currentView: 'projectLayer',
+    selectedProjectId: projectId,
+    projectLayerTab: 'milestone',
+  }),
+
+  setProjectLayerTab: (tab) => set({ projectLayerTab: tab }),
+  setProjectTimelineMode: (mode) => set({ projectTimelineMode: mode }),
 }))
 
 export default useStore

@@ -8,12 +8,12 @@ import './styles/global.css'
 // 즉시 필요한 것만 정적 import
 import SetupScreen from './components/shared/SetupScreen'
 import LoginScreen from './components/shared/LoginScreen'
-import TopNav from './components/layout/TopNav'
 import MobileTopBar from './components/layout/MobileTopBar'
 import FAB from './components/layout/FAB'
 import Toast from './components/shared/Toast'
 import { ViewSkeleton, LoadingSpinner } from './components/shared/Skeleton'
 import { SyncProviderWrapper } from './sync/SyncContext'
+import Sidebar from './components/layout/Sidebar'
 
 // React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
 const TodayView = lazy(() => import('./components/views/TodayView'))
@@ -23,6 +23,7 @@ const ProjectView = lazy(() => import('./components/views/ProjectView'))
 const TimelineView = lazy(() => import('./components/views/TimelineView'))
 const MemoryView = lazy(() => import('./components/views/MemoryView'))
 const TeamMatrixView = lazy(() => import('./components/matrix/TeamMatrixView'))
+const ProjectLayer = lazy(() => import('./components/project/ProjectLayer'))
 const TeamSettings = lazy(() => import('./components/team/TeamSettings'))
 const Onboarding = lazy(() => import('./components/team/Onboarding'))
 const InviteAccept = lazy(() => import('./components/team/InviteAccept'))
@@ -78,7 +79,7 @@ function AppShell({ mobile }) {
 
   // Loop-20: 팀 모드에서 매트릭스 뷰 분기
   const teamId = useStore(s => s.currentTeamId)
-  const views = { today: TodayView, allTasks: AllTasksView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView }
+  const views = { today: TodayView, allTasks: AllTasksView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView, projectLayer: ProjectLayer }
   const ViewComponent = views[currentView] || TodayView
 
   // 모바일에서 matrix/timeline 접근 시 today로 리다이렉트
@@ -89,18 +90,27 @@ function AppShell({ mobile }) {
   }, [currentView, mobile])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff' }}>
-      <TopNav />
-      <MobileTopBar />
+    <div style={{ display: 'flex', height: '100vh', background: '#fff' }}>
+      {/* 사이드바 (데스크탑만) */}
+      {!mobile && <Sidebar />}
 
-      <div style={{ paddingBottom: mobile ? 100 : 0 }}>
-        <Suspense fallback={<ViewSkeleton />}>
-          <ViewComponent />
-        </Suspense>
+      {/* 메인 영역 */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* 모바일 상단바 */}
+        {mobile && <MobileTopBar />}
+
+        {/* 뷰 컨텐츠 */}
+        <div style={{ flex: 1, overflow: 'auto', paddingBottom: mobile ? 100 : 0 }}>
+          <Suspense fallback={<ViewSkeleton />}>
+            <ViewComponent />
+          </Suspense>
+        </div>
       </div>
 
-      <FAB />
+      {/* 모바일 FAB */}
+      {mobile && <FAB />}
 
+      {/* 오버레이 패널들 */}
       {detailTask && <Suspense fallback={null}><DetailPanel /></Suspense>}
       {showNotificationPanel && <Suspense fallback={null}><NotificationPanel /></Suspense>}
       {showProjectMgr && <Suspense fallback={null}><ProjectManager /></Suspense>}
