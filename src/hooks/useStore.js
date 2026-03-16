@@ -66,6 +66,9 @@ function taskToRow(t) {
     created_by: t.createdBy || null,
     highlight_color: t.highlightColor || null,
     updated_at: new Date().toISOString(),
+    // ↓ Loop-26: Key Milestone 연결 ↓
+    key_milestone_id: t.keyMilestoneId || null,
+    deliverable_id: t.deliverableId || null,
   }
   if (_alarmColExists) row.alarm = t.alarm ?? null
   return row
@@ -117,6 +120,9 @@ function mapTask(r) {
     highlightColor: r.highlight_color || null,
     updatedAt: r.updated_at || null,
     deletedAt: r.deleted_at || null,
+    // ↓ Loop-26: Key Milestone 연결 ↓
+    keyMilestoneId: r.key_milestone_id || null,
+    deliverableId: r.deliverable_id || null,
   }
 }
 
@@ -162,6 +168,10 @@ const useStore = create((set, get) => ({
   userName: 'Ryan',
   setUserName: (name) => set({ userName: name }),
 
+  // ─── 스냅샷 상태 (iOS PWA 콜드 스타트 최적화) ───
+  snapshotTeamId: null,
+  snapshotRestored: false,
+
   // ─── Collapse State (synced to Supabase) ───
   collapseState: { ..._defaultCollapseState },
 
@@ -188,25 +198,34 @@ const useStore = create((set, get) => ({
 
   setView: (v) => set({ currentView: v }),
 
+  // ─── Sidebar collapse state ───
+  sidebarCollapsed: JSON.parse(localStorage.getItem('sidebarCollapsed') || 'false'),
+  toggleSidebar: () => {
+    const next = !get().sidebarCollapsed
+    set({ sidebarCollapsed: next })
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(next))
+  },
+
   // ─── 스냅샷 복원용 setter ───
   setTasks: (tasks) => set({ tasks }),
   setProjects: (projects) => set({ projects }),
   setMemos: (memos) => set({ memos }),
 
   // ─── 스냅샷 복원 (App 초기화 시 호출) ───
+  // ─── 스냅샷 복원 (App 초기화 시 호출 — Auth 전에 실행 가능) ───
   restoreSnapshot: () => {
     try {
       const cached = localStorage.getItem(SNAPSHOT_KEY)
       if (!cached) return false
       const snapshot = JSON.parse(cached)
-      // 24시간 이내 + 같은 팀 스냅샷만 사용
-      const teamId = get().currentTeamId
+      // 24시간 이내만 사용 (teamId 검증은 Auth 완료 후 지연 검증)
       if (Date.now() - snapshot.timestamp > SNAPSHOT_MAX_AGE) return false
-      if (snapshot.teamId !== teamId) return false
       set({
         tasks: snapshot.tasks || [],
         projects: snapshot.projects || [],
         memos: snapshot.memos || [],
+        snapshotTeamId: snapshot.teamId || null,
+        snapshotRestored: true,
       })
       return true
     } catch (e) {
@@ -214,11 +233,23 @@ const useStore = create((set, get) => ({
     }
   },
 
+  // ─── 스냅샷 초기화 (Auth 실패 또는 로그아웃 시 호출) ───
+  clearSnapshot: () => {
+    set({
+      snapshotRestored: false,
+      snapshotTeamId: null,
+      tasks: [],
+      projects: [],
+      memos: [],
+    })
+    try { localStorage.removeItem(SNAPSHOT_KEY) } catch (e) {}
+  },
+
   logout: async () => {
     const d = db()
     if (d) await d.auth.signOut()
     // 스냅샷 삭제
-    localStorage.removeItem(SNAPSHOT_KEY)
+    get().clearSnapshot()
   },
   openDetail: (task) => set({ detailTask: task, showNotificationPanel: false }),
   closeDetail: () => set({ detailTask: null }),
@@ -478,7 +509,16 @@ const useStore = create((set, get) => ({
   },
 
   updateProject: async (id, patch) => {
-    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) }))
+    // 소속 변경 차단 — 이 필드들은 업데이트에서 절대 제외
+    const {
+      teamId, userId,          // camelCase (프론트)
+      team_id, user_id,        // snake_case (DB)
+      created_by, createdBy,   // 생성자도 변경 불가
+      id: _id,                 // id도 변경 불가
+      ...safePatch
+    } = patch
+
+    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...safePatch } : p) }))
     const p = get().projects.find(x => x.id === id)
     if (!p) return
     const d = db()
@@ -491,6 +531,28 @@ const useStore = create((set, get) => ({
   },
 
   deleteProject: async (id) => {
+    const project = get().projects.find(p => p.id === id)
+    if (!project) return
+
+    // 팀 프로젝트: 팀장만 삭제 가능
+    const teamId = get().currentTeamId
+    if (project.teamId && teamId) {
+      const myRole = get().myRole
+      if (myRole !== 'owner') {
+        console.warn('[deleteProject] 팀 프로젝트 삭제는 팀장만 가능합니다')
+        return
+      }
+    }
+
+    // 개인 프로젝트: 본인 소유인지 확인
+    if (!project.teamId) {
+      const userId = _cachedUserId || (await getCurrentUserId())
+      if (project.userId && project.userId !== userId) {
+        console.warn('[deleteProject] 다른 사용자의 개인 프로젝트는 삭제할 수 없습니다')
+        return
+      }
+    }
+
     const d = db()
     // Loop-23: 연관 tasks soft delete (fallback to hard delete)
     const taskIds = get().tasks.filter(t => t.projectId === id).map(t => t.id)
@@ -786,6 +848,20 @@ const useStore = create((set, get) => ({
     localStorage.setItem('onboardingSkipped', 'true')
     set({ onboardingSkipped: true })
   },
+
+  // ─── Project Layer (Loop-26.2) ───
+  selectedProjectId: null,
+  projectLayerTab: 'milestone',     // 'milestone' | 'tasks' | 'ptimeline'
+  projectTimelineMode: 'gantt',     // 'gantt' | 'detail'
+
+  enterProjectLayer: (projectId) => set({
+    currentView: 'projectLayer',
+    selectedProjectId: projectId,
+    projectLayerTab: 'milestone',
+  }),
+
+  setProjectLayerTab: (tab) => set({ projectLayerTab: tab }),
+  setProjectTimelineMode: (mode) => set({ projectTimelineMode: mode }),
 }))
 
 export default useStore

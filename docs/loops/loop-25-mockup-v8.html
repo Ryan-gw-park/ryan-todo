@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ryan's Todo — Loop-25 Mockup v8</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif;background:#eceae4;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+.shell{display:flex;width:1280px;height:820px;font-size:13px;color:#2C2C2A;background:#f7f6f3;border-radius:14px;overflow:hidden;border:0.5px solid #d3d1c7;box-shadow:0 4px 32px rgba(0,0,0,.10)}
+
+/* Sidebar */
+.sb{width:210px;background:#fff;border-right:0.5px solid #e8e6df;display:flex;flex-direction:column;flex-shrink:0;user-select:none}
+.sb-top{padding:14px 14px 0;display:flex;flex-direction:column;gap:8px}
+.sb-logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;letter-spacing:-.01em}
+.sb-logo-c{width:28px;height:28px;border-radius:8px;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700}
+.team-sel{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:7px;background:#f5f4f0;cursor:pointer;font-size:12px;color:#6b6a66;border:0.5px solid #e8e6df}
+.team-sel:hover{background:#eeedea}
+.team-sel-icon{width:20px;height:20px;border-radius:5px;background:#378ADD;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;flex-shrink:0}
+.team-sel-name{font-weight:500;flex:1}
+.team-sel-arrow{font-size:10px;color:#b4b2a9}
+.sb-scroll{flex:1;overflow-y:auto;padding:4px 0}
+.sb-sec{padding:12px 14px 4px;font-size:10px;color:#a09f99;font-weight:600;letter-spacing:.05em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
+.sb-sec-add{font-size:14px;color:#b4b2a9;cursor:pointer;font-weight:400;line-height:1}.sb-sec-add:hover{color:#6b6a66}
+.sb-i{display:flex;align-items:center;gap:9px;padding:7px 12px;cursor:pointer;border-radius:7px;margin:1px 6px;font-size:13px;color:#6b6a66;transition:all .12s}
+.sb-i:hover{background:#f5f4f0;color:#2C2C2A}
+.sb-i.on{background:#f0efe8;color:#2C2C2A;font-weight:500}
+.sb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sb-icon{width:16px;text-align:center;font-size:13px;flex-shrink:0;opacity:.6}
+.sb-div{height:0.5px;background:#e8e6df;margin:6px 14px}
+.sb-footer{border-top:0.5px solid #e8e6df;padding:8px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.sb-f-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:#a09f99}
+.sb-f-item:hover{background:#f5f4f0;color:#6b6a66}
+.sb-profile{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer}
+.sb-profile:hover{background:#f5f4f0}
+.sb-avatar{width:24px;height:24px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:600;flex-shrink:0}
+.sb-pname{font-size:12px;font-weight:500;color:#2C2C2A}
+.sb-pemail{font-size:10px;color:#b4b2a9}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.phdr{display:flex;align-items:center;gap:10px;height:48px;padding:0 20px;background:#fff;border-bottom:0.5px solid #e8e6df;flex-shrink:0}
+.phdr-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.phdr-name{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.phdr-meta{font-size:11px;color:#a09f99}
+.phdr-tabs{margin-left:auto;display:flex;gap:2px}
+.pt{font-size:12px;padding:5px 14px;border-radius:7px;cursor:pointer;color:#a09f99;background:none;border:none;font-family:inherit;font-weight:500}
+.pt:hover{background:#f5f4f0;color:#6b6a66}
+.pt.on{background:#f0efe8;color:#2C2C2A;font-weight:600}
+.badge{font-size:10px;background:#e8e6df;border-radius:999px;padding:1px 7px;margin-left:4px;color:#a09f99;font-weight:500}
+.badge-w{background:#FAEEDA;color:#854F0B}
+
+/* Mode bar (Tasks + Parallel only) */
+.mode-bar{display:flex;align-items:center;gap:1px;padding:6px 20px;background:#fafaf8;border-bottom:0.5px solid #e8e6df;flex-shrink:0}
+.mb{font-size:11px;padding:4px 12px;border-radius:5px;cursor:pointer;color:#a09f99;background:none;border:none;font-family:inherit;font-weight:500}
+.mb:hover{background:#f0efe8;color:#6b6a66}
+.mb.on{background:#e8e6df;color:#2C2C2A;font-weight:600}
+
+.cnt{flex:1;overflow:auto;background:#fff}
+
+/* ── Reference ── */
+.rv{display:flex;flex-direction:column;height:100%}
+.rv-main{flex:1;overflow-y:auto}
+.rv-footer{border-top:0.5px solid #e8e6df;flex-shrink:0;background:#fafaf8}
+.rv-colhdr{display:flex;position:sticky;top:0;z-index:3;background:#fff;border-bottom:0.5px solid #e8e6df}
+.rv-ch{flex:1;padding:8px 22px;font-size:11px;font-weight:600;color:#a09f99;letter-spacing:.03em}
+.rv-ch+.rv-ch{border-left:0.5px solid #e8e6df}
+.rv-row{display:flex;border-bottom:0.5px solid #eeedea;min-height:72px}
+.rv-left{flex:1;padding:14px 22px;border-right:0.5px solid #eeedea}
+.rv-right{flex:1;padding:10px 18px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.mh{display:flex;align-items:flex-start;gap:10px}
+.mh-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.mh-info{flex:1}
+.mh-t{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.mh-d{font-size:11px;color:#a09f99;margin-top:3px;line-height:1.4}
+.mh-r{text-align:right;flex-shrink:0}
+.mh-date{font-size:13px;font-weight:500}
+.mh-date.urg{color:#BA7517;font-weight:600}
+.mh-dd{font-size:10px;color:#b4b2a9;display:block;margin-top:1px}
+.dv{padding:9px 12px;background:#fafaf8;border-radius:7px;border-left:3px solid transparent;transition:background .12s}
+.dv:hover{background:#f0efe8}
+.dv-r1{display:flex;align-items:center;gap:6px}
+.dv-n{font-size:11px;color:#b4b2a9;font-weight:600}
+.dv-t{font-size:13px;font-weight:500;flex:1}
+.dv-w{font-size:11px;color:#6b6a66;flex-shrink:0}
+.dv-r2{font-size:11px;color:#a09f99;margin-top:2px}
+.dv-r3{display:flex;align-items:center;gap:8px;margin-top:5px}
+.dv-tag{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500}
+.dv-tc{font-size:10px;display:inline-flex;align-items:center;gap:3px;margin-left:auto}
+.dv-tc.ok{color:#0F6E56}.dv-tc.no{color:#BA7517}
+.dv-add{font-size:11px;color:#b4b2a9;cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:3px}.dv-add:hover{color:#2C2C2A}
+.rv-empty{font-size:11px;color:#b4b2a9;font-style:italic;display:flex;align-items:center;gap:6px}
+.rv-empty-a{font-style:normal;color:#a09f99;cursor:pointer}.rv-empty-a:hover{color:#2C2C2A}
+.ctog{display:flex;align-items:center;gap:7px;padding:10px 22px;cursor:pointer;font-size:12px;color:#a09f99;font-weight:500}
+.ctog:hover{background:#f0efe8}
+.ctog .arr{font-size:10px;transition:transform .2s;display:inline-block}
+.ctog .arr.open{transform:rotate(90deg)}
+.ctog .sc{font-size:10px;background:#eeedea;border-radius:999px;padding:0 6px;color:#b4b2a9}
+.cbo{overflow:hidden;max-height:0;transition:max-height .25s ease}
+.ci{padding:0 22px 14px 40px}
+.li{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer}
+.li-ic{color:#378ADD;font-size:12px;margin-top:2px;flex-shrink:0}
+.li-t{font-size:12px;color:#378ADD}.li-t:hover{text-decoration:underline}
+.li-d{font-size:11px;color:#b4b2a9}
+.poli{padding:5px 0}.poli-t{font-size:12px;line-height:1.5}
+.poli-tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:3px;margin-right:4px;font-weight:500}
+.poli-d{font-size:11px;color:#a09f99;margin-top:1px}
+
+/* ── Tasks ── */
+.tbar{display:flex;align-items:center;gap:12px;padding:9px 22px;background:#fafaf8;border-bottom:0.5px solid #e8e6df;font-size:11px;color:#a09f99}
+.tbar-ms{display:flex;align-items:center;gap:5px}
+.tbar-dot{width:6px;height:6px;border-radius:50%;background:#BA7517}
+.tbar-label{font-weight:600;color:#2C2C2A;font-size:12px}
+.tbar-dd{color:#BA7517;font-weight:600}
+.tbar-gap{background:#FAEEDA;color:#854F0B;font-size:10px;padding:2px 8px;border-radius:3px;font-weight:500}
+.tg{padding:16px 22px 6px}
+.tg-h{font-size:12px;font-weight:600;color:#6b6a66;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.tg-c{font-size:11px;color:#b4b2a9;font-weight:400}
+.trow{display:flex;align-items:center;gap:8px;padding:7px 0}
+.trow:hover{background:#fafaf8;margin:0 -22px;padding:7px 22px}
+.tcb{width:16px;height:16px;border:1.5px solid #c2c0b6;border-radius:3px;flex-shrink:0;cursor:pointer;background:none;position:relative}
+.tcb.dn{background:#b4b2a9;border-color:#b4b2a9}
+.tcb.dn::after{content:'✓';position:absolute;top:-1px;left:2px;font-size:11px;color:#fff}
+.ttx{flex:1;font-size:13px}.ttx.dn{text-decoration:line-through;color:#b4b2a9}
+.tdv{font-size:9px;padding:2px 7px;border-radius:3px;flex-shrink:0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0.5px solid #e8e6df;color:#a09f99;background:#fafaf8}
+.ta{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:500;flex-shrink:0}
+.td{font-size:11px;color:#b4b2a9;flex-shrink:0;min-width:30px;text-align:right}
+
+/* Outliner */
+.ol{padding:12px 22px 20px}
+.ol-i{border-bottom:0.5px solid #f0efe8;padding:8px 0}
+.ol-h{display:flex;align-items:center;gap:8px;cursor:pointer}
+.ol-tog{font-size:10px;color:#b4b2a9;width:14px;text-align:center;flex-shrink:0;transition:transform .15s}
+.ol-tog.open{transform:rotate(90deg)}
+.ol-cb{width:15px;height:15px;border:1.5px solid #c2c0b6;border-radius:3px;flex-shrink:0}
+.ol-t{font-size:13px;font-weight:500;flex:1}
+.ol-m{display:flex;align-items:center;gap:6px}
+.ol-note{margin:6px 0 4px 36px;font-size:12px;color:#6b6a66;line-height:1.6;padding:8px 12px;background:#fafaf8;border-radius:6px;border-left:2px solid #e8e6df;display:none}
+.ol-note.open{display:block}
+.ol-note-ph{color:#b4b2a9;font-style:italic}
+
+/* Gantt shared */
+.gt{width:100%;border-collapse:collapse;table-layout:fixed}
+.gt th{font-size:10px;font-weight:500;color:#b4b2a9;text-align:center;padding:8px 0;border-bottom:0.5px solid #e8e6df;position:sticky;top:0;background:#fff;z-index:2}
+.gt th.tc{color:#378ADD;background:rgba(55,138,221,.04)}
+.gt td{padding:0;border-bottom:0.5px solid #f0efe8;vertical-align:middle}
+.gt td:first-child{padding:8px 12px;font-size:12px;white-space:nowrap;border-right:0.5px solid #e8e6df;width:210px}
+.gl{display:flex;align-items:center;gap:6px}
+.gl-n{color:#b4b2a9;font-weight:600;min-width:20px;font-size:11px}
+.gl-t{font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis}
+.gl-d{font-size:10px;color:#b4b2a9;margin-left:auto;flex-shrink:0}
+.bc{position:relative;height:38px}
+.gb{position:absolute;height:12px;top:13px;border-radius:3px;opacity:.85}
+.ubadge{font-size:9px;background:#FAEEDA;color:#854F0B;padding:0 5px;border-radius:2px;font-weight:600;margin-left:5px}
+.tln{position:absolute;top:0;bottom:0;width:1.5px;background:#378ADD;z-index:1;opacity:.45}
+
+/* ── Parallel: Simple (gantt only) ── */
+/* ── Parallel: Detail (gantt + tasks) ── */
+.pw{display:flex;flex-direction:column;height:100%}
+.pwh{display:flex;position:sticky;top:0;z-index:3;background:#fff;border-bottom:0.5px solid #e8e6df}
+.pwhl{padding:7px 12px;font-size:10px;color:#a09f99;font-weight:600;letter-spacing:.03em;flex-shrink:0}
+.pwcols{display:flex;flex:1}
+.pwcol{flex:1;text-align:center;font-size:10px;padding:7px 0;color:#b4b2a9;font-weight:500}
+.pwcol.today{color:#378ADD;background:rgba(55,138,221,.04)}
+.pwht{padding:7px 12px;font-size:10px;color:#a09f99;font-weight:600;letter-spacing:.03em;flex-shrink:0}
+.pwb{flex:1;overflow-y:auto}
+.pwms{background:#fafaf8;border-bottom:0.5px solid #e8e6df;display:flex}
+.pwmsl{display:flex;align-items:center;gap:7px;padding:6px 12px;font-size:11px;font-weight:600;color:#6b6a66;flex:1}
+.pwmsd{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pwmsr{flex-shrink:0;border-left:0.5px solid #e8e6df}
+.pwr{display:flex;border-bottom:0.5px solid #f0efe8;min-height:46px}
+.pwrl{width:160px;flex-shrink:0;padding:7px 10px 7px 26px;border-right:0.5px solid #e8e6df;display:flex;align-items:center}
+.pwrt{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwrg{flex:1;position:relative;min-height:38px;border-right:0.5px solid #e8e6df}
+.pwrk{flex-shrink:0;padding:5px 12px;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.pwrk.empty{background:repeating-linear-gradient(135deg,transparent,transparent 10px,rgba(186,117,23,.025) 10px,rgba(186,117,23,.025) 20px)}
+.pwtt{display:flex;align-items:center;gap:5px;font-size:11px}
+.pwtcb{width:11px;height:11px;border:1.5px solid #c2c0b6;border-radius:2px;flex-shrink:0}
+.pwtn{flex:1}
+.pwta{font-size:10px;padding:1px 6px;border-radius:999px;font-weight:500;flex-shrink:0}
+.pwe{display:flex;align-items:center;gap:5px;font-size:11px;color:#BA7517;font-weight:500}
+.pwab{font-size:10px;color:#a09f99;background:none;border:0.5px solid #d3d1c7;border-radius:3px;padding:2px 8px;cursor:pointer;font-family:inherit;margin-left:2px}.pwab:hover{background:#f5f4f0}
+
+.gph{display:flex;align-items:center;justify-content:center;height:100%;color:#b4b2a9;font-size:14px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="sb">
+    <div class="sb-top">
+      <div class="sb-logo"><div class="sb-logo-c">R</div> Ryan's Todo</div>
+      <div class="team-sel"><div class="team-sel-icon">S</div><span class="team-sel-name">SCD팀</span><span class="team-sel-arrow">▾</span></div>
+    </div>
+    <div class="sb-scroll">
+      <div class="sb-sec">글로벌 뷰</div>
+      <div class="sb-i" onclick="showG('오늘할일')"><span class="sb-icon">📋</span> 오늘할일</div>
+      <div class="sb-i" onclick="showG('매트릭스')"><span class="sb-icon">⊞</span> 매트릭스</div>
+      <div class="sb-i" onclick="showG('타임라인')"><span class="sb-icon">▤</span> 타임라인</div>
+      <div class="sb-i" onclick="showG('노트')"><span class="sb-icon">✎</span> 노트</div>
+      <div class="sb-div"></div>
+      <div class="sb-sec">팀 프로젝트 <span class="sb-sec-add">+</span></div>
+      <div class="sb-i on" data-p="jt" onclick="showP('jt')"><span class="sb-dot" style="background:#1D9E75"></span> 정기주총</div>
+      <div class="sb-i" data-p="abi" onclick="showP('abi')"><span class="sb-dot" style="background:#D85A30"></span> ABI 코리아</div>
+      <div class="sb-i" data-p="jp" onclick="showP('jp')"><span class="sb-dot" style="background:#378ADD"></span> 일본법인/해외SCM</div>
+      <div class="sb-i" data-p="bis" onclick="showP('bis')"><span class="sb-dot" style="background:#EF9F27"></span> BIS</div>
+      <div class="sb-div"></div>
+      <div class="sb-sec">개인 프로젝트 <span class="sb-sec-add">+</span></div>
+      <div class="sb-i" data-p="etc" onclick="showP('etc')"><span class="sb-dot" style="background:#97C459"></span> 개별과제</div>
+      <div class="sb-i" data-p="study" onclick="showP('study')"><span class="sb-dot" style="background:#b4b2a9"></span> 자기개발</div>
+    </div>
+    <div class="sb-footer">
+      <div class="sb-f-item"><span style="font-size:12px">?</span> 도움말</div>
+      <div class="sb-div" style="margin:2px 0"></div>
+      <div class="sb-profile"><div class="sb-avatar">RP</div><div><div class="sb-pname">Ryan Park</div><div class="sb-pemail">ryan@company.com</div></div></div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="phdr" id="phdr">
+      <div class="phdr-dot" style="background:#1D9E75"></div>
+      <span class="phdr-name">정기주총</span>
+      <span class="phdr-meta">2026.03 ~ 2026.05 · SCD팀</span>
+      <div class="phdr-tabs" id="ptabs"></div>
+    </div>
+    <div class="mode-bar" id="mbar" style="display:none"></div>
+    <div class="cnt" id="cnt"></div>
+  </div>
+</div>
+<script>
+var A={Ryan:['#FAECE7','#993C1D'],Ethan:['#E6F1FB','#185FA5'],Ash:['#EAF3DE','#3B6D11'],Eric:['#EEEDFE','#534AB7'],Edmond:['#FAEEDA','#854F0B']};
+function pill(n){return '<span class="ta" style="background:'+A[n][0]+';color:'+A[n][1]+'">'+n+'</span>'}
+function pillS(n){return '<span class="pwta" style="background:'+A[n][0]+';color:'+A[n][1]+'">'+n+'</span>'}
+
+var tab='ref',taskMode='list',paraMode='simple';
+
+function sw(t){tab=t;Z()}
+function Z(){
+  document.getElementById('phdr').style.display='flex';
+  var tabs=[{id:'ref',l:'Reference'},{id:'tasks',l:'Tasks',b:'12'},{id:'para',l:'병렬 보기',bw:'미배정 4'}];
+  document.getElementById('ptabs').innerHTML=tabs.map(function(t){
+    var c='pt'+(tab===t.id?' on':'');
+    var bh=t.b?'<span class="badge">'+t.b+'</span>':'';
+    if(t.bw)bh='<span class="badge badge-w">'+t.bw+'</span>';
+    return '<button class="'+c+'" onclick="sw(\''+t.id+'\')">'+t.l+bh+'</button>';
+  }).join('');
+
+  var mb=document.getElementById('mbar');
+  if(tab==='tasks'){
+    mb.style.display='flex';
+    mb.innerHTML=MBT('list','목록',taskMode)+MBT('outliner','아웃라이너',taskMode)+MBT('timeline','타임라인',taskMode);
+  } else if(tab==='para'){
+    mb.style.display='flex';
+    mb.innerHTML=MBT('simple','타임라인',paraMode)+MBT('detail','결과물 + Task',paraMode);
+  } else {
+    mb.style.display='none';
+  }
+
+  var c=document.getElementById('cnt');
+  if(tab==='ref') c.innerHTML=vRef();
+  else if(tab==='tasks') c.innerHTML=taskMode==='list'?vTaskList():taskMode==='outliner'?vTaskOL():vTaskTL();
+  else c.innerHTML=paraMode==='simple'?vParaSimple():vParaDetail();
+}
+function MBT(id,l,cur){return '<button class="mb'+(cur===id?' on':'')+'" onclick="setMode(\''+id+'\')">'+l+'</button>'}
+function setMode(m){if(tab==='tasks')taskMode=m;else if(tab==='para')paraMode=m;Z()}
+function showP(id){document.querySelectorAll('.sb-i').forEach(function(e){e.classList.remove('on')});var el=document.querySelector('[data-p="'+id+'"]');if(el)el.classList.add('on');tab='ref';Z()}
+function showG(n){document.querySelectorAll('.sb-i').forEach(function(e){e.classList.remove('on')});event.target.closest('.sb-i').classList.add('on');document.getElementById('phdr').style.display='none';document.getElementById('mbar').style.display='none';document.getElementById('cnt').innerHTML='<div class="gph">글로벌 '+n+' 뷰</div>'}
+
+/* ═══ DATA ═══ */
+var MS=[
+{t:'소집통지 발송 완료',d:'주주 1% 이상 이메일 + 등기 기준',date:'3월 20일',dd:'D-5',c:'#D85A30',u:1,dvs:[
+  {n:'01',t:'소집통지서 + 공고문',d:'법무 검토 완료본 · 이사회 결의 반영',w:'Ethan',tc:2,tag:'법무 검토 필수',tbg:'#E6F1FB',ttc:'#185FA5'}]},
+{t:'안건자료 확정',d:'이사회 승인 후 최종본',date:'3월 21일',dd:'D-6',c:'#BA7517',u:1,dvs:[
+  {n:'02',t:'안건자료 PPT (주주 배포용)',d:'사업보고서 · 감사보고서 · 재무제표',w:'Ryan',tc:1,tag:'Eric 디자인 승인',tbg:'#FAEEDA',ttc:'#854F0B'}]},
+{t:'위임장 취합 마감',d:'현장 집계 포함',date:'3월 31일',dd:'D-16',c:'#1D9E75',u:0,dvs:[]},
+{t:'등기 서류 마감',d:'주총 관련 등기 일체',date:'3월 28일',dd:'D-13',c:'#993C1D',u:0,dvs:[
+  {n:'03',t:'등기 서류 일체',d:'등기 서류 목록 · 위임장 양식',w:'Eric · Edmond',tc:2,tag:'',tbg:'',ttc:''}]},
+{t:'정기주총 개최',d:'본사 대강당 · 오전 10시',date:'5월 초',dd:'D-51',c:'#D85A30',u:0,dvs:[
+  {n:'04',t:'현장 운영 매뉴얼',d:'스크립트 + 배치도 + 투표 Dashboard',w:'Ash · Eric',tc:3,tag:'',tbg:'',ttc:''},
+  {n:'05',t:'의사록 + 등기 서류',d:'주총 후 2주 이내 등기 완료',w:'Edmond',tc:0,tag:'',tbg:'',ttc:''}]}
+];
+
+/* ─── Reference (no mode bar) ─── */
+function vRef(){
+var h='<div class="rv"><div class="rv-main"><div class="rv-colhdr"><div class="rv-ch">📅 주요 일정 '+MS.length+'</div><div class="rv-ch">📋 핵심 결과물 '+MS.reduce(function(s,m){return s+m.dvs.length},0)+'</div></div>';
+MS.forEach(function(m){
+  h+='<div class="rv-row"><div class="rv-left"><div class="mh"><div class="mh-dot" style="background:'+m.c+'"></div><div class="mh-info"><div class="mh-t">'+m.t+'</div><div class="mh-d">'+m.d+'</div></div><div class="mh-r"><div class="mh-date'+(m.u?' urg':'')+'">'+m.date+'</div><span class="mh-dd"'+(m.u?' style="color:#BA7517"':'')+'>'+m.dd+'</span></div></div></div><div class="rv-right">';
+  if(m.dvs.length){m.dvs.forEach(function(d){var ok=d.tc>0;h+='<div class="dv" style="border-left-color:'+m.c+'"><div class="dv-r1"><span class="dv-n">'+d.n+'</span><span class="dv-t">'+d.t+'</span><span class="dv-w">'+d.w+'</span></div><div class="dv-r2">'+d.d+'</div><div class="dv-r3">'+(d.tag?'<span class="dv-tag" style="background:'+d.tbg+';color:'+d.ttc+'">'+d.tag+'</span>':'')+'<span class="dv-tc '+(ok?'ok':'no')+'">'+(ok?'✓ Task '+d.tc+'건':'⚠ Task 미연결')+'</span></div></div>'});h+='<div class="dv-add">+ 결과물 추가</div>';}
+  else h+='<div class="rv-empty"><span>결과물 없음</span><span class="rv-empty-a">+ 추가</span></div>';
+  h+='</div></div>';
+});
+h+='</div><div class="rv-footer">';
+h+=COL('lk','🔗 참조 문서','3',LI('2025 정기주총 운영 결과 보고서','전년도 참고용')+LI('상법/정관 주요 조항 요약','법무팀 정리본')+LI('주주명부 (2026.01 기준)','1% 이상 주주 리스트'));
+h+=COL('po','✓ 합의된 정책','4',PO('외부 발송 문서는 법무 검토 필수','법무팀','#E6F1FB','#185FA5','소집통지·공고문·위임장')+PO('안건자료 디자인 변경은 Eric 승인 후','팀내','#EAF3DE','#3B6D11','임의 수정 금지')+PO('스테이징 배포 전 팀장 리뷰','팀내','#EAF3DE','#3B6D11','')+PO('주주 개인정보 외부 반출 금지','법무팀','#E6F1FB','#185FA5','BCC 사용'));
+h+='</div></div>';return h;}
+function COL(id,title,cnt,inner){return '<div class="ctog" onclick="togS(\''+id+'\')"><span class="arr" id="a-'+id+'">▸</span> '+title+' <span class="sc">'+cnt+'</span></div><div class="cbo" id="s-'+id+'"><div class="ci">'+inner+'</div></div>'}
+function LI(t,d){return '<div class="li"><span class="li-ic">↗</span><div><div class="li-t">'+t+'</div><div class="li-d">'+d+'</div></div></div>'}
+function PO(t,tg,bg,tc,d){return '<div class="poli"><div class="poli-t"><span class="poli-tag" style="background:'+bg+';color:'+tc+'">'+tg+'</span> '+t+'</div>'+(d?'<div class="poli-d">'+d+'</div>':'')+'</div>'}
+function togS(id){var b=document.getElementById('s-'+id),a=document.getElementById('a-'+id);if(b.style.maxHeight&&b.style.maxHeight!=='0px'){b.style.maxHeight='0';a.classList.remove('open')}else{b.style.maxHeight=b.scrollHeight+'px';a.classList.add('open')}}
+
+/* ─── Tasks: List ─── */
+function vTaskList(){
+return '<div><div class="tbar"><div class="tbar-ms"><div class="tbar-dot"></div><span>다음 마일스톤:</span> <span class="tbar-label">소집통지 발송 — 3/20</span> <span class="tbar-dd">(D-5)</span></div><div style="margin-left:auto"><span class="tbar-gap">미연결 결과물 2건</span></div></div>'+
+TG('🔥 오늘 할일',3,[TR('안건 PPT 작성','Ryan','3/14',0,'안건자료 PPT'),TR('소집통지 메일 발송','Ethan','3/14',0,'소집통지서'),TR('주주분류 확인 완료','Ash','3/13',1,'')])+
+TG('📌 이번 주',5,[TR('공동행사약정서 초안','Ryan','3/15',0,''),TR('1% 이상 주주 개별 연락','Ethan','3/16',0,'소집통지서'),TR('소집 공고 초안','Ash','3/17',0,''),TR('등기 서류 목록 작성','Eric','3/18',0,'등기 서류'),TR('위임장 양식 확인','Edmond','3/18',0,'등기 서류')])+
+TG('📅 다음 주',4,[TR('의사록 양식 준비','Ryan','3/24',0,''),TR('배치도 초안','Ash','3/25',0,'운영 매뉴얼'),TR('스크립트 작성','Ethan','3/26',0,'운영 매뉴얼'),TR('위임장 발송','Edmond','3/28',0,'')])+
+'</div>';}
+function TG(t,c,r){return '<div class="tg"><div class="tg-h">'+t+' <span class="tg-c">'+c+'</span></div>'+r.join('')+'</div>'}
+function TR(t,n,d,dn,dv){return '<div class="trow"><div class="tcb'+(dn?' dn':'')+'"></div><span class="ttx'+(dn?' dn':'')+'">'+t+'</span>'+(dv?'<span class="tdv">'+dv+'</span>':'')+pill(n)+'<span class="td">'+d+'</span></div>'}
+
+/* ─── Tasks: Outliner ─── */
+var OD=[
+{t:'안건 PPT 작성',a:'Ryan',dv:'안건자료 PPT',note:'사업보고서 기반 PPT 40페이지 구성.\n재무제표는 회계팀에서 3/16 전달 예정.\n디자인은 기존 템플릿, Eric 최종 검수.'},
+{t:'소집통지 메일 발송',a:'Ethan',dv:'소집통지서',note:'1% 이상 주주 56명 개별 발송.\n이사회 결의문 첨부 필수.\n법무팀 최종 검토 3/19 확인 후 발송.'},
+{t:'공동행사약정서 초안',a:'Ryan',dv:'',note:''},
+{t:'1% 이상 주주 개별 연락',a:'Ethan',dv:'소집통지서',note:'전화+이메일 병행. 해외 주주 3명 영문 통지.'},
+{t:'소집 공고 초안',a:'Ash',dv:'',note:''},
+{t:'등기 서류 목록 작성',a:'Eric',dv:'등기 서류',note:'법무법인 등기 위임 여부 확인.\n인감증명서 유효기간 체크.'},
+{t:'위임장 양식 확인',a:'Edmond',dv:'등기 서류',note:''},
+{t:'배치도 초안',a:'Ash',dv:'운영 매뉴얼',note:'대강당 200명 기준.\n투표 부스 3개, 접수대 2개.'},
+{t:'스크립트 작성',a:'Ethan',dv:'운영 매뉴얼',note:''},
+{t:'의사록 양식 준비',a:'Ryan',dv:'',note:''},
+{t:'위임장 발송',a:'Edmond',dv:'',note:''},
+];
+function vTaskOL(){
+var h='<div class="ol">';
+OD.forEach(function(o,i){var has=!!o.note;h+='<div class="ol-i"><div class="ol-h" onclick="togOL('+i+')"><span class="ol-tog'+(has?' open':'')+'" id="olt-'+i+'">'+(has?'▸':'·')+'</span><div class="ol-cb"></div><span class="ol-t">'+o.t+'</span><div class="ol-m">'+(o.dv?'<span class="tdv">'+o.dv+'</span>':'')+pill(o.a)+'</div></div><div class="ol-note'+(has?' open':'')+'" id="oln-'+i+'">'+(o.note?o.note.replace(/\n/g,'<br>'):'<span class="ol-note-ph">메모를 입력하세요...</span>')+'</div></div>'});
+return h+'</div>';}
+
+/* ─── Tasks: Timeline ─── */
+var GC=['2월','3/1주','3/2주▼','3/3주','3/4주','4/1주','4/2주','4/3주','5월','6월'];
+function gH(f){return '<tr><th style="text-align:left;padding-left:12px;width:210px">'+f+'</th>'+GC.map(function(c,i){return '<th class="'+(i===2?'tc':'')+'">'+c+'</th>'}).join('')+'</tr>'}
+var TI=[{l:'안건 PPT 작성',a:'Ryan',s:1.5,w:1,c:'#BA7517'},{l:'소집통지 메일',a:'Ethan',s:1.5,w:.8,c:'#D85A30'},{l:'주주분류 확인',a:'Ash',s:1,w:1,c:'#1D9E75'},{l:'1% 주주 연락',a:'Ethan',s:2,w:1,c:'#D85A30'},{l:'공동행사약정서',a:'Ryan',s:2,w:1,c:'#378ADD'},{l:'소집 공고 초안',a:'Ash',s:2.5,w:.8,c:'#1D9E75'},{l:'등기 서류 목록',a:'Eric',s:2.5,w:1,c:'#993C1D'},{l:'위임장 양식',a:'Edmond',s:2.5,w:.8,c:'#993C1D'},{l:'의사록 양식',a:'Ryan',s:3.5,w:1,c:'#1D9E75'},{l:'배치도 초안',a:'Ash',s:3.5,w:1,c:'#378ADD'},{l:'스크립트 작성',a:'Ethan',s:4,w:1,c:'#378ADD'},{l:'위임장 발송',a:'Edmond',s:4.5,w:1,c:'#1D9E75'}];
+function vTaskTL(){var h='<table class="gt">'+gH('Task');TI.forEach(function(t){h+='<tr><td><div class="gl"><span class="gl-t">'+t.l+'</span><span style="margin-left:auto">'+pillS(t.a)+'</span></div></td><td colspan="10"><div class="bc"><div class="gb" style="left:'+(t.s*10)+'%;width:'+(t.w*10)+'%;background:'+t.c+'"></div><div class="tln" style="left:22%"></div></div></td></tr>'});return h+'</table>'}
+
+/* ─── Parallel: Simple (milestone gantt only) ─── */
+var RI=[{n:'02',l:'주주분류+개별연락',c:'#1D9E75',s:1,w:2,u:1,d:'~3/18'},{n:'03',l:'공동행사약정서',c:'#378ADD',s:2,w:2,u:0,d:'~3/25'},{n:'04',l:'소집통지(이메일)',c:'#D85A30',s:1,w:1.5,u:1,d:'~3/20'},{n:'05',l:'소집 공고',c:'#1D9E75',s:2,w:1,u:0,d:'~3/22'},{n:'06',l:'위임장+등기취합',c:'#1D9E75',s:3,w:2,u:0,d:'~3/31'},{n:'07',l:'등기서류준비',c:'#993C1D',s:1,w:3.5,u:0,d:'~3/28'},{n:'08',l:'등기',c:'#534AB7',s:5,w:1,u:0,d:'4월'},{n:'09',l:'안건자료 PPT',c:'#D85A30',s:1,w:2.5,u:1,d:'~3/21'},{n:'10',l:'의사록+첨부',c:'#1D9E75',s:3,w:2,u:0,d:'~3/31'},{n:'11',l:'운영 매뉴얼',c:'#378ADD',s:2,w:3,u:0,d:'~3/31'},{n:'14',l:'정기주총 개최',c:'#D85A30',s:6,w:1,u:0,d:'5월'},{n:'15',l:'공시',c:'#888780',s:7,w:1,u:0,d:'5월~'}];
+function vParaSimple(){var h='<table class="gt">'+gH('항목');RI.forEach(function(r){h+='<tr><td><div class="gl"><span class="gl-n">'+r.n+'</span><span class="gl-t">'+r.l+'</span>'+(r.u?'<span class="ubadge">임박</span>':'')+'<span class="gl-d">'+r.d+'</span></div></td><td colspan="10"><div class="bc"><div class="gb" style="left:'+(r.s*10)+'%;width:'+(r.w*10)+'%;background:'+r.c+'"></div><div class="tln" style="left:22%"></div></div></td></tr>'});return h+'</table>'}
+
+/* ─── Parallel: Detail (deliverable + tasks) ─── */
+var PD=[
+{ms:'소집통지 발송',dd:'D-5',mc:'#D85A30',items:[{dv:'소집통지서+공고문',c:'#D85A30',s:1,w:1.5,tasks:[{t:'소집통지 메일 발송',a:'Ethan'},{t:'1% 이상 주주 연락',a:'Ethan'}]}]},
+{ms:'안건자료 확정',dd:'D-6',mc:'#BA7517',items:[{dv:'안건자료 PPT',c:'#BA7517',s:1,w:2.5,tasks:[{t:'안건 PPT 작성',a:'Ryan'}]}]},
+{ms:'위임장 취합 마감',dd:'D-16',mc:'#1D9E75',items:[{dv:'(결과물 미정)',c:'#1D9E75',s:3,w:2,tasks:[]}]},
+{ms:'등기 서류 마감',dd:'D-13',mc:'#993C1D',items:[{dv:'등기 서류 일체',c:'#993C1D',s:1,w:3.5,tasks:[{t:'등기 서류 목록',a:'Eric'},{t:'위임장 양식 확인',a:'Edmond'}]}]},
+{ms:'정기주총 개최',dd:'D-51',mc:'#D85A30',items:[{dv:'현장 운영 매뉴얼',c:'#378ADD',s:2,w:3,tasks:[{t:'배치도 초안',a:'Ash'},{t:'스크립트 작성',a:'Ethan'},{t:'투표 Dashboard',a:'Eric'}]},{dv:'의사록+등기서류',c:'#D85A30',s:6,w:1,tasks:[]}]}
+];
+function vParaDetail(){
+var cls=['3/1주','3/2주▼','3/3주','3/4주','4월','5월~'];
+var h='<div class="pw"><div class="pwh"><div class="pwhl" style="width:160px">결과물</div><div class="pwcols">'+cls.map(function(c,i){return '<div class="pwcol'+(i===1?' today':'')+'">'+c+'</div>'}).join('')+'</div><div class="pwht" style="width:42%">연결된 Tasks</div></div><div class="pwb">';
+PD.forEach(function(mg){
+  h+='<div class="pwms"><div class="pwmsl"><div class="pwmsd" style="background:'+mg.mc+'"></div>'+mg.ms+' <span style="font-size:10px;color:#b4b2a9;font-weight:400;margin-left:4px">'+mg.dd+'</span></div><div class="pwmsr" style="width:42%"></div></div>';
+  mg.items.forEach(function(d){
+    var empty=d.tasks.length===0;var ht=Math.max(46,d.tasks.length*27+14);
+    var right=empty?'<div class="pwe">⚠ 미배정 <button class="pwab">+ Task 추가</button></div>':d.tasks.map(function(t){return '<div class="pwtt"><div class="pwtcb"></div><span class="pwtn">'+t.t+'</span>'+pillS(t.a)+'</div>'}).join('');
+    h+='<div class="pwr" style="min-height:'+ht+'px"><div class="pwrl"><span class="pwrt">'+d.dv+'</span></div><div class="pwrg"><div class="gb" style="left:'+(d.s*14)+'%;width:'+(d.w*14)+'%;background:'+d.c+'"></div><div class="tln" style="left:22%"></div></div><div class="pwrk'+(empty?' empty':'')+'" style="width:42%">'+right+'</div></div>';
+  });
+});
+return h+'</div></div>';}
+
+function togOL(i){var n=document.getElementById('oln-'+i),t=document.getElementById('olt-'+i);n.classList.toggle('open');t.classList.toggle('open')}
+Z();
+</script>
+</body>
+</html>
