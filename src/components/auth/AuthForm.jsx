@@ -43,8 +43,8 @@ function GoogleIcon() {
  * @param {function} [props.onAuthSuccess] - Called after successful auth (optional)
  * @param {string} [props.externalError] - Error from parent (e.g. authError prop)
  */
-export default function AuthForm({ redirectTo, onAuthSuccess, externalError }) {
-  const [mode, setMode] = useState('login') // 'login' | 'signup'
+export default function AuthForm({ redirectTo, onAuthSuccess, externalError, defaultMode = 'login' }) {
+  const [mode, setMode] = useState(defaultMode) // 'login' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPw, setConfirmPw] = useState('')

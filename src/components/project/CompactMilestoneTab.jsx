@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { DndContext, DragOverlay, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -35,8 +35,10 @@ export default function CompactMilestoneTab({ projectId }) {
     return saved ? Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, Number(saved))) : DEFAULT_TASK_W
   })
 
-  // Persist taskColW to localStorage
+  // Track latest value for resize handler closure
+  const taskColWRef = useRef(taskColW)
   useEffect(() => {
+    taskColWRef.current = taskColW
     localStorage.setItem(TASK_COL_W_KEY, String(taskColW))
   }, [taskColW])
 
@@ -149,26 +151,29 @@ export default function CompactMilestoneTab({ projectId }) {
     updateMilestone(msId, patch)
   }, [updateMilestone])
 
-  // Resize bar handler
+  // Resize bar handler — uses ref to avoid stale closure
   const handleResizeStart = useCallback((e) => {
     e.preventDefault()
     const startX = e.clientX
-    const startW = taskColW
+    const startW = taskColWRef.current
     const onMove = (ev) => {
-      const delta = startX - ev.clientX
-      setTaskColW(Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, startW + delta)))
+      const newW = Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, startW + (startX - ev.clientX)))
+      setTaskColW(newW)
+      taskColWRef.current = newW
     }
     const onUp = () => {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      // Ensure final value is persisted
+      localStorage.setItem(TASK_COL_W_KEY, String(taskColWRef.current))
     }
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
-  }, [taskColW])
+  }, [])
 
   if (pkmLoading) {
     return <div style={{ padding: 40, textAlign: 'center', color: '#b4b2a9', fontSize: 13 }}>로딩 중...</div>

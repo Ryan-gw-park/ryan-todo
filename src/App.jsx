@@ -209,6 +209,16 @@ export default function App() {
     return <SetupScreen onConnect={() => setConnected(true)} />
   }
 
+  // ★ Fast path: invite 경로는 무거운 초기화 불필요
+  // InviteAccept 자체에서 auth 상태를 체크하므로 authLoading/snapshotRestored 대기 불필요
+  if (location.pathname.startsWith('/invite/')) {
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <InviteAccept />
+      </Suspense>
+    )
+  }
+
   // Step 2: 스냅샷이 복원되어 있으면 Auth/Team 로딩 중에도 AppShell 표시 (iOS PWA 최적화)
   // Auth 실패 시 위 useEffect에서 clearSnapshot() 호출 → snapshotRestored=false → 로그인 화면
   if (snapshotRestored) {
@@ -230,21 +240,8 @@ export default function App() {
     return <LoadingSpinner />
   }
 
-  // Step 3.5: Allow invite page without auth
-  if (!session && location.pathname.startsWith('/invite/')) {
-    return (
-      <Suspense fallback={<LoadingSpinner />}>
-        <InviteAccept />
-      </Suspense>
-    )
-  }
-
-  // Step 4: Login required — save invite path for post-login redirect
+  // Step 4: Login required
   if (!session) {
-    if (location.pathname.startsWith('/invite/')) {
-      sessionStorage.setItem('pendingInvite', location.pathname)
-      localStorage.setItem('pendingInvite', location.pathname)
-    }
     return <LoginScreen authError={authError} />
   }
 

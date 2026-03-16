@@ -143,6 +143,7 @@ export default function InviteAccept() {
 
             <AuthForm
               redirectTo={window.location.href}
+              defaultMode="signup"
             />
           </div>
         </div>

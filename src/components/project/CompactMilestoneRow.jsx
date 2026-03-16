@@ -251,38 +251,53 @@ export default function CompactMilestoneRow({
 
       {/* Right: tasks area */}
       <div
+        onClick={() => { if (!expanded) onToggleExpand(milestone.id) }}
         style={{
           width: taskColW, flexShrink: 0, padding: expanded ? '8px 12px' : '6px 12px',
           display: 'flex', flexWrap: 'wrap', gap: 4, alignContent: 'flex-start',
           minHeight: expanded ? 44 : 34,
+          cursor: expanded ? 'default' : 'pointer',
         }}
       >
-        {totalCnt === 0 && (
+        {expanded ? (
           <>
-            <div style={{
-              border: '1.5px dashed #e0ddd6', borderRadius: 5, padding: '3px 8px',
-              fontSize: 11, color: '#d3d1c7', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flex: 1, minHeight: 26,
-              ...(isDragOver ? { borderColor: '#1D9E75', background: '#f0fdf4', color: '#1D9E75' } : {}),
-            }}>
-              할일을 드래그하여 연결
-            </div>
-            <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
+            {totalCnt === 0 && (
+              <>
+                <div style={{
+                  border: '1.5px dashed #e0ddd6', borderRadius: 5, padding: '3px 8px',
+                  fontSize: 11, color: '#d3d1c7', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', flex: 1, minHeight: 26,
+                  ...(isDragOver ? { borderColor: '#1D9E75', background: '#f0fdf4', color: '#1D9E75' } : {}),
+                }}>
+                  할일을 드래그하여 연결
+                </div>
+                <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
+              </>
+            )}
+
+            {tasks.map(task => (
+              <MilestoneTaskChip
+                key={task.id}
+                task={task}
+                milestoneId={isBacklog ? '__backlog__' : milestone.id}
+                onToggle={onTaskToggle}
+                onClick={onTaskClick}
+              />
+            ))}
+
+            {totalCnt > 0 && (
+              <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
+            )}
           </>
-        )}
-
-        {tasks.map(task => (
-          <MilestoneTaskChip
-            key={task.id}
-            task={task}
-            milestoneId={isBacklog ? '__backlog__' : milestone.id}
-            onToggle={onTaskToggle}
-            onClick={onTaskClick}
-          />
-        ))}
-
-        {totalCnt > 0 && (
-          <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
+        ) : (
+          /* Collapsed: show summary only */
+          totalCnt > 0 ? (
+            <span style={{ fontSize: 11, color: '#b4b2a9', padding: '3px 0', whiteSpace: 'nowrap' }}>
+              {totalCnt}개 할일
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: '#d3d1c7', padding: '3px 0' }}>—</span>
+          )
         )}
       </div>
     </div>
