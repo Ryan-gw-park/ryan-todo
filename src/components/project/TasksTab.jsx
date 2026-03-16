@@ -1,5 +1,5 @@
-import MilestoneOutlinerView from './tasks/MilestoneOutlinerView'
+import CompactTaskList from './tasks/CompactTaskList'
 
 export default function TasksTab({ projectId }) {
-  return <MilestoneOutlinerView projectId={projectId} />
+  return <CompactTaskList projectId={projectId} />
 }
