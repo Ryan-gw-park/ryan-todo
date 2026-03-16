@@ -74,6 +74,9 @@ export default function MilestoneOutlinerView({ projectId }) {
   const expanded = collapseState.projectExpanded || {}
   const toggleExpand = (id) => setCollapseValue('projectExpanded', id, !(expanded[id] !== false))
 
+  // 전체 접기/펼치기
+  const [allNotesCollapsed, setAllNotesCollapsed] = useState(false)
+
   // Refs for cross-section navigation
   const sectionRefs = useRef({})
 
@@ -132,13 +135,43 @@ export default function MilestoneOutlinerView({ projectId }) {
   if ((!pkm || milestones.length === 0) && tasks.length === 0) {
     return (
       <div style={{ padding: 40, color: '#b4b2a9', textAlign: 'center' }}>
-        Key Milestone 탭에서 마일스톤을 추가하거나, 아래에서 할일을 생성하세요
+        마일스톤 탭에서 마일스톤을 추가하거나, 아래에서 할일을 생성하세요
       </div>
     )
   }
 
   return (
     <div style={{ padding: '0 0 40px', overflow: 'auto' }}>
+      {/* 전체 접기/펼치기 버튼 */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 20px 0' }}>
+        <button
+          onClick={() => setAllNotesCollapsed(v => !v)}
+          title={allNotesCollapsed ? '모든 노트 펼치기' : '모든 노트 접기'}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#ccc', padding: 4, display: 'flex', alignItems: 'center', gap: 4,
+            fontSize: 11,
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#888'}
+          onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+        >
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            {allNotesCollapsed ? (
+              <>
+                <path d="M2 3h10M2 7h10M2 11h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M10 5l2-2-2-2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+              </>
+            ) : (
+              <>
+                <path d="M2 3h10M2 7h6M2 11h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M12 7l-2 2-2-2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+              </>
+            )}
+          </svg>
+          {allNotesCollapsed ? '펼치기' : '접기'}
+        </button>
+      </div>
+
       {milestoneTaskGroups.map(({ milestone, tasks: msTasks }) => (
         <MilestoneSection
           key={milestone.id}
@@ -152,6 +185,7 @@ export default function MilestoneOutlinerView({ projectId }) {
           memberMap={memberMap}
           deliverableMap={deliverableMap}
           reorderTasks={reorderTasks}
+          allNotesCollapsed={allNotesCollapsed}
           onExitSectionDown={() => handleExitSectionDown(milestone.id)}
           onExitSectionUp={() => handleExitSectionUp(milestone.id)}
         />
@@ -168,6 +202,7 @@ export default function MilestoneOutlinerView({ projectId }) {
           memberMap={memberMap}
           deliverableMap={deliverableMap}
           reorderTasks={reorderTasks}
+          allNotesCollapsed={allNotesCollapsed}
           showHeader={milestones.length > 0}
           onExitSectionDown={() => handleExitSectionDown('unlinked')}
           onExitSectionUp={() => handleExitSectionUp('unlinked')}
@@ -179,7 +214,7 @@ export default function MilestoneOutlinerView({ projectId }) {
 
 const MilestoneSection = forwardRef(function MilestoneSection({
   milestone, tasks, projectId, color, expanded, toggleExpand, memberMap, deliverableMap, reorderTasks,
-  onExitSectionDown, onExitSectionUp,
+  allNotesCollapsed, onExitSectionDown, onExitSectionUp,
 }, ref) {
   const [collapsed, setCollapsed] = useState(false)
   const { addTask, openDetail } = useStore()
@@ -236,6 +271,16 @@ const MilestoneSection = forwardRef(function MilestoneSection({
     const reordered = arrayMove(tasks, oldIndex, newIndex)
     reorderTasks(reordered.map((t, i) => ({ ...t, sortOrder: i })))
   }
+
+  // Swap task order (Alt+Shift+Arrow)
+  const { updateTask } = useStore()
+  const handleSwap = useCallback((i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= tasks.length) return
+    const a = tasks[i], b = tasks[j]
+    updateTask(a.id, { sortOrder: b.sortOrder || 0 })
+    updateTask(b.id, { sortOrder: a.sortOrder || 0 })
+  }, [tasks, updateTask])
 
   // Navigation within section
   const handleExitTaskDown = (taskIndex) => {
@@ -311,6 +356,9 @@ const MilestoneSection = forwardRef(function MilestoneSection({
                   toggleExpand={toggleExpand}
                   memberMap={memberMap}
                   deliverableMap={deliverableMap}
+                  sectionCollapsed={allNotesCollapsed}
+                  onSwapUp={() => handleSwap(idx, -1)}
+                  onSwapDown={() => handleSwap(idx, 1)}
                   onExitUp={() => handleExitTaskUp(idx)}
                   onExitDown={() => handleExitTaskDown(idx)}
                 />
@@ -332,7 +380,7 @@ const MilestoneSection = forwardRef(function MilestoneSection({
 
 const UnlinkedSection = forwardRef(function UnlinkedSection({
   tasks, projectId, color, expanded, toggleExpand, memberMap, deliverableMap, reorderTasks,
-  showHeader = true, onExitSectionDown, onExitSectionUp,
+  allNotesCollapsed, showHeader = true, onExitSectionDown, onExitSectionUp,
 }, ref) {
   const [collapsed, setCollapsed] = useState(false)
   const { addTask, openDetail } = useStore()
@@ -386,6 +434,16 @@ const UnlinkedSection = forwardRef(function UnlinkedSection({
     const reordered = arrayMove(tasks, oldIndex, newIndex)
     reorderTasks(reordered.map((t, i) => ({ ...t, sortOrder: i })))
   }
+
+  // Swap task order (Alt+Shift+Arrow)
+  const { updateTask } = useStore()
+  const handleSwap = useCallback((i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= tasks.length) return
+    const a = tasks[i], b = tasks[j]
+    updateTask(a.id, { sortOrder: b.sortOrder || 0 })
+    updateTask(b.id, { sortOrder: a.sortOrder || 0 })
+  }, [tasks, updateTask])
 
   const handleExitTaskDown = (taskIndex) => {
     if (taskIndex < tasks.length - 1) {
@@ -442,6 +500,9 @@ const UnlinkedSection = forwardRef(function UnlinkedSection({
                   toggleExpand={toggleExpand}
                   memberMap={memberMap}
                   deliverableMap={deliverableMap}
+                  sectionCollapsed={allNotesCollapsed}
+                  onSwapUp={() => handleSwap(idx, -1)}
+                  onSwapDown={() => handleSwap(idx, 1)}
                   onExitUp={() => handleExitTaskUp(idx)}
                   onExitDown={() => handleExitTaskDown(idx)}
                 />
@@ -462,7 +523,7 @@ const UnlinkedSection = forwardRef(function UnlinkedSection({
 })
 
 const SortableOutlinerTask = forwardRef(function SortableOutlinerTask(
-  { task, color, expanded, toggleExpand, memberMap, deliverableMap, onExitUp, onExitDown },
+  { task, color, expanded, toggleExpand, memberMap, deliverableMap, sectionCollapsed, onSwapUp, onSwapDown, onExitUp, onExitDown },
   ref
 ) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -504,6 +565,9 @@ const SortableOutlinerTask = forwardRef(function SortableOutlinerTask(
               expanded={expanded}
               toggleExpand={toggleExpand}
               memberMap={memberMap}
+              sectionCollapsed={sectionCollapsed}
+              onSwapUp={onSwapUp}
+              onSwapDown={onSwapDown}
               onExitUp={onExitUp}
               onExitDown={onExitDown}
             />

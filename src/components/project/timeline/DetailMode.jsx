@@ -111,7 +111,7 @@ export default function DetailMode({ projectId }) {
   if (milestones.length === 0) {
     return (
       <div style={{ padding: 40, color: '#b4b2a9', textAlign: 'center', fontSize: 14 }}>
-        마일스톤이 없습니다. Key Milestone 탭에서 마일스톤을 추가하세요.
+        마일스톤이 없습니다. 마일스톤 탭에서 마일스톤을 추가하세요.
       </div>
     )
   }

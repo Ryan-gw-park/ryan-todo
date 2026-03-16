@@ -29,8 +29,8 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
   const unassignedCount = 0
 
   const TABS = [
-    { key: 'milestone', label: 'Key Milestone' },
-    { key: 'tasks', label: 'Tasks', badge: String(taskCount) },
+    { key: 'milestone', label: '마일스톤' },
+    { key: 'tasks', label: '할일', badge: String(taskCount) },
     { key: 'ptimeline', label: '타임라인', badgeWarn: unassignedCount > 0 ? `미배정 ${unassignedCount}` : null },
   ]
 
@@ -44,7 +44,7 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
       <span style={{ fontSize: 15, fontWeight: 600 }}>{project.name}</span>
       <span style={{ fontSize: 11, color: '#a09f99' }}>
         {project.teamId ? 'SCD팀' : '개인'}
-        {ownerName && <> · {ownerName}</>}
+        {' · 오너 : '}{ownerName || '미지정'}
       </span>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>

@@ -52,7 +52,7 @@ export default function KeyMilestoneTab({ projectId }) {
 function KmSkeleton() {
   return (
     <div style={{ padding: 40, color: '#b4b2a9', textAlign: 'center' }}>
-      <div style={{ fontSize: 13 }}>Key Milestone 로딩 중...</div>
+      <div style={{ fontSize: 13 }}>마일스톤 로딩 중...</div>
     </div>
   )
 }
@@ -67,6 +67,11 @@ function MilestoneRows({ pkmId, projectId }) {
   const tasks = useMemo(() =>
     allTasks.filter(t => t.projectId === projectId && !t.deletedAt),
     [allTasks, projectId]
+  )
+
+  const unlinkedTasks = useMemo(() =>
+    tasks.filter(t => !t.keyMilestoneId && t.category !== 'done'),
+    [tasks]
   )
 
   const handleMilestoneDragEnd = (event) => {
@@ -106,11 +111,13 @@ function MilestoneRows({ pkmId, projectId }) {
         <AddButton label="+ 마일스톤 추가" onClick={add} />
       </div>
 
-      {milestones.length === 0 && (
+      {milestones.length === 0 && unlinkedTasks.length === 0 && (
         <div style={{ padding: '40px 22px', color: '#b4b2a9', textAlign: 'center', fontSize: 14 }}>
           마일스톤을 추가하여 프로젝트 일정을 관리하세요
         </div>
       )}
+
+      <UnlinkedTasksSection tasks={unlinkedTasks} />
     </>
   )
 }
@@ -787,6 +794,49 @@ function PolicyItem({ item, onUpdate, onDelete }) {
         </button>
       </div>
       {item.description && <div style={{ fontSize: 11, color: '#a09f99', marginTop: 1, marginLeft: item.tag_label ? 0 : 0 }}>{item.description}</div>}
+    </div>
+  )
+}
+
+// ─── 미배정 할일 섹션 (Key Milestone 탭 하단) ───
+function UnlinkedTasksSection({ tasks }) {
+  const { openDetail } = useStore()
+  if (tasks.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 24, padding: '0 20px' }}>
+      <div style={{
+        fontSize: 13, fontWeight: 600, color: '#999',
+        padding: '8px 0', borderBottom: '1px solid #f0efe8', marginBottom: 8,
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        미배정 할일
+        <span style={{
+          fontSize: 11, background: '#f0efe8', borderRadius: 8,
+          padding: '1px 8px', fontWeight: 500, color: '#888',
+        }}>
+          {tasks.length}
+        </span>
+      </div>
+      {tasks.map(task => (
+        <div
+          key={task.id}
+          onClick={() => openDetail(task)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 4px', cursor: 'pointer', borderRadius: 6,
+            fontSize: 13, color: '#37352f',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#fafaf7'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <span style={{ color: '#ccc', fontSize: 11 }}>○</span>
+          <span style={{ flex: 1 }}>{task.text || '(제목 없음)'}</span>
+        </div>
+      ))}
+      <div style={{ fontSize: 11, color: '#bbb', padding: '8px 4px', fontStyle: 'italic' }}>
+        마일스톤을 추가한 후, 할일 상세에서 마일스톤을 연결할 수 있습니다
+      </div>
     </div>
   )
 }
