@@ -54,8 +54,8 @@ export default function TeamMatrixView() {
 
   // DnD
   const [activeId, setActiveId] = useState(null)
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
 
@@ -561,7 +561,7 @@ function MemberDropZone({ memberId, activeId, children }) {
   const { isOver, setNodeRef } = useDroppable({ id: `member:${memberId}` })
   return (
     <div ref={setNodeRef} style={{
-      transition: 'background 0.15s',
+      transition: 'background 0.08s',
       ...(isOver && activeId ? { background: 'rgba(49,130,206,0.06)', borderRadius: 8 } : {}),
     }}>
       {children}
@@ -576,7 +576,7 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
 
   return (
     <div ref={setNodeRef} style={{
-      ...cellStyle, display: 'flex', flexDirection: 'column', transition: 'background 0.15s',
+      ...cellStyle, display: 'flex', flexDirection: 'column', transition: 'background 0.08s',
       ...(showHighlight ? { background: color.header, outline: `2px dashed ${color.dot}`, outlineOffset: -2 } : {}),
     }}>
       {children}
@@ -772,8 +772,8 @@ function TeamMatrixCard({ task, readOnly, isDone }) {
   const isMobile = window.innerWidth < 768
 
   // DnD (only for editable cards)
-  const sortableResult = useSortable({ id: task.id, disabled: readOnly })
-  const { attributes, listeners, setNodeRef, transform, isDragging } = sortableResult
+  const sortableResult = useSortable({ id: task.id, disabled: readOnly, transition: { duration: 120, easing: 'ease' } })
+  const { attributes, listeners, setNodeRef, transform, transition: sortTransition, isDragging } = sortableResult
 
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(task.text)
@@ -824,7 +824,7 @@ function TeamMatrixCard({ task, readOnly, isDone }) {
     border: hlColor ? 'none' : '1px solid rgba(0,0,0,0.06)',
     boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
     marginBottom: 6,
-    transition: isDragging ? 'none' : 'box-shadow 0.15s',
+    transition: isDragging ? 'none' : [sortTransition, 'box-shadow 0.15s'].filter(Boolean).join(', '),
     opacity: isDone ? 0.5 : isDragging ? 0.3 : 1,
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     zIndex: isDragging ? 100 : undefined,
