@@ -45,14 +45,27 @@ export default function InviteAccept() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Load team info
+  // Load team info — only when logged in (anon can't read teams due to RLS)
   useEffect(() => {
-    if (!token) return
+    if (!token || !authReady) return
+    if (!session) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
     useInvitation.getTeamByInvite(token).then(info => {
       setTeamInfo(info)
       setLoading(false)
     })
-  }, [token])
+  }, [token, session, authReady])
+
+  // Timeout fallback — prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) setLoading(false)
+    }, 10000)
+    return () => clearTimeout(timeout)
+  }, [loading])
 
   // Pre-fill display name
   useEffect(() => {
@@ -112,7 +125,32 @@ export default function InviteAccept() {
     )
   }
 
-  // Invalid token
+  // Not logged in — show auth form (no team query, RLS blocks anon)
+  if (!session) {
+    return (
+      <div style={pageStyle}>
+        <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
+          <div style={cardStyle}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 12, background: '#37352f',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', fontSize: 22, fontWeight: 700, margin: '0 auto 16px',
+            }}>R</div>
+            <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: T.text }}>초대 링크가 확인되었습니다</h3>
+            <p style={{ color: T.textSub, fontSize: 13, margin: '0 0 20px' }}>
+              팀에 참가하려면 로그인이 필요합니다
+            </p>
+
+            <AuthForm
+              redirectTo={window.location.href}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Invalid token (logged in but team not found)
   if (!teamInfo) {
     return (
       <div style={pageStyle}>
@@ -147,34 +185,6 @@ export default function InviteAccept() {
             <button onClick={handleGoHome} style={{ ...btnStyle, background: T.text, color: '#fff' }}>
               {result.success && !isPending ? '시작하기' : '홈으로'}
             </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Not logged in — show auth form embedded in invite page
-  if (!session) {
-    return (
-      <div style={pageStyle}>
-        <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
-          <div style={cardStyle}>
-            {/* Team badge */}
-            <div style={{
-              width: 48, height: 48, borderRadius: 12, background: '#37352f',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: 22, fontWeight: 700, margin: '0 auto 16px',
-            }}>{(teamInfo.name || 'T')[0].toUpperCase()}</div>
-            <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: T.text }}>{teamInfo.name}</h3>
-            <p style={{ color: T.textSub, fontSize: 13, margin: '0 0 8px' }}>
-              팀에 참가하려면 로그인이 필요합니다
-            </p>
-            {teamInfo.description && <p style={{ color: T.textMuted, fontSize: 12, margin: '0 0 20px' }}>{teamInfo.description}</p>}
-            {!teamInfo.description && <div style={{ marginBottom: 20 }} />}
-
-            <AuthForm
-              redirectTo={window.location.href}
-            />
           </div>
         </div>
       </div>
