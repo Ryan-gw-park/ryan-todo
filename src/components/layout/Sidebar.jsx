@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../../hooks/useStore'
-import { getColor } from '../../utils/colors'
+import { getColor, COLOR_OPTIONS } from '../../utils/colors'
 import TeamSwitcher from '../team/TeamSwitcher'
 import useNotifications from '../../hooks/useNotifications'
 
@@ -43,12 +43,14 @@ export default function Sidebar() {
     currentView, setView,
     projects, currentTeamId, myTeams,
     toggleNotificationPanel,
-    userName, setShowProjectMgr,
+    userName, addProject,
     sidebarCollapsed, toggleSidebar,
     selectedProjectId, enterProjectLayer,
   } = useStore()
 
   const [showTeamSwitcher, setShowTeamSwitcher] = useState(false)
+  const [showAddProject, setShowAddProject] = useState(false)
+  const [addProjectScope, setAddProjectScope] = useState('team') // 'team' or 'personal'
   const currentTeam = myTeams?.find(t => t.id === currentTeamId)
   const teamName = currentTeam?.name || '개인 모드'
 
@@ -190,7 +192,7 @@ export default function Sidebar() {
         {/* Team Projects */}
         {currentTeamId && (
           <>
-            {!collapsed && <SectionLabel label="팀 프로젝트" onAdd={() => setShowProjectMgr(true)} />}
+            {!collapsed && <SectionLabel label="팀 프로젝트" onAdd={() => { setAddProjectScope('team'); setShowAddProject(true) }} />}
             {teamProjects.map(p => (
               <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} />
             ))}
@@ -199,7 +201,7 @@ export default function Sidebar() {
         )}
 
         {/* Personal Projects */}
-        {!collapsed && <SectionLabel label="개인 프로젝트" onAdd={() => setShowProjectMgr(true)} />}
+        {!collapsed && <SectionLabel label="개인 프로젝트" onAdd={() => { setAddProjectScope('personal'); setShowAddProject(true) }} />}
         {personalProjects.map(p => (
           <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} />
         ))}
@@ -249,6 +251,16 @@ export default function Sidebar() {
           )}
         </div>
       </div>
+
+      {/* Add Project Modal */}
+      {showAddProject && (
+        <AddProjectModal
+          scope={addProjectScope}
+          currentTeamId={currentTeamId}
+          addProject={addProject}
+          onClose={() => setShowAddProject(false)}
+        />
+      )}
     </div>
   )
 }
@@ -403,4 +415,55 @@ function FooterItem({ icon, label, badge, onClick, collapsed }) {
 
 function Divider() {
   return <div style={{ height: '0.5px', background: '#e8e6df', margin: `${S.dividerMy}px ${S.outerPx}px` }} />
+}
+
+function AddProjectModal({ scope, currentTeamId, addProject, onClose }) {
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('blue')
+  const inputRef = useRef(null)
+
+  useEffect(() => { if (inputRef.current) inputRef.current.focus() }, [])
+
+  const handleAdd = () => {
+    if (!name.trim()) return
+    const projectScope = currentTeamId ? scope : undefined
+    addProject(name.trim(), color, projectScope)
+    onClose()
+  }
+
+  const scopeLabel = scope === 'team' ? '팀 프로젝트' : '개인 프로젝트'
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 200, backdropFilter: 'blur(2px)' }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 360, background: 'white', borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', zIndex: 210, overflow: 'hidden' }}>
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#37352f', margin: 0 }}>새 프로젝트 추가</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
+        </div>
+        <div style={{ padding: '16px 24px 20px' }}>
+          {currentTeamId && (
+            <div style={{ fontSize: 11, color: '#999', marginBottom: 10 }}>소속: {scopeLabel}</div>
+          )}
+          <input
+            ref={inputRef}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') onClose() }}
+            placeholder="프로젝트 이름..."
+            style={{ width: '100%', fontSize: 14, fontWeight: 500, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 12 }}
+          />
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 16 }}>
+            {COLOR_OPTIONS.map(co => (
+              <button key={co.id} onClick={() => setColor(co.id)} style={{ width: 24, height: 24, borderRadius: 6, background: co.dot, border: color === co.id ? '2.5px solid #37352f' : '2px solid transparent', cursor: 'pointer', transition: 'border 0.1s' }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleAdd} disabled={!name.trim()} style={{ fontSize: 13, padding: '6px 16px', borderRadius: 6, border: 'none', background: '#37352f', color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, opacity: name.trim() ? 1 : 0.5 }}>추가</button>
+            <button onClick={onClose} style={{ fontSize: 13, padding: '6px 16px', borderRadius: 6, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
