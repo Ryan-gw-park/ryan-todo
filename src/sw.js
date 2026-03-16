@@ -9,6 +9,16 @@ import { ExpirationPlugin } from 'workbox-expiration'
 
 import { createHandlerBoundToURL } from 'workbox-precaching'
 
+// 설치 즉시 활성화
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+// 활성화 시 즉시 제어권 획득
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim())
+})
+
 // Precache: VitePWA replaces self.__WB_MANIFEST with actual file list at build time
 precacheAndRoute(self.__WB_MANIFEST)
 
