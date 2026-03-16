@@ -41,12 +41,16 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const {
     currentView, setView,
-    projects, currentTeamId,
+    projects, currentTeamId, myTeams,
     toggleNotificationPanel,
     userName, setShowProjectMgr,
     sidebarCollapsed, toggleSidebar,
     selectedProjectId, enterProjectLayer,
   } = useStore()
+
+  const [showTeamSwitcher, setShowTeamSwitcher] = useState(false)
+  const currentTeam = myTeams?.find(t => t.id === currentTeamId)
+  const teamName = currentTeam?.name || '개인 모드'
 
   // 프로젝트 활성 상태 판별
   const isProjectActive = (projectId) =>
@@ -120,30 +124,57 @@ export default function Sidebar() {
         </svg>
       </button>
 
-      {/* ── Top: Logo + Team Switcher ── */}
+      {/* ── Top: Unified Team Selector ── */}
       <div style={{
         padding: `${S.outerPx}px ${collapsed ? S.itemMx + 4 : S.outerPx}px 0`,
-        display: 'flex', flexDirection: 'column', gap: 8,
+        display: 'flex', flexDirection: 'column',
       }}>
-        {/* Logo — icon shares same S.iconW baseline alignment concept */}
         <div
-          onClick={toggleSidebar}
+          onClick={() => collapsed ? toggleSidebar() : setShowTeamSwitcher(!showTeamSwitcher)}
           style={{
-            display: 'flex', alignItems: 'center',
-            gap: S.gap,
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
             justifyContent: collapsed ? 'center' : 'flex-start',
-            cursor: 'pointer',
           }}
+          onMouseEnter={e => e.currentTarget.style.background = '#f6f5f0'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
+          <img
+            src="/favicon.ico"
+            alt=""
+            style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }}
+            onError={e => {
+              e.currentTarget.style.display = 'none'
+              e.currentTarget.nextSibling.style.display = 'flex'
+            }}
+          />
           <div style={{
-            width: 26, height: 26, borderRadius: 7,
-            background: '#1D9E75',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0,
-          }}>R</div>
-          {!collapsed && <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: '-.01em', color: '#2C2C2A' }}>Ryan's Todo</span>}
+            width: 28, height: 28, borderRadius: 8,
+            background: '#1D9E75', display: 'none',
+            alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontSize: 12, fontWeight: 500, flexShrink: 0,
+          }}>
+            R
+          </div>
+          {!collapsed && (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#2C2C2A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {teamName}
+                </div>
+              </div>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M3 5l3 3 3-3" stroke="#a09f99" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </>
+          )}
         </div>
-        {!collapsed && <TeamSwitcher />}
+        {!collapsed && (
+          <div style={{ position: 'relative' }}>
+            <TeamSwitcher controlled open={showTeamSwitcher} onClose={() => setShowTeamSwitcher(false)} />
+          </div>
+        )}
+        {!collapsed && <div style={{ height: 1, background: '#f0efe8', margin: '8px 0 4px' }} />}
       </div>
 
       {/* ── Scrollable content ── */}
@@ -208,7 +239,7 @@ export default function Sidebar() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 10, fontWeight: 600, flexShrink: 0,
           }}>
-            {userName ? userName.slice(0, 2).toUpperCase() : 'U'}
+            {(userName || 'U')[0].toUpperCase()}
           </div>
           {!collapsed && (
             <div style={{ minWidth: 0, overflow: 'hidden' }}>

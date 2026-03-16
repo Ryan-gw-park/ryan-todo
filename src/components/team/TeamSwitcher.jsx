@@ -7,17 +7,21 @@ const T = {
   textSub: '#888', textMuted: '#adb5bd', accent: '#2c5282',
 }
 
-export default function TeamSwitcher() {
+export default function TeamSwitcher({ controlled, open: externalOpen, onClose }) {
   const navigate = useNavigate()
   const { myTeams, currentTeamId, setTeam } = useStore()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const ref = useRef(null)
+
+  const isControlled = controlled === true
+  const open = isControlled ? externalOpen : internalOpen
+  const closeDropdown = isControlled ? onClose : () => setInternalOpen(false)
 
   // Close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target)) closeDropdown()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -30,29 +34,31 @@ export default function TeamSwitcher() {
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '6px 12px', borderRadius: 6,
-          border: `1px solid ${T.cardBorder}`, background: '#fff',
-          cursor: 'pointer', fontSize: 12, fontWeight: 500,
-          color: T.textSub, fontFamily: 'inherit', whiteSpace: 'nowrap',
-        }}
-      >
-        <span style={{
-          width: 16, height: 16, borderRadius: 4,
-          background: currentTeam ? '#37352f' : '#ccc',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0,
-        }}>
-          {currentTeam ? currentTeam.name[0].toUpperCase() : 'P'}
-        </span>
-        {label}
-        <svg width="10" height="10" viewBox="0 0 10 10" style={{ opacity: 0.4 }}>
-          <path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      {!isControlled && (
+        <button
+          onClick={() => setInternalOpen(!internalOpen)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 6,
+            border: `1px solid ${T.cardBorder}`, background: '#fff',
+            cursor: 'pointer', fontSize: 12, fontWeight: 500,
+            color: T.textSub, fontFamily: 'inherit', whiteSpace: 'nowrap',
+          }}
+        >
+          <span style={{
+            width: 16, height: 16, borderRadius: 4,
+            background: currentTeam ? '#37352f' : '#ccc',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0,
+          }}>
+            {currentTeam ? currentTeam.name[0].toUpperCase() : 'P'}
+          </span>
+          {label}
+          <svg width="10" height="10" viewBox="0 0 10 10" style={{ opacity: 0.4 }}>
+            <path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
 
       {open && (
         <div style={{
@@ -63,7 +69,7 @@ export default function TeamSwitcher() {
         }}>
           {/* Personal mode */}
           <div
-            onClick={() => { setTeam(null); setOpen(false) }}
+            onClick={() => { setTeam(null); closeDropdown() }}
             style={{
               padding: '10px 14px', fontSize: 13, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 8,
@@ -88,7 +94,7 @@ export default function TeamSwitcher() {
           {myTeams.map(t => (
             <div
               key={t.id}
-              onClick={() => { setTeam(t.id); setOpen(false) }}
+              onClick={() => { setTeam(t.id); closeDropdown() }}
               style={{
                 padding: '10px 14px', fontSize: 13, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -113,7 +119,7 @@ export default function TeamSwitcher() {
           {/* Team settings + Create */}
           {currentTeam && (
             <div
-              onClick={() => { navigate('/team/settings'); setOpen(false) }}
+              onClick={() => { navigate('/team/settings'); closeDropdown() }}
               style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', color: T.textSub, display: 'flex', alignItems: 'center', gap: 8 }}
               onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
               onMouseLeave={e => e.currentTarget.style.background = '#fff'}
@@ -127,7 +133,7 @@ export default function TeamSwitcher() {
             </div>
           )}
           <div
-            onClick={() => { navigate('/onboarding'); setOpen(false) }}
+            onClick={() => { navigate('/onboarding'); closeDropdown() }}
             style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', color: T.textSub, display: 'flex', alignItems: 'center', gap: 8 }}
             onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
             onMouseLeave={e => e.currentTarget.style.background = '#fff'}
