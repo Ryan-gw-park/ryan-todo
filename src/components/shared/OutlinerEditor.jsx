@@ -139,8 +139,11 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
     setCollapsed(prev => ({ ...prev, [idx]: !prev[idx] }))
   }, [])
 
-  /* ── Mouse selection ── */
+  /* ── Mouse selection (shift+click + drag) ── */
+  const dragState = useRef(null) // { anchor: idx, active: boolean }
+
   const handleRowMouseDown = useCallback((e, idx) => {
+    // Shift+Click: 범위 선택
     if (e.shiftKey) {
       e.preventDefault()
       const sel = selectionRef.current
@@ -154,12 +157,42 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
         selectionRef.current = [anchor, idx]
         setSelectedSet(s)
       }
-    } else {
-      if (selectedSet.size > 0) {
-        clearSelection()
+      return
+    }
+
+    // 텍스트 영역(textarea)에서 시작된 클릭은 드래그 선택 안 함
+    const tag = e.target.tagName?.toLowerCase()
+    if (tag === 'textarea' || tag === 'input' || tag === 'button') {
+      if (selectedSet.size > 0) clearSelection()
+      return
+    }
+
+    // 불릿 영역에서 드래그 시작
+    e.preventDefault()
+    dragState.current = { anchor: idx, active: true }
+    selectionRef.current = [idx, idx]
+    setSelectedSet(new Set([idx]))
+  }, [selectedSet, clearSelection, selectionRef])
+
+  const handleRowMouseEnter = useCallback((idx) => {
+    if (!dragState.current?.active) return
+    const { anchor } = dragState.current
+    const min = Math.min(anchor, idx), max = Math.max(anchor, idx)
+    const s = new Set()
+    for (let i = min; i <= max; i++) s.add(i)
+    selectionRef.current = [anchor, idx]
+    setSelectedSet(s)
+  }, [selectionRef])
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (dragState.current?.active) {
+        dragState.current.active = false
       }
     }
-  }, [selectedSet, clearSelection, selectionRef])
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
+  }, [])
 
   return (
     <div style={{ padding: '4px 0', minHeight: 40 }}>
@@ -181,6 +214,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
           onToggleCollapse={() => toggleCollapse(i)}
           selected={selectedSet.has(i)}
           onMouseDown={(e) => handleRowMouseDown(e, i)}
+          onMouseEnter={() => handleRowMouseEnter(i)}
         />
       ))}
       <button

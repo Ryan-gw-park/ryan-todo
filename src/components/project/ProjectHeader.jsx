@@ -1,13 +1,29 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
+import useTeamMembers from '../../hooks/useTeamMembers'
 
 export default function ProjectHeader({ project, currentTab, onTabChange }) {
   const color = getColor(project.color)
   const allTasks = useStore(s => s.tasks)
+  const currentTeamId = useStore(s => s.currentTeamId)
   const taskCount = useMemo(() => {
     return allTasks.filter(t => t.projectId === project.id && !t.deletedAt && !t.done).length
   }, [allTasks, project.id])
+
+  // Owner 이름 조회
+  const [ownerName, setOwnerName] = useState(null)
+  useEffect(() => {
+    if (!project.ownerId) { setOwnerName(null); return }
+    if (!currentTeamId) { setOwnerName(null); return }
+    let cancelled = false
+    useTeamMembers.getMembers(currentTeamId).then(members => {
+      if (cancelled) return
+      const owner = members.find(m => m.userId === project.ownerId)
+      setOwnerName(owner?.displayName || null)
+    })
+    return () => { cancelled = true }
+  }, [currentTeamId, project.ownerId])
 
   // TODO: 26.3 이후 미배정 결과물 수 계산
   const unassignedCount = 0
@@ -27,8 +43,8 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
       <div style={{ width: 10, height: 10, borderRadius: '50%', background: color.dot }} />
       <span style={{ fontSize: 15, fontWeight: 600 }}>{project.name}</span>
       <span style={{ fontSize: 11, color: '#a09f99' }}>
-        {/* 프로젝트 메타: 기간, 팀 이름 등 — 추후 확장 */}
         {project.teamId ? 'SCD팀' : '개인'}
+        {ownerName && <> · {ownerName}</>}
       </span>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>

@@ -10,7 +10,7 @@ function autoResize(el) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onPaste, onDelete, onChangeLevel, showPlaceholder, hasChildren, isCollapsed, onToggleCollapse, selected, onMouseDown }) {
+export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextChange, onKeyDown, onPaste, onDelete, onChangeLevel, showPlaceholder, hasChildren, isCollapsed, onToggleCollapse, selected, onMouseDown, onMouseEnter }) {
   const localRef = useRef(null)
   const isMobile = window.innerWidth < 768
   // 불릿포인트: 데스크탑 14px, 모바일 13px (할일 제목과 동일)
@@ -32,6 +32,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
   return (
     <div
       onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
       style={{
         display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 22, minHeight: 30,
         background: selected ? 'rgba(55, 53, 47, 0.06)' : 'transparent',

@@ -5,7 +5,7 @@ import { CATEGORIES } from '../utils/colors'
 // ─── Select 컬럼 최적화 ───
 // tasks: alarm, deleted_at 컬럼은 DB에 없을 수 있으므로 select('*') 유지 (기존 fallback 로직 활용)
 const TASK_COLUMNS = '*'
-const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id'
+const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id'
 const MEMO_COLUMNS = 'id, title, notes, color, sort_order, created_at, updated_at'
 
 // ─── 스냅샷 키 ───
@@ -104,6 +104,7 @@ function mapProject(r) {
     // ↓ Loop-20: 팀 관련 신규 필드 ↓
     teamId: r.team_id || null,
     userId: r.user_id || null,
+    ownerId: r.owner_id || null,
   }
 }
 function mapTask(r) {
@@ -497,13 +498,14 @@ const useStore = create((set, get) => ({
       // Loop-20 보완: 팀/개인 프로젝트 분기
       teamId: (teamId && projectScope !== 'personal') ? teamId : null,
       userId: (!teamId || projectScope === 'personal') ? userId : null,
+      ownerId: userId,
     }
     set(s => ({ projects: [...s.projects, p] }))
     const d = db()
     if (!d) return
     const { error } = await d.from('projects').upsert({
       id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder,
-      team_id: p.teamId, user_id: p.userId,
+      team_id: p.teamId, user_id: p.userId, owner_id: p.ownerId,
     })
     if (error) console.error('[Ryan Todo] addProject:', error)
   },
@@ -525,7 +527,7 @@ const useStore = create((set, get) => ({
     if (!d) return
     const { error } = await d.from('projects').upsert({
       id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder,
-      team_id: p.teamId || null, user_id: p.userId || null,
+      team_id: p.teamId || null, user_id: p.userId || null, owner_id: p.ownerId || null,
     })
     if (error) console.error('[Ryan Todo] updateProject:', error)
   },

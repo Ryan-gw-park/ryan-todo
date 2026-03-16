@@ -98,9 +98,9 @@ export default function MilestoneOutlinerView({ projectId }) {
   // Cross-section navigation
   const allSectionKeys = useMemo(() => {
     const keys = milestoneTaskGroups.map(g => g.milestone.id)
-    if (unlinkedTasks.length > 0) keys.push('unlinked')
+    if (unlinkedTasks.length > 0 || milestones.length === 0) keys.push('unlinked')
     return keys
-  }, [milestoneTaskGroups, unlinkedTasks.length])
+  }, [milestoneTaskGroups, milestones.length, unlinkedTasks.length])
 
   const handleExitSectionDown = useCallback((sectionKey) => {
     const idx = allSectionKeys.indexOf(sectionKey)
@@ -124,10 +124,15 @@ export default function MilestoneOutlinerView({ projectId }) {
     return <div style={{ padding: 40, color: '#b4b2a9', textAlign: 'center' }}>Loading...</div>
   }
 
-  if (!pkm || milestones.length === 0) {
+  if (loading) {
+    // already handled above
+  }
+
+  // 마일스톤 0개 + Task 0개 → 안내 메시지
+  if ((!pkm || milestones.length === 0) && tasks.length === 0) {
     return (
       <div style={{ padding: 40, color: '#b4b2a9', textAlign: 'center' }}>
-        Key Milestone 탭에서 마일스톤을 먼저 추가하세요
+        Key Milestone 탭에서 마일스톤을 추가하거나, 아래에서 할일을 생성하세요
       </div>
     )
   }
@@ -152,7 +157,7 @@ export default function MilestoneOutlinerView({ projectId }) {
         />
       ))}
 
-      {unlinkedTasks.length > 0 && (
+      {(unlinkedTasks.length > 0 || milestones.length === 0) && (
         <UnlinkedSection
           ref={el => sectionRefs.current['unlinked'] = el}
           tasks={unlinkedTasks}
@@ -163,6 +168,7 @@ export default function MilestoneOutlinerView({ projectId }) {
           memberMap={memberMap}
           deliverableMap={deliverableMap}
           reorderTasks={reorderTasks}
+          showHeader={milestones.length > 0}
           onExitSectionDown={() => handleExitSectionDown('unlinked')}
           onExitSectionUp={() => handleExitSectionUp('unlinked')}
         />
@@ -326,7 +332,7 @@ const MilestoneSection = forwardRef(function MilestoneSection({
 
 const UnlinkedSection = forwardRef(function UnlinkedSection({
   tasks, projectId, color, expanded, toggleExpand, memberMap, deliverableMap, reorderTasks,
-  onExitSectionDown, onExitSectionUp,
+  showHeader = true, onExitSectionDown, onExitSectionUp,
 }, ref) {
   const [collapsed, setCollapsed] = useState(false)
   const { addTask, openDetail } = useStore()
@@ -407,21 +413,23 @@ const UnlinkedSection = forwardRef(function UnlinkedSection({
 
   return (
     <div style={{ borderBottom: '0.5px solid #eeedea' }}>
-      <div
-        onClick={() => setCollapsed(!collapsed)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '12px 20px 8px', cursor: 'pointer',
-        }}
-      >
-        <span style={{ fontSize: 13 }}>--</span>
-        <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>기타 할일</span>
-        <span style={{ fontSize: 11, color: '#b4b2a9' }}>{tasks.length}건</span>
-        <span style={{ fontSize: 12, color: '#b4b2a9', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }}>▾</span>
-      </div>
+      {showHeader && (
+        <div
+          onClick={() => setCollapsed(!collapsed)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '12px 20px 8px', cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 13 }}>--</span>
+          <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>기타 할일</span>
+          <span style={{ fontSize: 11, color: '#b4b2a9' }}>{tasks.length}건</span>
+          <span style={{ fontSize: 12, color: '#b4b2a9', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+        </div>
+      )}
 
-      {!collapsed && (
-        <div style={{ padding: '0 20px 12px 38px' }}>
+      {(!showHeader || !collapsed) && (
+        <div style={{ padding: showHeader ? '0 20px 12px 38px' : '0 20px 12px' }}>
           <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
               {tasks.map((task, idx) => (
