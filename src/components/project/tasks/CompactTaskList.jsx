@@ -13,7 +13,7 @@ import { getColor } from '../../../utils/colors'
  * - InlineAdd로 마일스톤에 태스크 추가
  */
 export default function CompactTaskList({ projectId }) {
-  const { projects, currentTeamId, updateTask, toggleTask, collapseState, toggleCollapse, setDetailPanel } = useStore()
+  const { projects, currentTeamId, updateTask, toggleTask, collapseState, toggleCollapse, setCollapseGroup, setDetailPanel } = useStore()
   const { milestones, tasks, loading, unlinkedTasks, getTasksByMilestone } = useProjectTimelineData(projectId)
 
   // 프로젝트 색상
@@ -34,6 +34,21 @@ export default function CompactTaskList({ projectId }) {
   // 마일스톤 접기 상태 (collapseState.compactTask)
   const collapsed = collapseState.compactTask || {}
   const toggleMilestone = (msId) => toggleCollapse('compactTask', msId)
+
+  // 전체 접기/펼치기
+  const allIds = useMemo(() => {
+    const ids = milestones.map(ms => ms.id)
+    if (unlinkedTasks.length > 0) ids.push('__backlog__')
+    return ids
+  }, [milestones, unlinkedTasks])
+
+  const allCollapsed = allIds.length > 0 && allIds.every(id => collapsed[id])
+
+  const toggleAll = () => {
+    const newState = {}
+    allIds.forEach(id => { newState[id] = !allCollapsed })
+    setCollapseGroup('compactTask', newState)
+  }
 
   // 태스크 노트 펼침 상태 (로컬)
   const [expandedTasks, setExpandedTasks] = useState({})
@@ -66,6 +81,34 @@ export default function CompactTaskList({ projectId }) {
 
   return (
     <div style={{ flex: 1, overflow: 'auto' }}>
+      {/* 전체 접기/펼치기 툴바 */}
+      {allIds.length > 0 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          padding: '6px 12px',
+          borderBottom: '1px solid #f0efe8',
+        }}>
+          <button
+            onClick={toggleAll}
+            style={{
+              fontSize: 11,
+              color: '#888780',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              borderRadius: 4,
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f0efe8'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            {allCollapsed ? '▸ 전체 펼치기' : '▾ 전체 접기'}
+          </button>
+        </div>
+      )}
+
       {/* 마일스톤별 섹션 */}
       {milestones.map(ms => {
         const msTasks = getTasksByMilestone(ms.id)
