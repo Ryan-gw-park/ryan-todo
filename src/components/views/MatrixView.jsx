@@ -8,7 +8,8 @@ import { parseDateFromText } from '../../utils/dateParser'
 import InlineAdd from '../shared/InlineAdd'
 
 export default function MatrixView() {
-  const { projects, tasks, setShowProjectMgr, moveTaskTo, reorderTasks, collapseState, toggleCollapse: storeToggle } = useStore()
+  const { projects: rawProjects, tasks, setShowProjectMgr, moveTaskTo, reorderTasks, collapseState, toggleCollapse: storeToggle, sortProjectsLocally } = useStore()
+  const projects = sortProjectsLocally(rawProjects)
   const isMobile = window.innerWidth < 768
   const LW = isMobile ? 80 : 110
   const COL_GAP = 10
