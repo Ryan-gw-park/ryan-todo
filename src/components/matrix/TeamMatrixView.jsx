@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor } from '@dnd-kit/core'
+import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
@@ -14,6 +14,20 @@ import ColorPicker from '../shared/ColorPicker'
 import RowConfigSettings from '../shared/RowConfigSettings'
 import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
+
+// Custom collision: pointerWithin → prefer task cards for reorder, fall back to category zone for cross-cell
+function matrixCollision(args) {
+  const pw = pointerWithin(args)
+  if (pw.length > 0) {
+    // Prefer specific task card (for same-cell reorder); if none, use category zone
+    const task = pw.find(c => typeof c.id === 'string' && !c.id.includes(':') && !c.id.startsWith('member:'))
+    if (task) return [task]
+    const zone = pw.find(c => typeof c.id === 'string' && c.id.includes(':'))
+    if (zone) return [zone]
+    return pw
+  }
+  return rectIntersection(args)
+}
 
 const HIGHLIGHT_COLORS = {
   red:    { bg: '#E53E3E' },
@@ -40,8 +54,8 @@ export default function TeamMatrixView() {
 
   // DnD
   const [activeId, setActiveId] = useState(null)
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
 
@@ -295,7 +309,7 @@ export default function TeamMatrixView() {
           </div>
         </div>
 
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
 
