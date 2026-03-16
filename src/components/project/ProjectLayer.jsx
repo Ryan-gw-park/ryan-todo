@@ -32,8 +32,9 @@ export default function ProjectLayer() {
         onTabChange={setProjectLayerTab}
       />
 
-      {/* 모드 바: 타임라인 탭에서만 표시 */}
-      {tab === 'ptimeline' && (
+      {/* 모드 바: Loop-28에서 숨김 (GanttMode가 마일스톤+할일 통합 표시) */}
+      {/* ModeBar는 추후 정리 Loop에서 완전 제거 예정 */}
+      {false && tab === 'ptimeline' && (
         <ModeBar
           modes={[
             { key: 'gantt', label: '타임라인' },
@@ -48,11 +49,8 @@ export default function ProjectLayer() {
       <div style={{ flex: 1, overflow: 'auto', background: '#fff' }}>
         {tab === 'milestone' && <CompactMilestoneTab projectId={selectedProjectId} />}
         {tab === 'tasks' && <TasksTab projectId={selectedProjectId} />}
-        {tab === 'ptimeline' && (
-          timelineMode === 'gantt'
-            ? <GanttMode projectId={selectedProjectId} />
-            : <DetailMode projectId={selectedProjectId} />
-        )}
+        {/* Loop-28: 항상 GanttMode 사용 (마일스톤+할일 통합) */}
+        {tab === 'ptimeline' && <GanttMode projectId={selectedProjectId} />}
       </div>
     </div>
   )

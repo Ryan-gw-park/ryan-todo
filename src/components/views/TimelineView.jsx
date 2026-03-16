@@ -7,6 +7,9 @@ import { getColor } from '../../utils/colors'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
+import { useMilestonesByProjects } from '../../hooks/useMilestonesByProjects'
+import TimelineFilters from '../timeline/TimelineFilters'
+import { MilestoneBar } from '../timeline/MilestoneGanttRow'
 
 /* ─── Date helpers ─── */
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
@@ -115,14 +118,25 @@ export default function TimelineView() {
   const gridRef = useRef(null)
   const [activeId, setActiveId] = useState(null)
 
+  // ★ Loop-28: 뷰 깊이 + 필터 상태
+  const [timelineDepth, setTimelineDepth] = useState('project')  // 'project' | 'milestone' | 'task'
+  const [selProjects, setSelProjects] = useState(null)  // null = 전체
+  const [selMembers, setSelMembers] = useState(null)    // null = 전체
+
+  // ★ Loop-28: 마일스톤 데이터 가져오기
+  const projectIds = useMemo(() => filteredProjects.map(p => p.id), [filteredProjects])
+  const { milestones: allMilestones } = useMilestonesByProjects(projectIds)
+
   // ★ Loop-21: 팀원 이름 조회 (팀 모드일 때)
   const [memberMap, setMemberMap] = useState({})
+  const [memberList, setMemberList] = useState([])
   useEffect(() => {
     if (!currentTeamId) return
     useTeamMembers.getMembers(currentTeamId).then(members => {
       const map = {}
       members.forEach(m => { map[m.userId] = m.displayName })
       setMemberMap(map)
+      setMemberList(members)
     })
   }, [currentTeamId])
 
@@ -164,15 +178,36 @@ export default function TimelineView() {
   }, [scale, baseDate])
 
   /* ─── Data ─── */
+  // Loop-28: 필터 적용된 프로젝트
+  const displayProjects = useMemo(() => {
+    if (!selProjects) return filteredProjects
+    return filteredProjects.filter(p => selProjects.includes(p.id))
+  }, [filteredProjects, selProjects])
+
+  // Loop-28: 필터 적용된 할일
+  const displayTasks = useMemo(() => {
+    let result = filteredTasks.filter(t => !t.done && !t.deletedAt && t.category !== 'done')
+    if (selProjects) {
+      result = result.filter(t => selProjects.includes(t.projectId))
+    }
+    if (selMembers) {
+      result = result.filter(t => !t.assigneeId || selMembers.includes(t.assigneeId))
+    }
+    return result
+  }, [filteredTasks, selProjects, selMembers])
+
   const projectRows = useMemo(() => {
-    return filteredProjects.map(p => {
+    return displayProjects.map(p => {
       const c = getColor(p.color)
-      const projectTasks = filteredTasks
-        .filter(t => t.projectId === p.id && !t.done && !t.deletedAt && t.category !== 'done')
+      const projectTasks = displayTasks
+        .filter(t => t.projectId === p.id)
         .sort((a, b) => a.sortOrder - b.sortOrder)
-      return { project: p, color: c, tasks: projectTasks }
+      const projectMilestones = allMilestones
+        .filter(m => m.project_id === p.id)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      return { project: p, color: c, tasks: projectTasks, milestones: projectMilestones }
     })
-  }, [filteredProjects, filteredTasks])
+  }, [displayProjects, displayTasks, allMilestones])
 
   /* ─── DnD handlers ─── */
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
@@ -289,6 +324,18 @@ export default function TimelineView() {
           </div>
         </div>
 
+        {/* ── Loop-28: 뷰 깊이 + 필터 바 ── */}
+        <TimelineFilters
+          depth={timelineDepth}
+          onDepthChange={setTimelineDepth}
+          projects={filteredProjects}
+          selProjects={selProjects}
+          onProjectsChange={setSelProjects}
+          members={memberList}
+          selMembers={selMembers}
+          onMembersChange={setSelMembers}
+        />
+
         {/* ── Timeline grid ── */}
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', overflow: 'hidden', background: 'white' }}>
@@ -302,8 +349,25 @@ export default function TimelineView() {
                 <span style={{ fontSize: 10, color: '#999', fontWeight: 500, width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0, borderLeft: '1px solid #f0f0f0', paddingLeft: 8 }}>담당자</span>
               </div>
               {/* Project rows */}
-              {projectRows.map(({ project, color, tasks: pts }) => {
+              {projectRows.map(({ project, color, tasks: pts, milestones: pMs }) => {
                 const isCollapsed = collapsed[project.id]
+                // depth='project'일 때는 프로젝트 수준 할일만 표시 (기존 동작)
+                // depth='milestone' 또는 'task'일 때는 마일스톤 그룹핑
+                const showMilestones = timelineDepth !== 'project'
+                const showTasks = timelineDepth === 'task'
+
+                // 마일스톤별 할일 그룹핑
+                const tasksByMs = {}
+                const backlogTasks = []
+                pts.forEach(t => {
+                  if (t.keyMilestoneId) {
+                    if (!tasksByMs[t.keyMilestoneId]) tasksByMs[t.keyMilestoneId] = []
+                    tasksByMs[t.keyMilestoneId].push(t)
+                  } else {
+                    backlogTasks.push(t)
+                  }
+                })
+
                 return (
                   <ProjectDropZone key={project.id} id={`project:${project.id}`} isOver={false}>
                     {/* Project header */}
@@ -315,13 +379,82 @@ export default function TimelineView() {
                       <div style={{ width: 8, height: 8, borderRadius: 2, background: color.dot, flexShrink: 0 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
                     </div>
-                    {/* Tasks */}
-                    {!isCollapsed && (
+
+                    {/* depth='project': 기존 방식 (프로젝트 바로 아래 할일) */}
+                    {!isCollapsed && !showMilestones && (
                       <SortableContext items={pts.map(t => t.id)} strategy={verticalListSortingStrategy}>
                         {pts.map(task => (
                           <SortableTaskRow key={task.id} task={task} openDetail={openDetail} rowH={ROW_H} isDragging={activeId === task.id} assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null} />
                         ))}
                       </SortableContext>
+                    )}
+
+                    {/* depth='milestone' 또는 'task': 마일스톤 그룹핑 */}
+                    {!isCollapsed && showMilestones && (
+                      <>
+                        {pMs.map(ms => {
+                          const msTasks = tasksByMs[ms.id] || []
+                          const msCollapsed = collapsed[ms.id]
+                          const hasChildren = showTasks && msTasks.length > 0
+
+                          return (
+                            <div key={ms.id}>
+                              {/* 마일스톤 헤더 */}
+                              <div
+                                onClick={() => hasChildren && storeToggle('timeline', ms.id)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 5,
+                                  padding: '6px 4px 6px 20px',
+                                  cursor: hasChildren ? 'pointer' : 'default',
+                                  height: ROW_H, boxSizing: 'border-box',
+                                  borderBottom: '1px solid #f0f0f0',
+                                  background: '#fafafa',
+                                }}
+                              >
+                                {hasChildren ? (
+                                  <span style={{ fontSize: 9, color: '#a09f99', transform: msCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0, width: 10 }}>▾</span>
+                                ) : (
+                                  <span style={{ width: 10, flexShrink: 0 }} />
+                                )}
+                                <div style={{ width: 7, height: 7, borderRadius: 2, background: ms.color || '#1D9E75', flexShrink: 0 }} />
+                                <span style={{ fontSize: 12, fontWeight: 500, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ms.title || '제목 없음'}</span>
+                              </div>
+                              {/* 마일스톤 할일 (depth='task') */}
+                              {showTasks && !msCollapsed && msTasks.map(task => (
+                                <SortableTaskRow key={task.id} task={task} openDetail={openDetail} rowH={ROW_H} isDragging={activeId === task.id} assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null} indent={2} />
+                              ))}
+                            </div>
+                          )
+                        })}
+
+                        {/* 백로그 (마일스톤 미연결 할일) */}
+                        {backlogTasks.length > 0 && (
+                          <div>
+                            <div
+                              onClick={() => showTasks && storeToggle('timeline', `${project.id}__backlog`)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '6px 4px 6px 20px',
+                                cursor: showTasks ? 'pointer' : 'default',
+                                height: ROW_H, boxSizing: 'border-box',
+                                borderBottom: '1px solid #f0f0f0',
+                                background: '#fafafa',
+                              }}
+                            >
+                              {showTasks ? (
+                                <span style={{ fontSize: 9, color: '#a09f99', transform: collapsed[`${project.id}__backlog`] ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0, width: 10 }}>▾</span>
+                              ) : (
+                                <span style={{ width: 10, flexShrink: 0 }} />
+                              )}
+                              <div style={{ width: 7, height: 7, borderRadius: 2, background: '#b4b2a9', flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, fontWeight: 500, color: '#a09f99', fontStyle: 'italic' }}>백로그</span>
+                            </div>
+                            {showTasks && !collapsed[`${project.id}__backlog`] && backlogTasks.map(task => (
+                              <SortableTaskRow key={task.id} task={task} openDetail={openDetail} rowH={ROW_H} isDragging={activeId === task.id} assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null} indent={2} />
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </ProjectDropZone>
                 )
@@ -366,8 +499,23 @@ export default function TimelineView() {
                 </div>
 
                 {/* Project task rows with blocks */}
-                {projectRows.map(({ project, color, tasks: pts }) => {
+                {projectRows.map(({ project, color, tasks: pts, milestones: pMs }) => {
                   const isCollapsed = collapsed[project.id]
+                  const showMilestones = timelineDepth !== 'project'
+                  const showTasks = timelineDepth === 'task'
+
+                  // 마일스톤별 할일 그룹핑
+                  const tasksByMs = {}
+                  const backlogTasks = []
+                  pts.forEach(t => {
+                    if (t.keyMilestoneId) {
+                      if (!tasksByMs[t.keyMilestoneId]) tasksByMs[t.keyMilestoneId] = []
+                      tasksByMs[t.keyMilestoneId].push(t)
+                    } else {
+                      backlogTasks.push(t)
+                    }
+                  })
+
                   return (
                     <div key={project.id}>
                       {/* Project header row — empty in grid */}
@@ -381,8 +529,9 @@ export default function TimelineView() {
                           }} />
                         )}
                       </div>
-                      {/* Task rows with blocks */}
-                      {!isCollapsed && pts.map(task => (
+
+                      {/* depth='project': 기존 방식 */}
+                      {!isCollapsed && !showMilestones && pts.map(task => (
                         <TaskRow
                           key={task.id}
                           task={task}
@@ -398,6 +547,84 @@ export default function TimelineView() {
                           isDragging={activeId === task.id}
                         />
                       ))}
+
+                      {/* depth='milestone' 또는 'task': 마일스톤 그룹핑 */}
+                      {!isCollapsed && showMilestones && (
+                        <>
+                          {pMs.map(ms => {
+                            const msTasks = tasksByMs[ms.id] || []
+                            const msCollapsed = collapsed[ms.id]
+                            const msColor = ms.color || '#1D9E75'
+
+                            return (
+                              <div key={ms.id}>
+                                {/* 마일스톤 바 행 */}
+                                <div style={{ height: ROW_H, position: 'relative', background: '#fafafa' }}>
+                                  <WeekendShading columns={columns} colW={colW} h={ROW_H} />
+                                  {todayCol >= 0 && (
+                                    <div style={{
+                                      position: 'absolute', top: 0, bottom: 0,
+                                      left: todayCol * colW + colW / 2 - 1,
+                                      width: 2, background: '#ef4444', zIndex: 1, pointerEvents: 'none', opacity: 0.35,
+                                    }} />
+                                  )}
+                                  <MilestoneBar milestone={ms} columns={columns} colW={colW} dateToCol={dateToCol} rowH={ROW_H} />
+                                </div>
+
+                                {/* 마일스톤 할일 (depth='task') */}
+                                {showTasks && !msCollapsed && msTasks.map(task => (
+                                  <TaskRow
+                                    key={task.id}
+                                    task={task}
+                                    color={{ ...color, header: `${msColor}20`, dot: msColor, text: '#555' }}
+                                    columns={columns}
+                                    colW={colW}
+                                    scale={scale}
+                                    todayCol={todayCol}
+                                    dateToCol={dateToCol}
+                                    rowH={ROW_H}
+                                    openDetail={openDetail}
+                                    updateTask={updateTask}
+                                    isDragging={activeId === task.id}
+                                  />
+                                ))}
+                              </div>
+                            )
+                          })}
+
+                          {/* 백로그 행 */}
+                          {backlogTasks.length > 0 && (
+                            <div>
+                              <div style={{ height: ROW_H, position: 'relative', background: '#fafafa' }}>
+                                <WeekendShading columns={columns} colW={colW} h={ROW_H} />
+                                {todayCol >= 0 && (
+                                  <div style={{
+                                    position: 'absolute', top: 0, bottom: 0,
+                                    left: todayCol * colW + colW / 2 - 1,
+                                    width: 2, background: '#ef4444', zIndex: 1, pointerEvents: 'none', opacity: 0.35,
+                                  }} />
+                                )}
+                              </div>
+                              {showTasks && !collapsed[`${project.id}__backlog`] && backlogTasks.map(task => (
+                                <TaskRow
+                                  key={task.id}
+                                  task={task}
+                                  color={color}
+                                  columns={columns}
+                                  colW={colW}
+                                  scale={scale}
+                                  todayCol={todayCol}
+                                  dateToCol={dateToCol}
+                                  rowH={ROW_H}
+                                  openDetail={openDetail}
+                                  updateTask={updateTask}
+                                  isDragging={activeId === task.id}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   )
                 })}
@@ -438,12 +665,14 @@ function ProjectDropZone({ id, children }) {
 }
 
 /* ─── Sortable task row in left panel ─── */
-function SortableTaskRow({ task, openDetail, rowH, isDragging, assigneeName }) {
+function SortableTaskRow({ task, openDetail, rowH, isDragging, assigneeName, indent = 1 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id })
+  // indent: 1 = 기본 (프로젝트 하위), 2 = 마일스톤 하위
+  const paddingLeft = indent === 2 ? 42 : 30
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    padding: '0 10px 0 30px',
+    padding: `0 10px 0 ${paddingLeft}px`,
     height: rowH,
     display: 'flex',
     alignItems: 'center',
