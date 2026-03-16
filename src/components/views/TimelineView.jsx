@@ -93,8 +93,9 @@ function getMonthHeaders(baseDate, scale) {
 }
 
 const COL_WIDTHS = { month: 36, quarter: 12, year: 18 }
-const LEFT_PANEL = 170
-const LEFT_PANEL_MOBILE = 100
+const LEFT_PANEL = 220
+const LEFT_PANEL_MOBILE = 130
+const ASSIGNEE_W = 50
 const SCALES = [
   { key: 'month', label: '월간' },
   { key: 'quarter', label: '분기' },
@@ -167,7 +168,7 @@ export default function TimelineView() {
     return filteredProjects.map(p => {
       const c = getColor(p.color)
       const projectTasks = filteredTasks
-        .filter(t => t.projectId === p.id && t.category !== 'done')
+        .filter(t => t.projectId === p.id && !t.done && !t.deletedAt && t.category !== 'done')
         .sort((a, b) => a.sortOrder - b.sortOrder)
       return { project: p, color: c, tasks: projectTasks }
     })
@@ -297,7 +298,8 @@ export default function TimelineView() {
               {scale !== 'month' && <div style={{ height: 24 }} />}
               {/* Date header spacer */}
               <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-                <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>프로젝트 / 할일</span>
+                <span style={{ fontSize: 12, color: '#999', fontWeight: 500, flex: 1, minWidth: 0 }}>프로젝트 / 할일</span>
+                <span style={{ fontSize: 10, color: '#999', fontWeight: 500, width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0, borderLeft: '1px solid #f0f0f0', paddingLeft: 8 }}>담당자</span>
               </div>
               {/* Project rows */}
               {projectRows.map(({ project, color, tasks: pts }) => {
@@ -445,7 +447,7 @@ function SortableTaskRow({ task, openDetail, rowH, isDragging, assigneeName }) {
     height: rowH,
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     cursor: 'grab',
     boxSizing: 'border-box',
     opacity: isDragging ? 0.3 : 1,
@@ -458,8 +460,8 @@ function SortableTaskRow({ task, openDetail, rowH, isDragging, assigneeName }) {
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = 'rgba(0,0,0,0.02)' }}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
-      <span style={{ fontSize: 13, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{task.text}</span>
-      {assigneeName && <span style={{ fontSize: 10, color: '#aaa', fontWeight: 600, flexShrink: 0 }}>{assigneeName}</span>}
+      <span style={{ fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{task.text}</span>
+      <span style={{ fontSize: 10, color: '#aaa', fontWeight: 600, width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderLeft: '1px solid #f0f0f0', paddingLeft: 8 }}>{assigneeName || ''}</span>
     </div>
   )
 }

@@ -62,11 +62,25 @@ export default function MyProfile() {
   const [teamMembers, setTeamMembers] = useState({}) // { teamId: [members] }
   const [loadingTeams, setLoadingTeams] = useState(false)
 
+  // 비밀번호 관련 상태
+  const [hasGoogle, setHasGoogle] = useState(false)
+  const [hasPassword, setHasPassword] = useState(false)
+  const [showPwForm, setShowPwForm] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState('')
+
   useEffect(() => {
     const d = getDb()
     if (!d) return
     d.auth.getUser().then(({ data }) => {
       if (data?.user?.email) setEmail(data.user.email)
+      if (data?.user?.app_metadata) {
+        const providers = data.user.app_metadata.providers || []
+        setHasGoogle(providers.includes('google'))
+        setHasPassword(providers.includes('email'))
+      }
     })
   }, [])
 
@@ -109,6 +123,27 @@ export default function MyProfile() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handlePasswordSave = async () => {
+    if (!newPw || newPw.length < 8) { setPwMsg('비밀번호는 최소 8자 이상이어야 합니다.'); return }
+    if (newPw !== confirmPw) { setPwMsg('비밀번호가 일치하지 않습니다.'); return }
+    setPwSaving(true)
+    setPwMsg('')
+    const d = getDb()
+    if (!d) { setPwSaving(false); return }
+    const { error } = await d.auth.updateUser({ password: newPw })
+    if (error) {
+      setPwMsg('비밀번호 변경 실패: ' + error.message)
+    } else {
+      setPwMsg('비밀번호가 설정되었습니다.')
+      setHasPassword(true)
+      setShowPwForm(false)
+      setNewPw('')
+      setConfirmPw('')
+    }
+    setPwSaving(false)
+    setTimeout(() => setPwMsg(''), 3000)
   }
 
   const handleLogout = async () => {
@@ -220,6 +255,65 @@ export default function MyProfile() {
             )}
           </div>
         )}
+
+        {/* 보안 섹션 */}
+        <div style={sectionStyle}>
+          <label style={labelStyle}>보안</label>
+
+          {/* 로그인 방식 */}
+          <div style={{ fontSize: 13, color: T.text, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ color: hasGoogle ? '#38A169' : T.textMuted }}>{hasGoogle ? '✓' : '✕'}</span>
+              <span>Google 로그인</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: hasPassword ? '#38A169' : T.textMuted }}>{hasPassword ? '✓' : '✕'}</span>
+              <span>이메일+비밀번호</span>
+              {!hasPassword && <span style={{ fontSize: 11, color: T.danger }}>(미설정)</span>}
+            </div>
+          </div>
+
+          {pwMsg && (
+            <div style={{ padding: '6px 10px', borderRadius: 4, fontSize: 12, marginBottom: 10, background: pwMsg.includes('실패') ? '#fee' : '#efffef', color: pwMsg.includes('실패') ? T.danger : '#2d7a2d' }}>
+              {pwMsg}
+            </div>
+          )}
+
+          {!showPwForm ? (
+            <button onClick={() => setShowPwForm(true)} style={{
+              padding: '8px 16px', fontSize: 12, fontWeight: 500, borderRadius: 4,
+              border: `1px solid ${T.cardBorder}`, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', color: T.text,
+            }}>
+              {hasPassword ? '비밀번호 변경' : '비밀번호 설정'}
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                type="password" placeholder="새 비밀번호 (8자 이상)"
+                value={newPw} onChange={e => setNewPw(e.target.value)}
+                style={{ ...inputStyle, width: '100%' }}
+              />
+              <input
+                type="password" placeholder="비밀번호 확인"
+                value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handlePasswordSave() }}
+                style={{ ...inputStyle, width: '100%' }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={handlePasswordSave} disabled={pwSaving} style={{
+                  padding: '6px 16px', fontSize: 12, fontWeight: 500, borderRadius: 4,
+                  border: 'none', background: T.text, color: '#fff', cursor: 'pointer',
+                  fontFamily: 'inherit', opacity: pwSaving ? 0.5 : 1,
+                }}>{pwSaving ? '저장 중...' : '저장'}</button>
+                <button onClick={() => { setShowPwForm(false); setNewPw(''); setConfirmPw(''); setPwMsg('') }} style={{
+                  padding: '6px 16px', fontSize: 12, borderRadius: 4,
+                  border: `1px solid ${T.cardBorder}`, background: '#fff', cursor: 'pointer',
+                  fontFamily: 'inherit', color: T.textSub,
+                }}>취소</button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Logout section */}
         <div style={sectionStyle}>

@@ -63,7 +63,6 @@ export default function TeamSettings() {
   const [autoApprove, setAutoApprove] = useState(true)
   const [members, setMembers] = useState([])
   const [pendingRequests, setPendingRequests] = useState([])
-  const [inviteEmail, setInviteEmail] = useState('')
   const [inviteLink, setInviteLink] = useState('')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
@@ -138,16 +137,6 @@ export default function TeamSettings() {
     if (!confirm('이 팀원을 내보내시겠습니까?')) return
     await useTeamMembers.removeMember(currentTeamId, userId)
     await loadData()
-  }
-
-  const handleInviteEmail = async () => {
-    if (!inviteEmail.trim()) return
-    setLoading(true)
-    const ok = await useInvitation.sendEmailInvite(currentTeamId, inviteEmail.trim())
-    if (ok) { setMsg('초대를 보냈습니다.'); setInviteEmail('') }
-    else setMsg('초대 실패')
-    setLoading(false)
-    setTimeout(() => setMsg(''), 2000)
   }
 
   const handleCopyLink = async () => {
@@ -248,29 +237,16 @@ export default function TeamSettings() {
           {members.length === 0 && <p style={{ fontSize: 13, color: T.textMuted }}>팀원이 없습니다.</p>}
         </div>
 
-        {/* 초대 */}
+        {/* 멤버 초대 */}
         {isOwner && (
           <div style={sectionStyle}>
-            <span style={labelStyle}>초대</span>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input
-                placeholder="이메일 주소"
-                value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleInviteEmail()}
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button onClick={handleInviteEmail} disabled={loading || !inviteEmail.trim()} style={{
-                padding: '6px 14px', fontSize: 12, fontWeight: 500, borderRadius: 4,
-                border: 'none', background: T.text, color: '#fff', cursor: 'pointer',
-                fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: (loading || !inviteEmail.trim()) ? 0.5 : 1,
-              }}>초대</button>
-            </div>
+            <span style={labelStyle}>멤버 초대</span>
             <button onClick={handleCopyLink} style={{
-              padding: '6px 14px', fontSize: 12, borderRadius: 4,
-              border: `1px solid ${T.cardBorder}`, background: '#fff', cursor: 'pointer',
-              fontFamily: 'inherit', color: T.textSub,
-            }}>{copied ? '복사됨!' : '초대 링크 복사'}</button>
+              padding: '10px 20px', fontSize: 13, fontWeight: 600, borderRadius: 6,
+              border: 'none', background: T.text, color: '#fff', cursor: 'pointer',
+              fontFamily: 'inherit', width: '100%',
+            }}>{copied ? '링크가 복사되었습니다!' : '초대 링크 복사'}</button>
+            <p style={{ fontSize: 11, color: T.textMuted, marginTop: 8, marginBottom: 0 }}>링크를 복사해서 카톡, 슬랙 등으로 전달하세요</p>
           </div>
         )}
 

@@ -29,34 +29,7 @@ const useInvitation = {
     return `${window.location.origin}/invite/${code}`
   },
 
-  /** 이메일 초대 발송 — invite_code 확보 + Supabase Magic Link로 발송 */
-  async sendEmailInvite(teamId, email) {
-    const d = db()
-    if (!d) return false
-    const { data: { user } } = await d.auth.getUser()
-    if (!user) return false
-
-    // invite_code 확보 (없으면 생성)
-    const { data: team } = await d.from('teams').select('invite_code').eq('id', teamId).single()
-    let code = team?.invite_code
-    if (!code) {
-      code = generateCode()
-      const { error } = await d.from('teams').update({ invite_code: code }).eq('id', teamId)
-      if (error) { console.error('[Ryan Todo] sendEmailInvite invite_code:', error); return false }
-    }
-
-    // Magic Link 발송 — 인증 후 /invite/{code}로 리다이렉트
-    const inviteUrl = `${window.location.origin}/invite/${code}`
-    const { error: otpError } = await d.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: inviteUrl },
-    })
-
-    if (otpError) { console.error('[Ryan Todo] sendEmailInvite:', otpError); return false }
-    return true
-  },
-
-  /** 초대 수락 — invite_code 또는 invitation token으로 팀 찾기 + 가입 */
+  /** 초대 수락 — invite_code로 팀 찾기 + 가입 */
   async acceptInvite(token, displayName) {
     const d = db()
     if (!d) return { success: false, error: '연결 실패' }
@@ -73,26 +46,10 @@ const useInvitation = {
       .eq('invite_code', token)
       .single()
 
-    if (teamByCode) {
-      teamId = teamByCode.id
-      autoApprove = teamByCode.auto_approve
-    } else {
-      // 2. invitation token으로 찾기 (이메일 초대)
-      const { data: invitation } = await d
-        .from('team_invitations')
-        .select('id, team_id, status, teams(auto_approve)')
-        .eq('token', token)
-        .eq('status', 'pending')
-        .single()
+    if (!teamByCode) return { success: false, error: '유효하지 않은 초대입니다.' }
 
-      if (!invitation) return { success: false, error: '유효하지 않은 초대입니다.' }
-
-      teamId = invitation.team_id
-      autoApprove = invitation.teams?.auto_approve ?? true
-
-      // 초대 상태 업데이트
-      await d.from('team_invitations').update({ status: 'accepted' }).eq('id', invitation.id)
-    }
+    teamId = teamByCode.id
+    autoApprove = teamByCode.auto_approve
 
     // 3. 이미 멤버인지 확인
     const { data: existing } = await d
@@ -128,12 +85,8 @@ const useInvitation = {
     return { success: true, teamId }
   },
 
-  /** 초대 거절 */
-  async declineInvite(token) {
-    const d = db()
-    if (!d) return false
-    const { error } = await d.from('team_invitations').update({ status: 'declined' }).eq('token', token)
-    if (error) { console.error('[Ryan Todo] declineInvite:', error); return false }
+  /** 초대 거절 — 초대 링크 방식에서는 별도 거절 처리 불필요 (페이지 이탈로 처리) */
+  async declineInvite() {
     return true
   },
 
@@ -188,17 +141,7 @@ const useInvitation = {
       .eq('invite_code', token)
       .single()
 
-    if (teamByCode) return teamByCode
-
-    // invitation token으로 시도
-    const { data: invitation } = await d
-      .from('team_invitations')
-      .select('team_id, teams(id, name, description)')
-      .eq('token', token)
-      .eq('status', 'pending')
-      .single()
-
-    return invitation?.teams || null
+    return teamByCode || null
   },
 }
 
