@@ -10,10 +10,9 @@ import { useKeyPolicies } from '../../hooks/useKeyPolicies'
 import CompactMilestoneRow from './CompactMilestoneRow'
 import MilestoneTaskChip from './MilestoneTaskChip'
 
-const MIN_TASK_W = 200
-const MAX_TASK_W = 800
 const DEFAULT_TASK_W = 400
 const TASK_COL_W_KEY = 'milestoneTaskColW'
+const SPLIT_MIN_PCT = 0.30 // each side must be at least 30% of container
 
 export default function CompactMilestoneTab({ projectId }) {
   const { pkm, loading: pkmLoading } = useProjectKeyMilestone(projectId)
@@ -30,9 +29,11 @@ export default function CompactMilestoneTab({ projectId }) {
 
   const [expandedMs, setExpandedMs] = useState(new Set())
   const [activeTask, setActiveTask] = useState(null)
+  const [activeMilestone, setActiveMilestone] = useState(null)
+  const containerRef = useRef(null)
   const [taskColW, setTaskColW] = useState(() => {
     const saved = localStorage.getItem(TASK_COL_W_KEY)
-    return saved ? Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, Number(saved))) : DEFAULT_TASK_W
+    return saved ? Number(saved) || DEFAULT_TASK_W : DEFAULT_TASK_W
   })
 
   // Track latest value for resize handler closure
@@ -84,11 +85,15 @@ export default function CompactMilestoneTab({ projectId }) {
     if (data?.type === 'task') {
       const task = projectTasks.find(t => t.id === data.taskId)
       if (task) setActiveTask(task)
+    } else if (data?.type === 'milestone') {
+      const ms = milestones.find(m => m.id === event.active.id)
+      if (ms) setActiveMilestone(ms)
     }
-  }, [projectTasks])
+  }, [projectTasks, milestones])
 
   const handleDragEnd = useCallback((event) => {
     setActiveTask(null)
+    setActiveMilestone(null)
     const { active, over } = event
     if (!over) return
 
@@ -130,7 +135,7 @@ export default function CompactMilestoneTab({ projectId }) {
     }
   }, [milestones, reorderMilestones, updateTask, projectTasks])
 
-  const handleDragCancel = useCallback(() => { setActiveTask(null) }, [])
+  const handleDragCancel = useCallback(() => { setActiveTask(null); setActiveMilestone(null) }, [])
 
   // Add task to milestone
   const handleAddTask = useCallback((msId, text) => {
@@ -156,8 +161,11 @@ export default function CompactMilestoneTab({ projectId }) {
     e.preventDefault()
     const startX = e.clientX
     const startW = taskColWRef.current
+    const containerW = containerRef.current?.offsetWidth || 1200
+    const minW = Math.round(containerW * SPLIT_MIN_PCT)
+    const maxW = Math.round(containerW * (1 - SPLIT_MIN_PCT))
     const onMove = (ev) => {
-      const newW = Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, startW + (startX - ev.clientX)))
+      const newW = Math.max(minW, Math.min(maxW, startW + (startX - ev.clientX)))
       setTaskColW(newW)
       taskColWRef.current = newW
     }
@@ -182,6 +190,7 @@ export default function CompactMilestoneTab({ projectId }) {
   const BACKLOG_MS = { id: '__backlog__', title: '백로그' }
 
   return (
+    <div ref={containerRef}>
     <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
@@ -291,11 +300,13 @@ export default function CompactMilestoneTab({ projectId }) {
         ))}
       </FooterSection>
 
-      {/* Drag overlay for task chips */}
+      {/* Drag overlay */}
       <DragOverlay dropAnimation={null}>
         {activeTask ? <TaskChipOverlay task={activeTask} /> : null}
+        {activeMilestone ? <MilestoneOverlay milestone={activeMilestone} /> : null}
       </DragOverlay>
     </DndContext>
+    </div>
   )
 }
 
@@ -317,6 +328,23 @@ function TaskChipOverlay({ task }) {
         {task.done && '✓'}
       </div>
       <span style={{ color: '#2C2C2A' }}>{task.text}</span>
+    </div>
+  )
+}
+
+function MilestoneOverlay({ milestone }) {
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+      background: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 500,
+      border: '1px solid #e0ddd6', boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+      cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap',
+    }}>
+      <div style={{
+        width: 8, height: 8, borderRadius: '50%',
+        background: milestone.color || '#1D9E75', flexShrink: 0,
+      }} />
+      <span style={{ color: '#2C2C2A' }}>{milestone.title || '(제목 없음)'}</span>
     </div>
   )
 }
