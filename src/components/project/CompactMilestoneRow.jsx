@@ -19,9 +19,9 @@ function MilestoneInlineAdd({ onAdd }) {
   if (!active) return (
     <button
       onClick={() => { setActive(true); setTimeout(() => ref.current?.focus(), 0) }}
-      style={{ fontSize: 11, color: '#a09f99', cursor: 'pointer', padding: '3px 6px', borderRadius: 4, border: 'none', background: 'none', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-      onMouseEnter={e => e.currentTarget.style.color = '#5F5E5A'}
-      onMouseLeave={e => e.currentTarget.style.color = '#a09f99'}
+      style={{ fontSize: 11, color: '#888780', cursor: 'pointer', padding: '3px 8px', borderRadius: 4, border: '1px dashed #d8d6cf', background: '#fafaf8', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = '#a09f99'; e.currentTarget.style.color = '#5F5E5A' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = '#d8d6cf'; e.currentTarget.style.color = '#888780' }}
     >
       + 추가
     </button>
@@ -271,11 +271,11 @@ export default function CompactMilestoneRow({
               <>
                 <div style={{
                   border: '1.5px dashed #e0ddd6', borderRadius: 5, padding: '3px 8px',
-                  fontSize: 11, color: '#b4b2a9', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', flex: 1, minHeight: 26,
+                  fontSize: 10, color: '#c4c2ba', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', minHeight: 24, maxWidth: 130,
                   ...(isDragOver ? { borderColor: '#1D9E75', background: '#f0fdf4', color: '#1D9E75' } : {}),
                 }}>
-                  할일을 드래그하여 연결
+                  드래그하여 연결
                 </div>
                 <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
               </>
@@ -302,11 +302,11 @@ export default function CompactMilestoneRow({
               <>
                 <div style={{
                   border: '1.5px dashed #e0ddd6', borderRadius: 5, padding: '3px 8px',
-                  fontSize: 11, color: '#b4b2a9', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', flex: 1, minHeight: 24,
+                  fontSize: 10, color: '#c4c2ba', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', minHeight: 22, maxWidth: 130,
                   ...(isDragOver ? { borderColor: '#1D9E75', background: '#f0fdf4', color: '#1D9E75' } : {}),
                 }}>
-                  할일을 드래그하여 연결
+                  드래그하여 연결
                 </div>
                 <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
               </>
