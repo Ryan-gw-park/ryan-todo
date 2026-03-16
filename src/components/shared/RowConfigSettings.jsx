@@ -54,9 +54,6 @@ function ProjectSection({ title, projects, sectionKey, onReorder, editingId, set
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: sectionKey === 'team' ? '#1e7e34' : '#7c3aed', marginBottom: 8, padding: '4px 8px', background: sectionKey === 'team' ? '#e6f4ea' : '#f3e8fd', borderRadius: 6, display: 'inline-block' }}>
-        {title}
-      </div>
       {projects.map((p, idx) => {
         const c = getColor(p.color)
         const isEditing = editingId === p.id
@@ -107,7 +104,7 @@ function ProjectSection({ title, projects, sectionKey, onReorder, editingId, set
 
 /* ── Inline project management (embedded in 프로젝트 tab) ── */
 function ProjectTabContent() {
-  const { projects, addProject, updateProject, reorderProjects, currentTeamId, projectSectionOrder, setProjectSectionOrder } = useStore()
+  const { projects, addProject, updateProject, reorderProjects, currentTeamId } = useStore()
 
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
@@ -130,103 +127,28 @@ function ProjectTabContent() {
     }
   }
 
-  // 섹션 내 프로젝트 순서 변경
-  const handleSectionReorder = (sectionKey, newList) => {
-    const teamPs = sectionKey === 'team' ? newList : projects.filter(p => p.teamId === currentTeamId)
-    const personalPs = sectionKey === 'personal' ? newList : projects.filter(p => !p.teamId)
-    // 섹션 순서에 따라 전체 리스트 재구성
-    const sections = { team: teamPs, personal: personalPs }
-    const fullList = [...sections[projectSectionOrder[0]], ...sections[projectSectionOrder[1]]]
-    reorderProjects(fullList)
-  }
-
-  // 섹션 순서 변경 (팀↔개인)
-  const swapSectionOrder = () => {
-    setProjectSectionOrder([projectSectionOrder[1], projectSectionOrder[0]])
-  }
-
   const localProjectOrder = useStore(s => s.localProjectOrder)
   const sortLocally = (list) => [...list].sort((a, b) => {
     const orderA = localProjectOrder[a.id] ?? a.sortOrder ?? 0
     const orderB = localProjectOrder[b.id] ?? b.sortOrder ?? 0
     return orderA - orderB
   })
-  const teamPs = sortLocally(projects.filter(p => p.teamId === currentTeamId))
-  const personalPs = sortLocally(projects.filter(p => !p.teamId))
-  const sections = { team: teamPs, personal: personalPs }
-  const sectionLabels = { team: '팀 프로젝트', personal: '개인 프로젝트' }
+  const allProjects = sortLocally(projects)
 
-  // 개인 모드 (팀 미선택)
-  if (!currentTeamId) {
-    return (
-      <div>
-        <div style={{ fontSize: 11, color: '#bbb', marginBottom: 10 }}>드래그하여 순서 변경 · 클릭하여 편집</div>
-        <ProjectSection
-          title="프로젝트"
-          projects={projects}
-          sectionKey="personal"
-          onReorder={(_, list) => reorderProjects(list)}
-          editingId={editingId} setEditingId={setEditingId}
-          editName={editName} setEditName={setEditName}
-          editColor={editColor} setEditColor={setEditColor}
-          confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
-          startEdit={startEdit} saveEdit={saveEdit}
-        />
-        {adding ? (
-          <div style={{ padding: 12, border: '1.5px dashed #3b82f6', borderRadius: 8, marginTop: 8 }}>
-            <input ref={addRef} value={newName} onChange={e => setNewName(e.target.value)} placeholder="프로젝트 이름..."
-              onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') { setAdding(false); setNewName('') } }}
-              style={{ width: '100%', fontSize: 14, fontWeight: 500, border: '1px solid #ddd', borderRadius: 6, padding: '6px 10px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 8 }} />
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-              {COLOR_OPTIONS.map(co => (
-                <button key={co.id} onClick={() => setNewColor(co.id)} style={{ width: 24, height: 24, borderRadius: 6, background: co.dot, border: newColor === co.id ? '2.5px solid #37352f' : '2px solid transparent', cursor: 'pointer' }} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={handleAdd} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: 'none', background: '#37352f', color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>추가</button>
-              <button onClick={() => { setAdding(false); setNewName('') }} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setAdding(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', width: '100%', border: '1px dashed #ddd', borderRadius: 8, background: 'none', cursor: 'pointer', color: '#999', fontSize: 13, fontFamily: 'inherit', marginTop: 8, transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#999'; e.currentTarget.style.color = '#666' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#ddd'; e.currentTarget.style.color = '#999' }}>
-            <PlusIcon size={14} /> 새 프로젝트 추가
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  // 팀 모드
   return (
     <div>
       <div style={{ fontSize: 11, color: '#bbb', marginBottom: 10 }}>드래그하여 순서 변경 · 클릭하여 편집</div>
-
-      {/* 섹션 순서 변경 버튼 */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <button onClick={swapSectionOrder} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 4, border: '1px solid #ddd', background: '#fafafa', cursor: 'pointer', color: '#666', fontFamily: 'inherit' }}>
-          ↕ 섹션 순서 변경
-        </button>
-      </div>
-
-      {/* 섹션 순서대로 렌더링 */}
-      {projectSectionOrder.map(sectionKey => (
-        <ProjectSection
-          key={sectionKey}
-          title={sectionLabels[sectionKey]}
-          projects={sections[sectionKey]}
-          sectionKey={sectionKey}
-          onReorder={handleSectionReorder}
-          editingId={editingId} setEditingId={setEditingId}
-          editName={editName} setEditName={setEditName}
-          editColor={editColor} setEditColor={setEditColor}
-          confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
-          startEdit={startEdit} saveEdit={saveEdit}
-        />
-      ))}
-
+      <ProjectSection
+        title="프로젝트"
+        projects={allProjects}
+        sectionKey="all"
+        onReorder={(_, list) => reorderProjects(list)}
+        editingId={editingId} setEditingId={setEditingId}
+        editName={editName} setEditName={setEditName}
+        editColor={editColor} setEditColor={setEditColor}
+        confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
+        startEdit={startEdit} saveEdit={saveEdit}
+      />
       {adding ? (
         <div style={{ padding: 12, border: '1.5px dashed #3b82f6', borderRadius: 8, marginTop: 8 }}>
           <input ref={addRef} value={newName} onChange={e => setNewName(e.target.value)} placeholder="프로젝트 이름..."
@@ -237,10 +159,12 @@ function ProjectTabContent() {
               <button key={co.id} onClick={() => setNewColor(co.id)} style={{ width: 24, height: 24, borderRadius: 6, background: co.dot, border: newColor === co.id ? '2.5px solid #37352f' : '2px solid transparent', cursor: 'pointer' }} />
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-            <button onClick={() => setNewScope('team')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, border: newScope === 'team' ? '1.5px solid #1e7e34' : '1px solid #ddd', background: newScope === 'team' ? '#e6f4ea' : 'white', color: newScope === 'team' ? '#1e7e34' : '#888' }}>팀 프로젝트</button>
-            <button onClick={() => setNewScope('personal')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, border: newScope === 'personal' ? '1.5px solid #7c3aed' : '1px solid #ddd', background: newScope === 'personal' ? '#f3e8fd' : 'white', color: newScope === 'personal' ? '#7c3aed' : '#888' }}>개인 프로젝트</button>
-          </div>
+          {currentTeamId && (
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+              <button onClick={() => setNewScope('team')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, border: newScope === 'team' ? '1.5px solid #1e7e34' : '1px solid #ddd', background: newScope === 'team' ? '#e6f4ea' : 'white', color: newScope === 'team' ? '#1e7e34' : '#888' }}>팀 프로젝트</button>
+              <button onClick={() => setNewScope('personal')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, border: newScope === 'personal' ? '1.5px solid #7c3aed' : '1px solid #ddd', background: newScope === 'personal' ? '#f3e8fd' : 'white', color: newScope === 'personal' ? '#7c3aed' : '#888' }}>개인 프로젝트</button>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={handleAdd} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: 'none', background: '#37352f', color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>추가</button>
             <button onClick={() => { setAdding(false); setNewName('') }} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: 'white', color: '#666', cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>

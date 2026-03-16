@@ -269,14 +269,9 @@ export default function TeamMatrixView() {
   // Loop-20.2: 전역 필터 적용
   const { filteredProjects, filteredTasks: _ft } = useProjectFilter(projects, tasks)
 
-  // Loop-20 보완: 프로젝트 열 팀/개인 분리 + spacer
-  const teamProjects = filteredProjects.filter(p => p.teamId === currentTeamId)
-  const personalProjects = filteredProjects.filter(p => !p.teamId)
-  const hasPersonal = personalProjects.length > 0 && currentTeamId
-  const allColumns = hasPersonal
-    ? [...teamProjects, { _spacer: true, id: '__spacer' }, ...personalProjects]
-    : filteredProjects
-  const N = allColumns.filter(c => !c._spacer).length
+  // 프로젝트 열 — localProjectOrder 기준 단일 리스트 (섹션 분리 없음)
+  const allColumns = filteredProjects
+  const N = allColumns.length
   const rowCategoryMap = { me_today: 'today', me_next: 'next' }
 
   return (
@@ -308,7 +303,6 @@ export default function TeamMatrixView() {
               <div style={{ display: 'flex', gap: COL_GAP, marginBottom: 0 }}>
                 <div style={{ width: LW, flexShrink: 0, ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}) }} />
                 {allColumns.map(p => {
-                  if (p._spacer) return <div key="__spacer" style={{ width: 12, flexShrink: 0 }} />
                   const c = getColor(p.color)
                   const pt = tasks.filter(t => t.projectId === p.id)
                   const isCol = collapsed[p.id]
@@ -422,8 +416,7 @@ export default function TeamMatrixView() {
                           <span style={{ fontSize: 10, color: '#aaa' }}>▸</span>
                         </div>
                         {allColumns.map(p => {
-                          if (p._spacer) return <div key="__spacer" style={{ width: 12, flexShrink: 0 }} />
-                          const isCol = collapsed[p.id]
+                                  const isCol = collapsed[p.id]
                           const isPersonalCol = !p.teamId
                           const count = isPersonalCol ? 0 : mTasks.filter(t => t.projectId === p.id).length
                           return (
@@ -591,7 +584,6 @@ function TaskRowWithDnd({ label, emoji, columns, tasks: rowTasks, isMobile, LW, 
       </div>
 
       {columns.map(p => {
-        if (p._spacer) return <div key="__spacer" style={{ width: 12, flexShrink: 0 }} />
         const c = getColor(p.color)
         const isCol = collapsed[p.id]
         const cellTasks = rowTasks.filter(t => t.projectId === p.id)
@@ -648,7 +640,6 @@ function ReadOnlyRow({ columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN,
       }} />
 
       {columns.map(p => {
-        if (p._spacer) return <div key="__spacer" style={{ width: 12, flexShrink: 0 }} />
         const c = getColor(p.color)
         const isCol = collapsed[p.id]
         // 팀원 펼침 행: 개인 프로젝트 열은 빈 셀
@@ -702,7 +693,6 @@ function CompletedRow({ columns, tasks: doneTasks, isMobile, LW, COL_GAP, COL_MI
         <span style={{ fontSize: 13, fontWeight: 600, color: '#999', lineHeight: 1.3, whiteSpace: 'nowrap' }}>완료</span>
       </div>
       {columns.map(p => {
-        if (p._spacer) return <div key="__spacer" style={{ width: 12, flexShrink: 0 }} />
         const c = getColor(p.color)
         const isCol = collapsed[p.id]
         const cellTasks = doneTasks.filter(t => t.projectId === p.id)
