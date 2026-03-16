@@ -39,7 +39,7 @@ export default function TodayView() {
   }
   const toggleProject = (pid) => toggleCollapse('today', pid)
 
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
 
