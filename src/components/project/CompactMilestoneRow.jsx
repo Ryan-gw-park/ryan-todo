@@ -19,7 +19,9 @@ function MilestoneInlineAdd({ onAdd }) {
   if (!active) return (
     <button
       onClick={() => { setActive(true); setTimeout(() => ref.current?.focus(), 0) }}
-      style={{ fontSize: 11, color: '#c4c2ba', cursor: 'pointer', padding: '3px 6px', borderRadius: 4, border: 'none', background: 'none', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+      style={{ fontSize: 11, color: '#a09f99', cursor: 'pointer', padding: '3px 6px', borderRadius: 4, border: 'none', background: 'none', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+      onMouseEnter={e => e.currentTarget.style.color = '#5F5E5A'}
+      onMouseLeave={e => e.currentTarget.style.color = '#a09f99'}
     >
       + 추가
     </button>
@@ -156,7 +158,7 @@ export default function CompactMilestoneRow({
           {/* Drag grip indicator */}
           {!isBacklog ? (
             <div
-              style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d3d1c7', fontSize: 10, flexShrink: 0, opacity: hover ? 0.8 : 0, transition: 'opacity .12s', userSelect: 'none' }}
+              style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b4b2a9', fontSize: 10, flexShrink: 0, opacity: hover ? 0.8 : 0, transition: 'opacity .12s', userSelect: 'none' }}
             >
               ⠿
             </div>
@@ -171,7 +173,7 @@ export default function CompactMilestoneRow({
             style={{
               width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: 3, border: 'none', background: 'none', cursor: 'pointer',
-              color: '#c4c2ba', fontSize: 9, flexShrink: 0,
+              color: '#a09f99', fontSize: 9, flexShrink: 0,
               transform: expanded ? 'none' : 'rotate(-90deg)', transition: 'transform .15s',
             }}
           >
@@ -203,7 +205,7 @@ export default function CompactMilestoneRow({
               <div style={{ width: 32, height: 3, background: '#eeeee6', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: '#1D9E75', borderRadius: 2, transition: 'width .3s' }} />
               </div>
-              <span style={{ fontSize: 9.5, color: '#b4b2a9', fontVariantNumeric: 'tabular-nums' }}>{doneCnt}/{totalCnt}</span>
+              <span style={{ fontSize: 9.5, color: '#888780', fontVariantNumeric: 'tabular-nums' }}>{doneCnt}/{totalCnt}</span>
             </div>
           )}
         </div>
@@ -212,24 +214,28 @@ export default function CompactMilestoneRow({
         {expanded && (
           <div style={{ padding: '0 12px 8px 46px', display: 'flex', flexDirection: 'column', gap: 3 }}>
             {!isBacklog && (milestone.start_date || milestone.end_date) && (
-              <div style={{ fontSize: 10.5, color: '#ccc9c0', display: 'flex', alignItems: 'center', gap: 4 }}>
-                {fmt(milestone.start_date)} <span style={{ color: '#ddd9d0' }}>→</span> {fmt(milestone.end_date)}
+              <div style={{ fontSize: 10.5, color: '#a09f99', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {fmt(milestone.start_date)} <span style={{ color: '#c4c2ba' }}>→</span> {fmt(milestone.end_date)}
               </div>
             )}
             {milestone.description && (
-              <div style={{ fontSize: 11.5, color: '#a09f99', lineHeight: 1.4 }}>{milestone.description}</div>
+              <div style={{ fontSize: 11.5, color: '#888780', lineHeight: 1.4 }}>{milestone.description}</div>
             )}
             {!isBacklog && deliverables && deliverables.length > 0 && (
               deliverables.map(d => (
-                <div key={d.id} style={{ fontSize: 11, color: '#a09f99', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#d3d1c7' }} />
+                <div key={d.id} style={{ fontSize: 11, color: '#888780', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#b4b2a9' }} />
                   {d.title || '결과물'}
                 </div>
               ))
             )}
             {!isBacklog && (
-              <div style={{ fontSize: 11, color: '#c4c2ba', cursor: 'pointer', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#d3d1c7' }} />
+              <div
+                style={{ fontSize: 11, color: '#a09f99', cursor: 'pointer', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#5F5E5A'}
+                onMouseLeave={e => e.currentTarget.style.color = '#a09f99'}
+              >
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#b4b2a9' }} />
                 결과물 추가
               </div>
             )}
@@ -265,7 +271,7 @@ export default function CompactMilestoneRow({
               <>
                 <div style={{
                   border: '1.5px dashed #e0ddd6', borderRadius: 5, padding: '3px 8px',
-                  fontSize: 11, color: '#d3d1c7', display: 'flex', alignItems: 'center',
+                  fontSize: 11, color: '#b4b2a9', display: 'flex', alignItems: 'center',
                   justifyContent: 'center', flex: 1, minHeight: 26,
                   ...(isDragOver ? { borderColor: '#1D9E75', background: '#f0fdf4', color: '#1D9E75' } : {}),
                 }}>
@@ -290,14 +296,47 @@ export default function CompactMilestoneRow({
             )}
           </>
         ) : (
-          /* Collapsed: show summary only */
-          totalCnt > 0 ? (
-            <span style={{ fontSize: 11, color: '#b4b2a9', padding: '3px 0', whiteSpace: 'nowrap' }}>
-              {totalCnt}개 할일
-            </span>
-          ) : (
-            <span style={{ fontSize: 11, color: '#d3d1c7', padding: '3px 0' }}>—</span>
-          )
+          /* Collapsed: show task chip preview (max 3) + "+N개" badge */
+          <>
+            {totalCnt === 0 ? (
+              <>
+                <div style={{
+                  border: '1.5px dashed #e0ddd6', borderRadius: 5, padding: '3px 8px',
+                  fontSize: 11, color: '#b4b2a9', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', flex: 1, minHeight: 24,
+                  ...(isDragOver ? { borderColor: '#1D9E75', background: '#f0fdf4', color: '#1D9E75' } : {}),
+                }}>
+                  할일을 드래그하여 연결
+                </div>
+                <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
+              </>
+            ) : (
+              <>
+                {tasks.slice(0, 3).map(task => (
+                  <MilestoneTaskChip
+                    key={task.id}
+                    task={task}
+                    milestoneId={isBacklog ? '__backlog__' : milestone.id}
+                    onToggle={onTaskToggle}
+                    onClick={onTaskClick}
+                  />
+                ))}
+                {totalCnt > 3 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onToggleExpand(milestone.id) }}
+                    style={{
+                      fontSize: 10.5, color: '#888780', background: '#eeeee6',
+                      border: 'none', borderRadius: 999, padding: '2px 8px',
+                      cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    +{totalCnt - 3}개
+                  </button>
+                )}
+                <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />
+              </>
+            )}
+          </>
         )}
       </div>
     </div>

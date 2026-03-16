@@ -202,14 +202,14 @@ export default function CompactMilestoneTab({ projectId }) {
       <div style={{
         display: 'flex', alignItems: 'center', height: 30, padding: '0 12px',
         background: '#fafaf8', borderBottom: '0.5px solid #e8e6df',
-        fontSize: 10.5, color: '#b4b2a9', fontWeight: 600, letterSpacing: '.03em',
+        fontSize: 10.5, color: '#888780', fontWeight: 600, letterSpacing: '.03em',
         position: 'sticky', top: 0, zIndex: 2,
       }}>
         <button
           onClick={toggleExpandAll}
           style={{
             border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            fontSize: 10, color: '#c4c2ba', padding: '2px 6px', borderRadius: 3,
+            fontSize: 10, color: '#a09f99', padding: '2px 6px', borderRadius: 3,
             marginRight: 4, display: 'flex', alignItems: 'center', gap: 3,
           }}
           title={allExpanded ? '전체 접기' : '전체 펼치기'}
@@ -255,7 +255,7 @@ export default function CompactMilestoneTab({ projectId }) {
         onClick={handleAddMilestone}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '7px 12px 7px 46px', color: '#c4c2ba', fontSize: 12,
+          padding: '7px 12px 7px 46px', color: '#a09f99', fontSize: 12,
           cursor: 'pointer', borderBottom: '0.5px solid #f0efe8',
           transition: 'background .1s',
         }}
@@ -353,7 +353,7 @@ function FooterSection({ icon, label, count, children }) {
   const [open, setOpen] = useState(false)
   return (
     <div style={{ borderTop: '0.5px solid #f0efe8' }}>
-      <div onClick={() => setOpen(!open)} style={{ fontSize: 11, color: '#c4c2ba', cursor: 'pointer', padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div onClick={() => setOpen(!open)} style={{ fontSize: 11, color: '#a09f99', cursor: 'pointer', padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 4 }}>
         {icon} {label} <span style={{ fontSize: 9.5, background: '#eeeee6', borderRadius: 999, padding: '0 5px' }}>{count}</span>
       </div>
       {open && <div style={{ padding: '0 16px 8px' }}>{children}</div>}
