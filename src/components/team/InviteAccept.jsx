@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import useStore from '../../hooks/useStore'
 import useInvitation from '../../hooks/useInvitation'
 import useTeam from '../../hooks/useTeam'
+import { getDb } from '../../utils/supabase'
+import AuthForm from '../auth/AuthForm'
 
 const T = {
   card: '#ffffff', cardBorder: '#e8e8e8', text: '#1a1a1a',
@@ -19,11 +21,29 @@ export default function InviteAccept() {
   const navigate = useNavigate()
   const { userName, initTeamState } = useStore()
 
+  const [session, setSession] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
   const [teamInfo, setTeamInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState(false)
   const [result, setResult] = useState(null)
   const [displayName, setDisplayName] = useState('')
+
+  // Track auth state
+  useEffect(() => {
+    const supabase = getDb()
+    if (!supabase) { setAuthReady(true); return }
+
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s)
+      setAuthReady(true)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   // Load team info
   useEffect(() => {
@@ -39,15 +59,25 @@ export default function InviteAccept() {
     if (userName) setDisplayName(userName)
   }, [userName])
 
+  // Auto-accept when session becomes available and team info is loaded
+  useEffect(() => {
+    if (session && teamInfo && !result && !accepting) {
+      // Pre-fill from session user if not set
+      if (!displayName) {
+        const meta = session.user?.user_metadata
+        const name = meta?.full_name || meta?.name || session.user?.email?.split('@')[0] || ''
+        if (name) setDisplayName(name)
+      }
+    }
+  }, [session, teamInfo])
+
   const handleAccept = async () => {
     setAccepting(true)
     const res = await useInvitation.acceptInvite(token, displayName.trim() || undefined)
     setResult(res)
     if (res.success) {
-      // 신규 사용자용 개인 프로젝트 + 할일 생성
       await useTeam.createInitialPersonalData()
       await initTeamState()
-      // Auto-select the team
       if (res.teamId) {
         useStore.getState().setTeam(res.teamId)
       }
@@ -62,10 +92,21 @@ export default function InviteAccept() {
 
   const handleGoHome = () => navigate('/', { replace: true })
 
+  const pageStyle = {
+    position: 'fixed', inset: 0, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', background: 'white',
+    fontFamily: "'Noto Sans KR', 'Inter', sans-serif",
+  }
+
+  const cardStyle = {
+    background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`,
+    padding: '40px 32px', textAlign: 'center',
+  }
+
   // Loading
-  if (loading) {
+  if (loading || !authReady) {
     return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+      <div style={pageStyle}>
         <span style={{ fontSize: 14, color: '#999' }}>초대 정보를 확인하는 중...</span>
       </div>
     )
@@ -74,9 +115,9 @@ export default function InviteAccept() {
   // Invalid token
   if (!teamInfo) {
     return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+      <div style={pageStyle}>
         <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
-          <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`, padding: '40px 32px', textAlign: 'center' }}>
+          <div style={cardStyle}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>😕</div>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: T.text }}>유효하지 않은 초대</h3>
             <p style={{ color: T.textSub, fontSize: 14, margin: '0 0 24px' }}>초대 링크가 만료되었거나 유효하지 않습니다.</p>
@@ -91,9 +132,9 @@ export default function InviteAccept() {
   if (result) {
     const isPending = result.pending
     return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+      <div style={pageStyle}>
         <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
-          <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`, padding: '40px 32px', textAlign: 'center' }}>
+          <div style={cardStyle}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>{result.success ? (isPending ? '⏳' : '🎉') : '❌'}</div>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: T.text }}>
               {result.success
@@ -112,11 +153,39 @@ export default function InviteAccept() {
     )
   }
 
-  // Accept screen
+  // Not logged in — show auth form embedded in invite page
+  if (!session) {
+    return (
+      <div style={pageStyle}>
+        <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
+          <div style={cardStyle}>
+            {/* Team badge */}
+            <div style={{
+              width: 48, height: 48, borderRadius: 12, background: '#37352f',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', fontSize: 22, fontWeight: 700, margin: '0 auto 16px',
+            }}>{(teamInfo.name || 'T')[0].toUpperCase()}</div>
+            <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: T.text }}>{teamInfo.name}</h3>
+            <p style={{ color: T.textSub, fontSize: 13, margin: '0 0 8px' }}>
+              팀에 참가하려면 로그인이 필요합니다
+            </p>
+            {teamInfo.description && <p style={{ color: T.textMuted, fontSize: 12, margin: '0 0 20px' }}>{teamInfo.description}</p>}
+            {!teamInfo.description && <div style={{ marginBottom: 20 }} />}
+
+            <AuthForm
+              redirectTo={window.location.href}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Logged in — accept screen
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', fontFamily: "'Noto Sans KR', 'Inter', sans-serif" }}>
+    <div style={pageStyle}>
       <div style={{ maxWidth: 400, width: '100%', padding: '0 24px' }}>
-        <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.cardBorder}`, padding: '40px 32px', textAlign: 'center' }}>
+        <div style={cardStyle}>
           <div style={{
             width: 48, height: 48, borderRadius: 12, background: '#37352f',
             display: 'flex', alignItems: 'center', justifyContent: 'center',

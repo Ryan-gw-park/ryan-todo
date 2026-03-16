@@ -230,6 +230,15 @@ export default function App() {
     return <LoadingSpinner />
   }
 
+  // Step 3.5: Allow invite page without auth
+  if (!session && location.pathname.startsWith('/invite/')) {
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <InviteAccept />
+      </Suspense>
+    )
+  }
+
   // Step 4: Login required — save invite path for post-login redirect
   if (!session) {
     if (location.pathname.startsWith('/invite/')) {
