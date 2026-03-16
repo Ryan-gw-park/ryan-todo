@@ -1,6 +1,6 @@
 import useStore from '../../hooks/useStore'
 import ProjectHeader from './ProjectHeader'
-import KeyMilestoneTab from './KeyMilestoneTab'
+import CompactMilestoneTab from './CompactMilestoneTab'
 import TasksTab from './TasksTab'
 import GanttMode from './timeline/GanttMode'
 import DetailMode from './timeline/DetailMode'
@@ -46,7 +46,7 @@ export default function ProjectLayer() {
 
       {/* 탭 콘텐츠 */}
       <div style={{ flex: 1, overflow: 'auto', background: '#fff' }}>
-        {tab === 'milestone' && <KeyMilestoneTab projectId={selectedProjectId} />}
+        {tab === 'milestone' && <CompactMilestoneTab projectId={selectedProjectId} />}
         {tab === 'tasks' && <TasksTab projectId={selectedProjectId} />}
         {tab === 'ptimeline' && (
           timelineMode === 'gantt'
