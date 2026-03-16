@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
   }
 
   // Build invite URL — use the app's origin from the referrer or a configured env var
-  const APP_URL = Deno.env.get('APP_URL') || 'https://ryantodo.netlify.app'
+  const APP_URL = Deno.env.get('APP_URL') || 'https://ryan-todo-master.vercel.app'
   const inviteUrl = `${APP_URL}/invite/${token}`
 
   // If RESEND_API_KEY is set, send via Resend; otherwise log only (dev mode)

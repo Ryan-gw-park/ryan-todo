@@ -54,7 +54,7 @@ function ProjectSection({ title, projects, sectionKey, onReorder, editingId, set
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: sectionKey === 'team' ? '#1e7e34' : '#7c3aed', marginBottom: 8, padding: '4px 8px', background: sectionKey === 'team' ? '#e6f4ea' : '#f3e8fd', borderRadius: 6, display: 'inline-block' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8 }}>
         {title}
       </div>
       {projects.map((p, idx) => {
@@ -107,7 +107,7 @@ function ProjectSection({ title, projects, sectionKey, onReorder, editingId, set
 
 /* ── Inline project management (embedded in 프로젝트 tab) ── */
 function ProjectTabContent() {
-  const { projects, addProject, updateProject, reorderProjects, currentTeamId, projectSectionOrder, setProjectSectionOrder } = useStore()
+  const { projects, addProject, updateProject, reorderProjects, currentTeamId } = useStore()
 
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
@@ -130,31 +130,13 @@ function ProjectTabContent() {
     }
   }
 
-  // 섹션 내 프로젝트 순서 변경
-  const handleSectionReorder = (sectionKey, newList) => {
-    const teamPs = sectionKey === 'team' ? newList : projects.filter(p => p.teamId === currentTeamId)
-    const personalPs = sectionKey === 'personal' ? newList : projects.filter(p => !p.teamId)
-    // 섹션 순서에 따라 전체 리스트 재구성
-    const sections = { team: teamPs, personal: personalPs }
-    const fullList = [...sections[projectSectionOrder[0]], ...sections[projectSectionOrder[1]]]
-    reorderProjects(fullList)
-  }
-
-  // 섹션 순서 변경 (팀↔개인)
-  const swapSectionOrder = () => {
-    setProjectSectionOrder([projectSectionOrder[1], projectSectionOrder[0]])
-  }
-
   const localProjectOrder = useStore(s => s.localProjectOrder)
   const sortLocally = (list) => [...list].sort((a, b) => {
     const orderA = localProjectOrder[a.id] ?? a.sortOrder ?? 0
     const orderB = localProjectOrder[b.id] ?? b.sortOrder ?? 0
     return orderA - orderB
   })
-  const teamPs = sortLocally(projects.filter(p => p.teamId === currentTeamId))
-  const personalPs = sortLocally(projects.filter(p => !p.teamId))
-  const sections = { team: teamPs, personal: personalPs }
-  const sectionLabels = { team: '팀 프로젝트', personal: '개인 프로젝트' }
+  const allProjects = sortLocally(projects)
 
   // 개인 모드 (팀 미선택)
   if (!currentTeamId) {
@@ -204,28 +186,17 @@ function ProjectTabContent() {
     <div>
       <div style={{ fontSize: 11, color: '#bbb', marginBottom: 10 }}>드래그하여 순서 변경 · 클릭하여 편집</div>
 
-      {/* 섹션 순서 변경 버튼 */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <button onClick={swapSectionOrder} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 4, border: '1px solid #ddd', background: '#fafafa', cursor: 'pointer', color: '#666', fontFamily: 'inherit' }}>
-          ↕ 섹션 순서 변경
-        </button>
-      </div>
-
-      {/* 섹션 순서대로 렌더링 */}
-      {projectSectionOrder.map(sectionKey => (
-        <ProjectSection
-          key={sectionKey}
-          title={sectionLabels[sectionKey]}
-          projects={sections[sectionKey]}
-          sectionKey={sectionKey}
-          onReorder={handleSectionReorder}
-          editingId={editingId} setEditingId={setEditingId}
-          editName={editName} setEditName={setEditName}
-          editColor={editColor} setEditColor={setEditColor}
-          confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
-          startEdit={startEdit} saveEdit={saveEdit}
-        />
-      ))}
+      <ProjectSection
+        title="프로젝트"
+        projects={allProjects}
+        sectionKey="all"
+        onReorder={(_, list) => reorderProjects(list)}
+        editingId={editingId} setEditingId={setEditingId}
+        editName={editName} setEditName={setEditName}
+        editColor={editColor} setEditColor={setEditColor}
+        confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
+        startEdit={startEdit} saveEdit={saveEdit}
+      />
 
       {adding ? (
         <div style={{ padding: 12, border: '1.5px dashed #3b82f6', borderRadius: 8, marginTop: 8 }}>
