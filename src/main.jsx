@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 
-// SW 등록 + 자동 업데이트
-if ('serviceWorker' in navigator) {
+// SW 등록 + 자동 업데이트 (프로덕션만)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
 

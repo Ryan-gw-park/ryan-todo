@@ -17,7 +17,9 @@ const btnStyle = {
 }
 
 export default function InviteAccept() {
-  const { token } = useParams()
+  const params = useParams()
+  // Fast path에서는 Route 없이 렌더되므로 useParams가 빈 객체 → pathname에서 직접 추출
+  const token = params.token || window.location.pathname.split('/invite/')[1]
   const navigate = useNavigate()
   const { userName, initTeamState } = useStore()
 

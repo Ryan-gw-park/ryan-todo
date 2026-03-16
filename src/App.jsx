@@ -204,19 +204,19 @@ export default function App() {
     }
   }, [authLoading, session, snapshotRestored])
 
-  // Step 1: Supabase connection setup
-  if (!connected) {
-    return <SetupScreen onConnect={() => setConnected(true)} />
-  }
-
-  // ★ Fast path: invite 경로는 무거운 초기화 불필요
-  // InviteAccept 자체에서 auth 상태를 체크하므로 authLoading/snapshotRestored 대기 불필요
+  // ★ Fast path: invite 경로는 렌더 함수 최상단 — 모든 초기화 대기 없이 즉시 렌더
+  // InviteAccept 내부에서 getDb()로 직접 Supabase 클라이언트를 가져오므로 connected 상태 불필요
   if (location.pathname.startsWith('/invite/')) {
     return (
       <Suspense fallback={<LoadingSpinner />}>
         <InviteAccept />
       </Suspense>
     )
+  }
+
+  // Step 1: Supabase connection setup
+  if (!connected) {
+    return <SetupScreen onConnect={() => setConnected(true)} />
   }
 
   // Step 2: 스냅샷이 복원되어 있으면 Auth/Team 로딩 중에도 AppShell 표시 (iOS PWA 최적화)
