@@ -35,9 +35,57 @@ function MilestoneInlineAdd({ onAdd }) {
   )
 }
 
+function InlineTitle({ title, onSave, isBacklog }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(title)
+  const inputRef = useRef(null)
+
+  if (isBacklog) {
+    return <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3 }}>{title}</span>
+  }
+
+  if (!editing) {
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); setEditing(true); setValue(title); setTimeout(() => inputRef.current?.focus(), 0) }}
+        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3, cursor: 'text', minWidth: 20 }}
+        title="클릭하여 수정"
+      >
+        {title || '(제목 없음)'}
+      </span>
+    )
+  }
+
+  const submit = () => {
+    setEditing(false)
+    const trimmed = value.trim()
+    if (trimmed !== title) {
+      onSave({ title: trimmed })
+    }
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      autoFocus
+      value={value}
+      onChange={e => setValue(e.target.value)}
+      onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setValue(title); setEditing(false) } }}
+      onBlur={submit}
+      onClick={e => e.stopPropagation()}
+      style={{
+        fontSize: 13, fontWeight: 500, lineHeight: 1.3, fontFamily: 'inherit',
+        border: 'none', outline: 'none', background: '#f5f4f0', color: '#2C2C2A',
+        padding: '1px 6px', borderRadius: 4, width: '100%', minWidth: 60,
+      }}
+    />
+  )
+}
+
 export default function CompactMilestoneRow({
   milestone, tasks, expanded, onToggleExpand, onTaskToggle,
   onAddTask, onTaskClick, isBacklog, deliverables,
+  taskColW, onResizeStart, onUpdateMilestone,
 }) {
   const [hover, setHover] = useState(false)
 
@@ -68,6 +116,14 @@ export default function CompactMilestoneRow({
     transition,
   }
 
+  // Click on non-title area toggles expand, drag on non-title area activates sortable
+  const handleHeaderAreaClick = (e) => {
+    // Only toggle if click is on the header area itself (not on title, chevron, etc.)
+    if (e.target === e.currentTarget) {
+      onToggleExpand(milestone.id)
+    }
+  }
+
   return (
     <div
       ref={(node) => { setSortRef(node); setDropRef(node) }}
@@ -83,14 +139,21 @@ export default function CompactMilestoneRow({
       onMouseLeave={() => setHover(false)}
     >
       {/* Left: milestone info */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '0.5px solid #f0efe8' }}>
-        {/* Top line */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px 4px 0', minHeight: 34 }}>
-          {/* Drag grip */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Top line — non-title area is drag handle + click to expand */}
+        <div
+          onClick={handleHeaderAreaClick}
+          {...(!isBacklog ? { ...attributes, ...listeners } : {})}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 12px 4px 0', minHeight: 34,
+            cursor: isBacklog ? 'pointer' : 'grab',
+          }}
+        >
+          {/* Drag grip indicator */}
           {!isBacklog ? (
             <div
-              {...attributes} {...listeners}
-              style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', color: '#d3d1c7', fontSize: 10, flexShrink: 0, opacity: hover ? 0.8 : 0, transition: 'opacity .12s', userSelect: 'none' }}
+              style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d3d1c7', fontSize: 10, flexShrink: 0, opacity: hover ? 0.8 : 0, transition: 'opacity .12s', userSelect: 'none' }}
             >
               ⠿
             </div>
@@ -100,7 +163,8 @@ export default function CompactMilestoneRow({
 
           {/* Chevron */}
           <button
-            onClick={() => onToggleExpand(milestone.id)}
+            onClick={(e) => { e.stopPropagation(); onToggleExpand(milestone.id) }}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
               width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: 3, border: 'none', background: 'none', cursor: 'pointer',
@@ -114,10 +178,18 @@ export default function CompactMilestoneRow({
           {/* Color dot */}
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: isBacklog ? '#b4b2a9' : (milestone.color || '#1D9E75'), flexShrink: 0 }} />
 
-          {/* Title */}
-          <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3, flex: 1 }}>
-            {milestone.title}
-          </span>
+          {/* Title — click to edit, stopPropagation prevents drag/expand */}
+          <div
+            style={{ flex: 1, minWidth: 0 }}
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
+            <InlineTitle
+              title={milestone.title}
+              isBacklog={isBacklog}
+              onSave={(patch) => onUpdateMilestone(milestone.id, patch)}
+            />
+          </div>
 
           {/* Progress badge */}
           {totalCnt > 0 && (
@@ -159,10 +231,22 @@ export default function CompactMilestoneRow({
         )}
       </div>
 
+      {/* Resize bar */}
+      <div
+        onMouseDown={onResizeStart}
+        style={{
+          width: 5, cursor: 'col-resize', flexShrink: 0,
+          background: 'transparent', position: 'relative', zIndex: 1,
+          borderLeft: '0.5px solid #f0efe8',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = '#e0ddd6'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      />
+
       {/* Right: tasks area */}
       <div
         style={{
-          width: 400, flexShrink: 0, padding: expanded ? '8px 12px' : '6px 12px',
+          width: taskColW, flexShrink: 0, padding: expanded ? '8px 12px' : '6px 12px',
           display: 'flex', flexWrap: 'wrap', gap: 4, alignContent: 'flex-start',
           minHeight: expanded ? 44 : 34,
         }}

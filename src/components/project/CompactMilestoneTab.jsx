@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { DndContext, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
+import { DndContext, DragOverlay, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
@@ -8,10 +8,15 @@ import { useKeyDeliverables } from '../../hooks/useKeyDeliverables'
 import { useKeyLinks } from '../../hooks/useKeyLinks'
 import { useKeyPolicies } from '../../hooks/useKeyPolicies'
 import CompactMilestoneRow from './CompactMilestoneRow'
+import MilestoneTaskChip from './MilestoneTaskChip'
+
+const MIN_TASK_W = 200
+const MAX_TASK_W = 800
+const DEFAULT_TASK_W = 400
 
 export default function CompactMilestoneTab({ projectId }) {
   const { pkm, loading: pkmLoading } = useProjectKeyMilestone(projectId)
-  const { milestones, add: addMilestone, reorder: reorderMilestones } = useKeyMilestones(pkm?.id, projectId)
+  const { milestones, add: addMilestone, update: updateMilestone, reorder: reorderMilestones } = useKeyMilestones(pkm?.id, projectId)
   const { deliverables, getByMilestone } = useKeyDeliverables(pkm?.id, projectId)
   const { items: links } = useKeyLinks(pkm?.id, projectId)
   const { items: policies } = useKeyPolicies(pkm?.id, projectId)
@@ -23,6 +28,8 @@ export default function CompactMilestoneTab({ projectId }) {
   const openDetail = useStore(s => s.openDetail)
 
   const [expandedMs, setExpandedMs] = useState(new Set())
+  const [activeTask, setActiveTask] = useState(null)
+  const [taskColW, setTaskColW] = useState(DEFAULT_TASK_W)
 
   // Sensors
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
@@ -60,8 +67,17 @@ export default function CompactMilestoneTab({ projectId }) {
     setExpandedMs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }, [])
 
-  // DnD handler
+  // DnD handlers
+  const handleDragStart = useCallback((event) => {
+    const data = event.active.data.current
+    if (data?.type === 'task') {
+      const task = projectTasks.find(t => t.id === data.taskId)
+      if (task) setActiveTask(task)
+    }
+  }, [projectTasks])
+
   const handleDragEnd = useCallback((event) => {
+    setActiveTask(null)
     const { active, over } = event
     if (!over) return
 
@@ -101,7 +117,9 @@ export default function CompactMilestoneTab({ projectId }) {
       }
       return
     }
-  }, [milestones, reorderMilestones, updateTask])
+  }, [milestones, reorderMilestones, updateTask, projectTasks])
+
+  const handleDragCancel = useCallback(() => { setActiveTask(null) }, [])
 
   // Add task to milestone
   const handleAddTask = useCallback((msId, text) => {
@@ -117,6 +135,32 @@ export default function CompactMilestoneTab({ projectId }) {
     }
   }, [addMilestone])
 
+  // Update milestone title
+  const handleUpdateMilestone = useCallback((msId, patch) => {
+    updateMilestone(msId, patch)
+  }, [updateMilestone])
+
+  // Resize bar handler
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = taskColW
+    const onMove = (ev) => {
+      const delta = startX - ev.clientX
+      setTaskColW(Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, startW + delta)))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [taskColW])
+
   if (pkmLoading) {
     return <div style={{ padding: 40, textAlign: 'center', color: '#b4b2a9', fontSize: 13 }}>로딩 중...</div>
   }
@@ -124,7 +168,13 @@ export default function CompactMilestoneTab({ projectId }) {
   const BACKLOG_MS = { id: '__backlog__', title: '백로그' }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       {/* Column header */}
       <div style={{
         display: 'flex', alignItems: 'center', height: 30, padding: '0 12px',
@@ -145,7 +195,15 @@ export default function CompactMilestoneTab({ projectId }) {
           {allExpanded ? '접기' : '펼치기'}
         </button>
         <div style={{ flex: 1, paddingLeft: 22 }}>마일스톤</div>
-        <div style={{ width: 400, flexShrink: 0, paddingLeft: 12 }}>연결된 할일</div>
+        {/* Resize handle in header */}
+        <div
+          onMouseDown={handleResizeStart}
+          style={{
+            width: 5, alignSelf: 'stretch', cursor: 'col-resize',
+            background: 'transparent', flexShrink: 0, position: 'relative', zIndex: 3,
+          }}
+        />
+        <div style={{ width: taskColW, flexShrink: 0, paddingLeft: 12 }}>연결된 할일</div>
       </div>
 
       {/* Milestone rows */}
@@ -162,6 +220,9 @@ export default function CompactMilestoneTab({ projectId }) {
             onTaskClick={openDetail}
             isBacklog={false}
             deliverables={getByMilestone ? getByMilestone(ms.id) : []}
+            taskColW={taskColW}
+            onResizeStart={handleResizeStart}
+            onUpdateMilestone={handleUpdateMilestone}
           />
         ))}
       </SortableContext>
@@ -193,6 +254,9 @@ export default function CompactMilestoneTab({ projectId }) {
           onTaskClick={openDetail}
           isBacklog={true}
           deliverables={[]}
+          taskColW={taskColW}
+          onResizeStart={handleResizeStart}
+          onUpdateMilestone={handleUpdateMilestone}
         />
       </div>
 
@@ -212,7 +276,34 @@ export default function CompactMilestoneTab({ projectId }) {
           </div>
         ))}
       </FooterSection>
+
+      {/* Drag overlay for task chips */}
+      <DragOverlay dropAnimation={null}>
+        {activeTask ? <TaskChipOverlay task={activeTask} /> : null}
+      </DragOverlay>
     </DndContext>
+  )
+}
+
+function TaskChipOverlay({ task }) {
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px',
+      background: '#e8f5e9', borderRadius: 5, fontSize: 12,
+      border: '1px dashed #1D9E75', boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+      cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap',
+    }}>
+      <div style={{
+        width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+        border: task.done ? 'none' : '1.5px solid #1D9E75',
+        background: task.done ? '#1D9E75' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontSize: 8,
+      }}>
+        {task.done && '✓'}
+      </div>
+      <span style={{ color: '#2C2C2A' }}>{task.text}</span>
+    </div>
   )
 }
 
