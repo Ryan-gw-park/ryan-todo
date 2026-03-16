@@ -3,7 +3,6 @@ import useStore from './useStore'
 export default function useProjectFilter(projects, tasks) {
   const teamId = useStore(s => s.currentTeamId)
   const filter = useStore(s => s.projectFilter)
-  const sectionOrder = useStore(s => s.projectSectionOrder)
   const localProjectOrder = useStore(s => s.localProjectOrder)
 
   // 로컬 순서 적용 정렬 함수
@@ -19,25 +18,20 @@ export default function useProjectFilter(projects, tasks) {
     return { filteredProjects: sorted, filteredTasks: tasks }
   }
 
-  // 팀/개인 분리 후 로컬 순서 적용
-  const teamPs = sortLocally(projects.filter(p => p.teamId === teamId))
-  const personalPs = sortLocally(projects.filter(p => !p.teamId))
-  const sections = { team: teamPs, personal: personalPs }
-
-  // 섹션 순서대로 정렬된 전체 프로젝트
-  const orderedProjects = [...(sections[sectionOrder[0]] || []), ...(sections[sectionOrder[1]] || [])]
+  // 로컬 순서로 단일 정렬 (팀/개인 섹션 분리 없이)
+  const sorted = sortLocally(projects)
 
   // 필터 적용
   let filteredProjects
   switch (filter) {
     case 'team':
-      filteredProjects = orderedProjects.filter(p => p.teamId)
+      filteredProjects = sorted.filter(p => p.teamId)
       break
     case 'personal':
-      filteredProjects = orderedProjects.filter(p => !p.teamId)
+      filteredProjects = sorted.filter(p => !p.teamId)
       break
     default: // 'all'
-      filteredProjects = orderedProjects
+      filteredProjects = sorted
   }
 
   const projectIds = new Set(filteredProjects.map(p => p.id))
