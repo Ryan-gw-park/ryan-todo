@@ -39,6 +39,7 @@ function InlineTitle({ title, onSave, isBacklog }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title)
   const inputRef = useRef(null)
+  const measureRef = useRef(null)
 
   if (isBacklog) {
     return <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3 }}>{title}</span>
@@ -48,7 +49,7 @@ function InlineTitle({ title, onSave, isBacklog }) {
     return (
       <span
         onClick={(e) => { e.stopPropagation(); setEditing(true); setValue(title); setTimeout(() => inputRef.current?.focus(), 0) }}
-        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3, cursor: 'text', minWidth: 20 }}
+        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.3, cursor: 'text', minWidth: 20, whiteSpace: 'nowrap' }}
         title="클릭하여 수정"
       >
         {title || '(제목 없음)'}
@@ -64,6 +65,9 @@ function InlineTitle({ title, onSave, isBacklog }) {
     }
   }
 
+  // Measure text width for auto-sizing input
+  const inputW = Math.max(60, (value || '').length * 8 + 24)
+
   return (
     <input
       ref={inputRef}
@@ -76,7 +80,7 @@ function InlineTitle({ title, onSave, isBacklog }) {
       style={{
         fontSize: 13, fontWeight: 500, lineHeight: 1.3, fontFamily: 'inherit',
         border: 'none', outline: 'none', background: '#f5f4f0', color: '#2C2C2A',
-        padding: '1px 6px', borderRadius: 4, width: '100%', minWidth: 60,
+        padding: '1px 6px', borderRadius: 4, width: inputW, maxWidth: '100%', minWidth: 60,
       }}
     />
   )
@@ -108,8 +112,7 @@ export default function CompactMilestoneRow({
   const totalCnt = tasks.length
   const pct = totalCnt > 0 ? Math.round((doneCnt / totalCnt) * 100) : 0
 
-  const previewTasks = expanded ? tasks : tasks.slice(0, 2)
-  const hiddenCount = expanded ? 0 : Math.max(0, tasks.length - 2)
+  // Always show all tasks — flex-wrap handles layout based on available width
 
   const sortStyle = {
     transform: CSS.Transform.toString(transform),
@@ -180,7 +183,7 @@ export default function CompactMilestoneRow({
 
           {/* Title — click to edit, stopPropagation prevents drag/expand */}
           <div
-            style={{ flex: 1, minWidth: 0 }}
+            style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
             onPointerDown={e => e.stopPropagation()}
             onClick={e => e.stopPropagation()}
           >
@@ -190,6 +193,9 @@ export default function CompactMilestoneRow({
               onSave={(patch) => onUpdateMilestone(milestone.id, patch)}
             />
           </div>
+
+          {/* Spacer — clickable/draggable area */}
+          <div style={{ flex: 1 }} />
 
           {/* Progress badge */}
           {totalCnt > 0 && (
@@ -265,7 +271,7 @@ export default function CompactMilestoneRow({
           </>
         )}
 
-        {previewTasks.map(task => (
+        {tasks.map(task => (
           <MilestoneTaskChip
             key={task.id}
             task={task}
@@ -274,19 +280,6 @@ export default function CompactMilestoneRow({
             onClick={onTaskClick}
           />
         ))}
-
-        {hiddenCount > 0 && (
-          <button
-            onClick={() => onToggleExpand(milestone.id)}
-            style={{
-              fontSize: 10.5, color: '#a09f99', background: '#eeeee6', border: 'none',
-              borderRadius: 999, padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            +{hiddenCount}개 더보기
-          </button>
-        )}
 
         {totalCnt > 0 && (
           <MilestoneInlineAdd onAdd={(text) => onAddTask(milestone.id, text)} />

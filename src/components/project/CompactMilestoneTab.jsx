@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { DndContext, DragOverlay, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -13,6 +13,7 @@ import MilestoneTaskChip from './MilestoneTaskChip'
 const MIN_TASK_W = 200
 const MAX_TASK_W = 800
 const DEFAULT_TASK_W = 400
+const TASK_COL_W_KEY = 'milestoneTaskColW'
 
 export default function CompactMilestoneTab({ projectId }) {
   const { pkm, loading: pkmLoading } = useProjectKeyMilestone(projectId)
@@ -29,7 +30,15 @@ export default function CompactMilestoneTab({ projectId }) {
 
   const [expandedMs, setExpandedMs] = useState(new Set())
   const [activeTask, setActiveTask] = useState(null)
-  const [taskColW, setTaskColW] = useState(DEFAULT_TASK_W)
+  const [taskColW, setTaskColW] = useState(() => {
+    const saved = localStorage.getItem(TASK_COL_W_KEY)
+    return saved ? Math.max(MIN_TASK_W, Math.min(MAX_TASK_W, Number(saved))) : DEFAULT_TASK_W
+  })
+
+  // Persist taskColW to localStorage
+  useEffect(() => {
+    localStorage.setItem(TASK_COL_W_KEY, String(taskColW))
+  }, [taskColW])
 
   // Sensors
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
