@@ -8,6 +8,7 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
   const allTasks = useStore(s => s.tasks)
   const currentTeamId = useStore(s => s.currentTeamId)
   const updateProject = useStore(s => s.updateProject)
+  const openModal = useStore(s => s.openModal)
   const taskCount = useMemo(() => {
     return allTasks.filter(t => t.projectId === project.id && !t.deletedAt && !t.done).length
   }, [allTasks, project.id])
@@ -41,6 +42,15 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
             />
           </>
         )}
+      </span>
+      <span
+        onClick={() => openModal({ type: 'projectSettings', projectId: project.id })}
+        style={{ fontSize: 14, color: '#b4b2a9', cursor: 'pointer', padding: '0 4px' }}
+        onMouseEnter={e => e.currentTarget.style.color = '#666'}
+        onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+        title="프로젝트 설정"
+      >
+        ⚙
       </span>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>

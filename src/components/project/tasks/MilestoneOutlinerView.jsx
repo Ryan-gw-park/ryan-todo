@@ -93,7 +93,7 @@ export default function MilestoneOutlinerView({ projectId }) {
   // Unlinked tasks (keyMilestoneId is null)
   const unlinkedTasks = useMemo(() =>
     tasks
-      .filter(t => !t.keyMilestoneId && t.category !== 'done')
+      .filter(t => !t.keyMilestoneId && !t.done)
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
     [tasks]
   )

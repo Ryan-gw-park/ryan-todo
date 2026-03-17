@@ -1,11 +1,10 @@
 import { create } from 'zustand'
 import { getDb } from '../utils/supabase'
-import { CATEGORIES } from '../utils/colors'
 
 // ─── Select 컬럼 최적화 ───
 // tasks: alarm, deleted_at 컬럼은 DB에 없을 수 있으므로 select('*') 유지 (기존 fallback 로직 활용)
 const TASK_COLUMNS = '*'
-const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id'
+const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id, description, start_date, due_date, status, created_by'
 const MEMO_COLUMNS = 'id, title, notes, color, sort_order, created_at, updated_at'
 
 // ─── 스냅샷 키 ───
@@ -21,6 +20,58 @@ const SNAPSHOT_MAX_AGE = 24 * 60 * 60 * 1000 // 24시간
  */
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
+
+// ─── Loop-31: 상태 전이 규칙 헬퍼 ───
+function applyTransitionRules(currentTask, patch) {
+  const resolved = { ...patch }
+
+  // R1: assigneeId 설정 → scope='assigned'
+  if ('assigneeId' in resolved && resolved.assigneeId !== currentTask.assigneeId) {
+    if (resolved.assigneeId) {
+      if (!('scope' in resolved)) resolved.scope = 'assigned'
+    } else {
+      // R2: assigneeId=null → scope='team' 또는 'private'
+      if (!('scope' in resolved)) {
+        resolved.scope = currentTask.teamId ? 'team' : 'private'
+      }
+      // R2+: 팀 할일 배정 해제 → category='backlog'
+      if (currentTask.teamId && !('category' in resolved)) {
+        resolved.category = 'backlog'
+      }
+    }
+  }
+
+  // R3: done=true → prevCategory 저장 (category는 변경 안 함)
+  if ('done' in resolved) {
+    if (resolved.done && !currentTask.done) {
+      resolved.prevCategory = currentTask.category
+    }
+    // R4: done=false → prevCategory 초기화
+    if (!resolved.done && currentTask.done) {
+      resolved.prevCategory = ''
+    }
+  }
+
+  // R5: projectId 변경 → keyMilestoneId 초기화
+  if ('projectId' in resolved && resolved.projectId !== currentTask.projectId) {
+    if (!('keyMilestoneId' in resolved)) {
+      resolved.keyMilestoneId = null
+    }
+  }
+
+  // R6: scope='private' → teamId, assigneeId 초기화
+  if (resolved.scope === 'private') {
+    if (!('teamId' in resolved)) resolved.teamId = null
+    if (!('assigneeId' in resolved)) resolved.assigneeId = null
+  }
+
+  // R7: scope='team' → assigneeId 초기화
+  if (resolved.scope === 'team' && !('assigneeId' in resolved)) {
+    resolved.assigneeId = null
+  }
+
+  return resolved
+}
 
 function db() {
   const d = getDb()
@@ -189,6 +240,9 @@ const useStore = create((set, get) => ({
   currentView: 'today',
   detailTask: null,
   showProjectMgr: false,
+  // Loop-33: 모달 상태
+  activeModal: null,        // { type: 'projectSettings', projectId } | { type: 'milestoneDetail', milestoneId, returnTo } | null
+  confirmDialog: null,      // { target: 'project'|'milestone', targetId, targetName, meta } | null
   toast: null, // { msg, undoTaskId?, undoPrevCategory? }
   userName: 'Ryan',
   setUserName: (name) => set({ userName: name }),
@@ -276,9 +330,14 @@ const useStore = create((set, get) => ({
     // 스냅샷 삭제
     get().clearSnapshot()
   },
-  openDetail: (task) => set({ detailTask: task, showNotificationPanel: false }),
+  openDetail: (task) => set({ detailTask: task, showNotificationPanel: false, activeModal: null }),
   closeDetail: () => set({ detailTask: null }),
   setShowProjectMgr: (v) => set({ showProjectMgr: v }),
+  // Loop-33: 모달 액션
+  openModal: (modalState) => set({ activeModal: modalState, detailTask: null }),
+  closeModal: () => set({ activeModal: null }),
+  openConfirmDialog: (state) => set({ confirmDialog: state }),
+  closeConfirmDialog: () => set({ confirmDialog: null }),
   showToast: (msg, opts) => {
     const id = Date.now()
     set({ toast: { msg, id, ...opts } })
@@ -412,7 +471,10 @@ const useStore = create((set, get) => ({
   },
 
   updateTask: async (id, patch) => {
-    set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) }))
+    const currentTask = get().tasks.find(x => x.id === id)
+    if (!currentTask) return
+    const resolvedPatch = applyTransitionRules(currentTask, patch)
+    set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...resolvedPatch } : t) }))
     const t = get().tasks.find(x => x.id === id)
     if (!t) return
     const d = db()
@@ -445,27 +507,26 @@ const useStore = create((set, get) => ({
     get().showToast('삭제됐습니다')
   },
 
-  // ─── Toggle Done (auto-move category) ───
+  // ─── Toggle Done (Loop-31: category 변경 안 함, done만 토글) ───
   toggleDone: async (id) => {
     const t = get().tasks.find(x => x.id === id)
     if (!t) return
     if (!t.done) {
-      // Mark done → move to "done" category + show toast with undo
-      get().updateTask(id, { done: true, category: 'done', prevCategory: t.category })
+      // Mark done → applyTransitionRules R3가 prevCategory 자동 저장
+      get().updateTask(id, { done: true })
       setTimeout(() => {
         get().showToast('할일이 완료되었습니다', { undoTaskId: id, undoPrevCategory: t.category })
       }, 300)
     } else {
-      // Undo → move back to prev category
-      const dest = t.prevCategory && t.prevCategory !== 'done' ? t.prevCategory : 'backlog'
-      get().updateTask(id, { done: false, category: dest, prevCategory: '' })
+      // Undo → applyTransitionRules R4가 prevCategory='' 자동 설정
+      get().updateTask(id, { done: false })
     }
   },
 
   // ─── Undo completion (called from toast) ───
   undoComplete: (taskId, prevCategory) => {
-    const dest = prevCategory && prevCategory !== 'done' ? prevCategory : 'backlog'
-    get().updateTask(taskId, { done: false, category: dest, prevCategory: '' })
+    // Loop-31: done=false만 전달, R4가 prevCategory='' 자동 처리
+    get().updateTask(taskId, { done: false })
     set({ toast: null })
   },
 
@@ -475,18 +536,9 @@ const useStore = create((set, get) => ({
   },
 
   // ─── Move task to different project/category (DnD) ───
+  // Loop-31: done 처리는 호출부에서 명시적으로 patch에 포함
   moveTaskTo: async (id, projectId, category) => {
-    const t = get().tasks.find(x => x.id === id)
-    if (!t) return
-    const patch = { projectId, category }
-    if (category === 'done' && !t.done) {
-      patch.done = true
-      patch.prevCategory = t.category !== 'done' ? t.category : t.prevCategory
-    } else if (category !== 'done' && t.done) {
-      patch.done = false
-      patch.prevCategory = ''
-    }
-    get().updateTask(id, patch)
+    get().updateTask(id, { projectId, category })
   },
 
   // ─── Reorder tasks (batch sortOrder update) ───
@@ -519,6 +571,12 @@ const useStore = create((set, get) => ({
       teamId: (teamId && projectScope !== 'personal') ? teamId : null,
       userId: (!teamId || projectScope === 'personal') ? userId : null,
       ownerId: userId,
+      // Loop-32: 새 필드 기본값
+      description: '',
+      start_date: null,
+      due_date: null,
+      status: 'active',
+      created_by: userId,
     }
     set(s => ({ projects: [...s.projects, p] }))
     const d = db()
@@ -526,6 +584,8 @@ const useStore = create((set, get) => ({
     const { error } = await d.from('projects').upsert({
       id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder,
       team_id: p.teamId, user_id: p.userId, owner_id: p.ownerId,
+      description: p.description, start_date: p.start_date,
+      due_date: p.due_date, status: p.status, created_by: p.created_by,
     })
     if (error) console.error('[Ryan Todo] addProject:', error)
   },
@@ -548,6 +608,9 @@ const useStore = create((set, get) => ({
     const { error } = await d.from('projects').upsert({
       id: p.id, name: p.name, color: p.color, sort_order: p.sortOrder,
       team_id: p.teamId || null, user_id: p.userId || null, owner_id: p.ownerId || null,
+      description: p.description ?? '', start_date: p.start_date || null,
+      due_date: p.due_date || null, status: p.status || 'active',
+      created_by: p.created_by || null,
     })
     if (error) console.error('[Ryan Todo] updateProject:', error)
   },

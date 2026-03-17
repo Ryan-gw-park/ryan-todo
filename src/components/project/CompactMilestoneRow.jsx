@@ -91,7 +91,7 @@ function InlineTitle({ title, onSave, isBacklog }) {
 export default function CompactMilestoneRow({
   milestone, tasks, expanded, onToggleExpand, onTaskToggle,
   onAddTask, onTaskClick, isBacklog, deliverables,
-  taskColW, onResizeStart, onUpdateMilestone,
+  taskColW, onResizeStart, onUpdateMilestone, onOpenMilestoneDetail,
 }) {
   const [hover, setHover] = useState(false)
 
@@ -207,6 +207,19 @@ export default function CompactMilestoneRow({
               </div>
               <span style={{ fontSize: 9.5, color: '#888780', fontVariantNumeric: 'tabular-nums' }}>{doneCnt}/{totalCnt}</span>
             </div>
+          )}
+          {/* Detail button */}
+          {!isBacklog && onOpenMilestoneDetail && hover && (
+            <button
+              onClick={e => { e.stopPropagation(); onOpenMilestoneDetail(milestone.id) }}
+              onPointerDown={e => e.stopPropagation()}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, color: '#b4b2a9', padding: '0 4px', flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = '#666'}
+              onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+              title="상세"
+            >
+              ›
+            </button>
           )}
         </div>
 

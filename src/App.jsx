@@ -34,6 +34,7 @@ const MyProfile = lazy(() => import('./components/shared/MyProfile'))
 const ModeSelect = lazy(() => import('./components/team/ModeSelect'))
 const ProjectManager = lazy(() => import('./components/shared/ProjectManager'))
 const HelpPage = lazy(() => import('./components/shared/HelpPage'))
+const ModalRouter = lazy(() => import('./components/modals/ModalRouter'))
 
 function isMobile() { return window.innerWidth < 768 }
 
@@ -115,6 +116,7 @@ function AppShell({ mobile }) {
       {detailTask && <Suspense fallback={null}><DetailPanel /></Suspense>}
       {showNotificationPanel && <Suspense fallback={null}><NotificationPanel /></Suspense>}
       {showProjectMgr && <Suspense fallback={null}><ProjectManager /></Suspense>}
+      <Suspense fallback={null}><ModalRouter /></Suspense>
       <Toast />
     </div>
   )

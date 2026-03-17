@@ -260,12 +260,12 @@ export default function DetailMode({ projectId }) {
                             onClick={() => toggleDone(t.id)}
                             style={{ cursor: 'pointer', flexShrink: 0 }}
                           >
-                            <CheckIcon checked={t.category === 'done'} size={12} />
+                            <CheckIcon checked={t.done} size={12} />
                           </div>
                           <span style={{
                             flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            textDecoration: t.category === 'done' ? 'line-through' : 'none',
-                            color: t.category === 'done' ? '#b4b2a9' : '#2C2C2A'
+                            textDecoration: t.done ? 'line-through' : 'none',
+                            color: t.done ? '#b4b2a9' : '#2C2C2A'
                           }}>
                             {t.text}
                           </span>

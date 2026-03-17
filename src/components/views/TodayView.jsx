@@ -94,7 +94,7 @@ export default function TodayView() {
       const targetProjectId = overId.replace('project:', '')
       if (task.projectId !== targetProjectId) {
         const targetTasks = tasks
-          .filter(t => t.projectId === targetProjectId && t.category === 'today')
+          .filter(t => t.projectId === targetProjectId && t.category === 'today' && !t.done)
           .sort((a, b) => a.sortOrder - b.sortOrder)
         const newOrder = targetTasks.length > 0 ? targetTasks[targetTasks.length - 1].sortOrder + 1 : Date.now()
         moveTaskTo(active.id, targetProjectId, 'today')
@@ -110,7 +110,7 @@ export default function TodayView() {
     if (task.projectId === overTask.projectId) {
       // Same project: reorder
       const projectTasks = tasks
-        .filter(t => t.projectId === task.projectId && t.category === 'today')
+        .filter(t => t.projectId === task.projectId && t.category === 'today' && !t.done)
         .sort((a, b) => a.sortOrder - b.sortOrder)
       const oldIndex = projectTasks.findIndex(t => t.id === active.id)
       const newIndex = projectTasks.findIndex(t => t.id === overId)
@@ -121,7 +121,7 @@ export default function TodayView() {
       // Cross-project move
       const targetProjectId = overTask.projectId
       const targetTasks = tasks
-        .filter(t => t.projectId === targetProjectId && t.category === 'today')
+        .filter(t => t.projectId === targetProjectId && t.category === 'today' && !t.done)
         .sort((a, b) => a.sortOrder - b.sortOrder)
       const overIndex = targetTasks.findIndex(t => t.id === overId)
       moveTaskTo(active.id, targetProjectId, 'today')
@@ -175,7 +175,7 @@ export default function TodayView() {
             {filteredProjects.map(p => {
               const c = getColor(p.color)
               const todayTasks = tasks
-                .filter(t => t.projectId === p.id && t.category === 'today')
+                .filter(t => t.projectId === p.id && t.category === 'today' && !t.done)
                 .sort((a, b) => a.sortOrder - b.sortOrder)
               return (
                 <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} />

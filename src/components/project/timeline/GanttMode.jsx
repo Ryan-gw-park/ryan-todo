@@ -161,7 +161,7 @@ export default function GanttMode({ projectId }) {
             const bar = calcMilestoneBar(ms, columns)
             const days = daysUntil(ms.end_date)
             const isUrgent = days !== null && days <= 7 && days >= 0
-            const msTasks = getTasksByMilestone(ms.id).filter(t => !t.done && t.category !== 'done')
+            const msTasks = getTasksByMilestone(ms.id).filter(t => !t.done)
             const hasChildren = msTasks.length > 0
             const isCollapsed = collapsed[ms.id]
             const msColor = ms.color || '#1D9E75'

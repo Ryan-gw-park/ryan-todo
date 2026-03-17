@@ -37,6 +37,9 @@ export function useKeyMilestones(pkmId, projectId) {
         title: '',
         sort_order: milestones.length,
         created_by: userId,
+        // Loop-32: 새 필드 기본값
+        owner_id: null,
+        status: 'not_started',
       })
       .select()
       .single()

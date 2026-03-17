@@ -329,6 +329,7 @@ function NavItem({ icon, label, isActive, onClick, collapsed }) {
 
 function ProjectItem({ project, isActive, onClick, collapsed }) {
   const [hovered, setHovered] = useState(false)
+  const openModal = useStore(s => s.openModal)
   const color = getColor(project.color)
   return (
     <div
@@ -360,9 +361,21 @@ function ProjectItem({ project, isActive, onClick, collapsed }) {
         }} />
       </div>
       {!collapsed && (
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {project.name}
-        </span>
+        <>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            {project.name}
+          </span>
+          {hovered && (
+            <span
+              onClick={e => { e.stopPropagation(); openModal({ type: 'projectSettings', projectId: project.id }) }}
+              style={{ fontSize: 12, color: '#b4b2a9', padding: '0 2px', cursor: 'pointer', flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = '#666'}
+              onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+            >
+              ⚙
+            </span>
+          )}
+        </>
       )}
     </div>
   )

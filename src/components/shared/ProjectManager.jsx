@@ -5,7 +5,7 @@ import { PlusIcon, GripIcon, EditIcon, TrashIcon } from './Icons'
 import { getCachedUserId } from '../../hooks/useStore'
 
 export default function ProjectManager() {
-  const { projects, setShowProjectMgr, addProject, updateProject, deleteProject, reorderProjects, logout, currentTeamId, myRole } = useStore()
+  const { projects, setShowProjectMgr, addProject, updateProject, deleteProject, reorderProjects, logout, currentTeamId, myRole, openModal } = useStore()
   const isMobile = window.innerWidth < 768
 
   const [editingId, setEditingId] = useState(null)
@@ -93,6 +93,7 @@ export default function ProjectManager() {
                       </span>
                     )}
                     <button onClick={() => startEdit(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 4, display: 'flex' }}><EditIcon /></button>
+                    <button onClick={() => { setShowProjectMgr(false); openModal({ type: 'projectSettings', projectId: p.id }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 4, display: 'flex', fontSize: 13 }} title="상세 설정">⚙</button>
                     {/* ★ Loop-21: 삭제 권한 — 팀 프로젝트: 팀장만, 개인: 본인만 */}
                     {(() => {
                       const canDelete = p.teamId ? myRole === 'owner' : (!currentTeamId || p.userId === getCachedUserId())

@@ -189,7 +189,7 @@ export default function TimelineView({ projectId = null }) {
 
   // Loop-28: 필터 적용된 할일
   const displayTasks = useMemo(() => {
-    let result = filteredTasks.filter(t => !t.done && !t.deletedAt && t.category !== 'done')
+    let result = filteredTasks.filter(t => !t.done && !t.deletedAt)
     if (isProjectMode) {
       result = result.filter(t => t.projectId === projectId)
     } else if (selProjects) {
@@ -242,7 +242,7 @@ export default function TimelineView({ projectId = null }) {
     if (task.projectId === overTask.projectId) {
       // Same project: reorder
       const projectTasks = tasks
-        .filter(t => t.projectId === task.projectId && t.category !== 'done')
+        .filter(t => t.projectId === task.projectId && !t.done)
         .sort((a, b) => a.sortOrder - b.sortOrder)
       const oldIndex = projectTasks.findIndex(t => t.id === active.id)
       const newIndex = projectTasks.findIndex(t => t.id === overId)

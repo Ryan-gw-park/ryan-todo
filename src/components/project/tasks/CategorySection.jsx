@@ -10,7 +10,7 @@ const CategorySection = forwardRef(function CategorySection({ cat, catTasks, pro
   const taskRefs = useRef({})
   const addBtnRef = useRef(null)
   const pendingFocusRef = useRef(null)
-  const isDoneCat = cat.key === 'done'
+  const isDoneCat = cat.key === 'done'  // UI 행 렌더링용 (CATEGORIES 배열의 done 항목)
   const sectionKey = `${projectId}:${cat.key}`
   const sectionCollapsed = collapseState.projectSection?.[sectionKey]
   const isMobile = window.innerWidth < 768

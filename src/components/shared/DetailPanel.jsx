@@ -22,7 +22,7 @@ function getDefaultAlarmDatetime(dueDate) {
 }
 
 export default function DetailPanel() {
-  const { detailTask, closeDetail, tasks, projects, updateTask, deleteTask, toggleDone, collapseState, toggleCollapse, currentTeamId } = useStore()
+  const { detailTask, closeDetail, tasks, projects, updateTask, deleteTask, toggleDone, collapseState, toggleCollapse, currentTeamId, openModal } = useStore()
   const myRole = useStore(s => s.myRole)
   const isMobile = window.innerWidth < 768
 
@@ -131,11 +131,25 @@ export default function DetailPanel() {
           {/* 마일스톤 선택 */}
           {task.projectId && (
             <DetailRow label="마일스톤">
-              <MilestoneSelector
-                projectId={task.projectId}
-                value={task.keyMilestoneId}
-                onChange={(keyMilestoneId) => canEdit && updateTask(task.id, { keyMilestoneId })}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <MilestoneSelector
+                  projectId={task.projectId}
+                  value={task.keyMilestoneId}
+                  onChange={(keyMilestoneId) => canEdit && updateTask(task.id, { keyMilestoneId })}
+                  style={{ flex: 1 }}
+                />
+                {task.keyMilestoneId && (
+                  <span
+                    onClick={() => openModal({ type: 'milestoneDetail', milestoneId: task.keyMilestoneId, returnTo: null })}
+                    style={{ fontSize: 12, color: '#b4b2a9', cursor: 'pointer', padding: '2px 4px', flexShrink: 0 }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#666'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+                    title="마일스톤 상세"
+                  >
+                    ›
+                  </span>
+                )}
+              </div>
             </DetailRow>
           )}
 
@@ -152,13 +166,13 @@ export default function DetailPanel() {
               {CATEGORIES.filter(ct => ct.key !== 'done').map(ct => (
                 <button
                   key={ct.key}
-                  onClick={() => canEdit && updateTask(task.id, { category: ct.key, done: false, prevCategory: '' })}
+                  onClick={() => canEdit && updateTask(task.id, task.done ? { category: ct.key, done: false } : { category: ct.key })}
                   style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: canEdit ? 'pointer' : 'default', fontFamily: 'inherit', fontWeight: 500, border: task.category === ct.key ? '1.5px solid #37352f' : '1px solid #e0e0e0', background: task.category === ct.key ? '#f7f7f7' : 'white', color: canEdit ? '#37352f' : '#999', opacity: canEdit ? 1 : 0.6 }}
                 >
                   {ct.emoji} {ct.label}
                 </button>
               ))}
-              {task.category === 'done' && <span style={{ fontSize: 12, color: '#2e7d32', background: '#e8f5e9', padding: '4px 10px', borderRadius: 6, fontWeight: 500 }}>✅ 완료</span>}
+              {task.done && <span style={{ fontSize: 12, color: '#2e7d32', background: '#e8f5e9', padding: '4px 10px', borderRadius: 6, fontWeight: 500 }}>✅ 완료</span>}
             </div>
           </DetailRow>
 
@@ -199,11 +213,11 @@ export default function DetailPanel() {
           {/* Status */}
           <DetailRow label="상태">
             {canEdit ? (
-              task.category === 'done'
+              task.done
                 ? <button onClick={() => { toggleDone(task.id); closeDetail() }} style={{ fontSize: 12, color: '#f57c00', background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>↩ 되돌리기</button>
                 : <button onClick={() => { toggleDone(task.id); closeDetail() }} style={{ fontSize: 12, color: '#2e7d32', background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>✓ 완료 처리</button>
             ) : (
-              <span style={{ fontSize: 12, color: '#999' }}>{task.category === 'done' ? '✅ 완료' : '진행 중'}</span>
+              <span style={{ fontSize: 12, color: '#999' }}>{task.done ? '✅ 완료' : '진행 중'}</span>
             )}
           </DetailRow>
 

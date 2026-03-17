@@ -70,7 +70,7 @@ function MilestoneRows({ pkmId, projectId }) {
   )
 
   const unlinkedTasks = useMemo(() =>
-    tasks.filter(t => !t.keyMilestoneId && t.category !== 'done'),
+    tasks.filter(t => !t.keyMilestoneId && !t.done),
     [tasks]
   )
 
@@ -233,6 +233,8 @@ function MilestoneRow({
 
 // ─── 마일스톤 헤더 ───
 function MilestoneHeader({ milestone, onUpdate, onDelete, hovered, dragHandleProps }) {
+  const openConfirmDialog = useStore(s => s.openConfirmDialog)
+  const tasks = useStore(s => s.tasks)
   const [editingTitle, setEditingTitle] = useState(!milestone.title)
   const [title, setTitle] = useState(milestone.title || '')
   const [editingDesc, setEditingDesc] = useState(false)
@@ -336,9 +338,16 @@ function MilestoneHeader({ milestone, onUpdate, onDelete, hovered, dragHandlePro
         </div>
       </div>
 
-      {/* 삭제 버튼 */}
+      {/* 삭제 버튼 — Loop-33: 확인 다이얼로그 경유 */}
       <button
-        onClick={() => onDelete(milestone.id)}
+        onClick={() => {
+          const linkedTasks = tasks.filter(t => t.keyMilestoneId === milestone.id)
+          openConfirmDialog({
+            target: 'milestone', targetId: milestone.id,
+            targetName: milestone.title || '제목 없음',
+            meta: { taskCount: linkedTasks.length, returnTo: null }
+          })
+        }}
         style={{
           border: 'none', background: 'transparent', cursor: 'pointer',
           fontSize: 12, color: '#c2c0b6', padding: 0, width: 20, height: 20,
@@ -585,7 +594,7 @@ function SortableTaskRow({ task, onUpdate, onDelete, onToggleDone }) {
   })
   const [hovered, setHovered] = useState(false)
   const [text, setText] = useState(task.text)
-  const isDone = task.category === 'done'
+  const isDone = !!task.done
 
   useEffect(() => { setText(task.text) }, [task.text])
 

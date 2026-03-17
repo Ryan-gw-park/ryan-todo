@@ -3,7 +3,7 @@ import { CheckIcon, UndoIcon } from './Icons'
 
 export default function TaskItem({ task, color, compact, hlColor }) {
   const { openDetail, toggleDone } = useStore()
-  const isDone = task.category === 'done'
+  const isDone = !!task.done
   const isMobile = window.innerWidth < 768
   // 할일 제목: 데스크탑 14px, 모바일 13px
   const taskFontSize = isMobile ? 13 : 14

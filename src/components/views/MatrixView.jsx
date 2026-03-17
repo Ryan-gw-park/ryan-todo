@@ -156,8 +156,9 @@ export default function MatrixView() {
                     {projects.map(p => {
                       const c = getColor(p.color)
                       const isCol = collapsed[p.id]
+                      // Loop-31: 완료 행은 done 기준, 미완료 행은 category + !done
                       const catTasks = tasks
-                        .filter(t => t.projectId === p.id && t.category === cat.key)
+                        .filter(t => t.projectId === p.id && (isDone ? t.done : (t.category === cat.key && !t.done)))
                         .sort((a, b) => a.sortOrder - b.sortOrder)
                       const isDoneCollapsed = isDone && doneCollapsed[p.id] !== false && catTasks.length > 0
                       const cellRadius = isLast ? '0 0 10px 10px' : '0'

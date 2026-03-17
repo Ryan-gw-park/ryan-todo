@@ -14,7 +14,7 @@ import { getColor } from '../../../utils/colors'
  * - InlineAdd로 마일스톤에 태스크 추가
  */
 export default function CompactTaskList({ projectId }) {
-  const { projects, currentTeamId, updateTask, toggleTask, collapseState, toggleCollapse, setCollapseGroup, setDetailPanel } = useStore()
+  const { projects, currentTeamId, updateTask, toggleDone, collapseState, toggleCollapse, setCollapseGroup, setDetailPanel } = useStore()
   const { milestones, tasks, loading, unlinkedTasks, getTasksByMilestone } = useProjectTimelineData(projectId)
 
   // 프로젝트 색상
@@ -59,7 +59,7 @@ export default function CompactTaskList({ projectId }) {
 
   // 태스크 완료 토글
   const handleToggleDone = (taskId) => {
-    toggleTask(taskId)
+    toggleDone(taskId)
   }
 
   // 태스크 클릭 → DetailPanel

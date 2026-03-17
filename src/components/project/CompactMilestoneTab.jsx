@@ -26,6 +26,7 @@ export default function CompactMilestoneTab({ projectId }) {
   const updateTask = useStore(s => s.updateTask)
   const toggleDone = useStore(s => s.toggleDone)
   const openDetail = useStore(s => s.openDetail)
+  const openModal = useStore(s => s.openModal)
 
   const [expandedMs, setExpandedMs] = useState(new Set())
   const [activeTask, setActiveTask] = useState(null)
@@ -246,6 +247,7 @@ export default function CompactMilestoneTab({ projectId }) {
             taskColW={taskColW}
             onResizeStart={handleResizeStart}
             onUpdateMilestone={handleUpdateMilestone}
+            onOpenMilestoneDetail={(milestoneId) => openModal({ type: 'milestoneDetail', milestoneId, returnTo: null })}
           />
         ))}
       </SortableContext>

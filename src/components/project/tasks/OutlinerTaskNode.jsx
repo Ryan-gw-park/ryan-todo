@@ -26,7 +26,7 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
 
   const hasNotes = !!(task.notes && task.notes.trim())
   const isOpen = expanded[task.id] !== false
-  const isDone = task.category === 'done'
+  const isDone = !!task.done
 
   useEffect(() => { setTitleText(task.text) }, [task.text])
 

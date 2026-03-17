@@ -157,12 +157,11 @@ export default function TeamMatrixView() {
     const overId = over.id
 
     // ── 팀원 행 drop ──
+    // Loop-31: category 강제 변경 제거 — R1이 scope='assigned' 자동 설정
     if (typeof overId === 'string' && overId.startsWith('member:')) {
       const targetMemberId = overId.split(':')[1]
       updateTask(active.id, {
         assigneeId: targetMemberId,
-        scope: 'assigned',
-        category: 'next',
       })
       return
     }
@@ -170,10 +169,33 @@ export default function TeamMatrixView() {
     // ── 카테고리 drop zone (projectId:category) ──
     if (typeof overId === 'string' && overId.includes(':')) {
       const [targetProjectId, targetCategory] = overId.split(':')
-      if (task.projectId === targetProjectId && task.category === targetCategory) return
+      const project = projects.find(p => p.id === targetProjectId)
+
+      // Loop-31: 드롭 대상의 expected scope/assigneeId 결정
+      let expectedScope = task.scope
+      let expectedAssignee = task.assigneeId
+      if (project?.teamId) {
+        if (targetCategory === 'today' || targetCategory === 'next') {
+          expectedScope = 'assigned'
+          expectedAssignee = userId
+        } else if (targetCategory === 'backlog') {
+          expectedScope = 'team'
+          expectedAssignee = null
+        }
+      }
+      const expectedDone = targetCategory === 'done'
+
+      // 조기 리턴: 모든 상태가 동일할 때만
+      const isSamePosition = (
+        task.projectId === targetProjectId &&
+        task.category === targetCategory &&
+        task.scope === expectedScope &&
+        task.assigneeId === expectedAssignee &&
+        task.done === expectedDone
+      )
+      if (isSamePosition) return
 
       const patch = { projectId: targetProjectId, category: targetCategory }
-      const project = projects.find(p => p.id === targetProjectId)
 
       // 자동 배정
       if (project?.teamId) {
@@ -186,13 +208,11 @@ export default function TeamMatrixView() {
         }
       }
 
-      // done 처리
+      // Loop-31: done 처리 — 완료 행 drop 시 done=true, 미완료 행 drop 시 done=false
       if (targetCategory === 'done' && !task.done) {
         patch.done = true
-        patch.prevCategory = task.category !== 'done' ? task.category : task.prevCategory
       } else if (targetCategory !== 'done' && task.done) {
         patch.done = false
-        patch.prevCategory = ''
       }
 
       updateTask(active.id, patch)
@@ -228,12 +248,11 @@ export default function TeamMatrixView() {
         }
       }
 
-      if (overTask.category === 'done' && !task.done) {
+      // Loop-31: done 처리 — 대상 task의 done 상태 기준
+      if (overTask.done && !task.done) {
         patch.done = true
-        patch.prevCategory = task.category
-      } else if (overTask.category !== 'done' && task.done) {
+      } else if (!overTask.done && task.done) {
         patch.done = false
-        patch.prevCategory = ''
       }
 
       updateTask(active.id, patch)
@@ -263,11 +282,11 @@ export default function TeamMatrixView() {
     .sort((a, b) => a.sortOrder - b.sortOrder)
 
   const memberTasks = (memberId) => tasks
-    .filter(t => t.assigneeId === memberId && t.scope === 'assigned' && t.teamId === currentTeamId)
+    .filter(t => t.assigneeId === memberId && t.scope === 'assigned' && t.teamId === currentTeamId && !t.done)
     .sort((a, b) => a.sortOrder - b.sortOrder)
 
   const remainingTasks = tasks
-    .filter(t => t.teamId === currentTeamId && t.scope === 'team' && !t.assigneeId && !t.done)
+    .filter(t => t.teamId === currentTeamId && t.scope === 'team' && !t.assigneeId && !t.done && t.category === 'backlog')
     .sort((a, b) => a.sortOrder - b.sortOrder)
 
   const completedTasks = tasks

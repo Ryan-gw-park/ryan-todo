@@ -72,7 +72,7 @@ export function useProjectTimelineData(projectId) {
 
   // 미연결 Task (keyMilestoneId가 null인 프로젝트 Task)
   const unlinkedTasks = useMemo(() =>
-    tasks.filter(t => !t.keyMilestoneId && t.category !== 'done'),
+    tasks.filter(t => !t.keyMilestoneId && !t.done),
     [tasks]
   )
 
