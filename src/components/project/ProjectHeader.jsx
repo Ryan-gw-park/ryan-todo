@@ -9,6 +9,8 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
   const currentTeamId = useStore(s => s.currentTeamId)
   const updateProject = useStore(s => s.updateProject)
   const openModal = useStore(s => s.openModal)
+  const userName = useStore(s => s.userName)
+  const ownerName = userName || '나'
   const taskCount = useMemo(() => {
     return allTasks.filter(t => t.projectId === project.id && !t.deletedAt && !t.done).length
   }, [allTasks, project.id])
@@ -35,11 +37,15 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
         {currentTeamId && (
           <>
             {' · 오너 : '}
-            <OwnerDropdown
-              projectId={project.id}
-              ownerId={project.ownerId}
-              onChangeOwner={(newOwnerId) => updateProject(project.id, { ownerId: newOwnerId })}
-            />
+            {project.teamId ? (
+              <OwnerDropdown
+                projectId={project.id}
+                ownerId={project.ownerId}
+                onChangeOwner={(newOwnerId) => updateProject(project.id, { ownerId: newOwnerId })}
+              />
+            ) : (
+              <span style={{ fontSize: 11, color: '#2C2C2A', fontWeight: 500 }}>{ownerName}</span>
+            )}
           </>
         )}
       </span>

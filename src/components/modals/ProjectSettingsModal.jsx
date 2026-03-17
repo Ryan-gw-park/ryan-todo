@@ -29,6 +29,7 @@ export default function ProjectSettingsModal() {
   const openModal = useStore(s => s.openModal)
   const openConfirmDialog = useStore(s => s.openConfirmDialog)
   const currentTeamId = useStore(s => s.currentTeamId)
+  const userName = useStore(s => s.userName)
 
   // Milestones
   const { pkm } = useProjectKeyMilestone(projectId)
@@ -131,11 +132,17 @@ export default function ProjectSettingsModal() {
         {currentTeamId && (
           <>
             <label style={{ ...labelStyle, marginTop: 14 }}>오너</label>
-            <MemberSelect
-              value={project.ownerId}
-              members={members}
-              onChange={v => updateProject(projectId, { ownerId: v })}
-            />
+            {project.teamId ? (
+              <MemberSelect
+                value={project.ownerId}
+                members={members}
+                onChange={v => updateProject(projectId, { ownerId: v })}
+              />
+            ) : (
+              <span style={{ fontSize: 13, color: '#2C2C2A', display: 'inline-block', marginTop: 4, padding: '4px 0' }}>
+                {getMemberName(project.ownerId) || userName || '나'}
+              </span>
+            )}
           </>
         )}
 
