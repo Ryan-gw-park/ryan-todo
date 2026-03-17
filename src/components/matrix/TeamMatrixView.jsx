@@ -337,7 +337,7 @@ export default function TeamMatrixView() {
                 <div style={{ width: LW, flexShrink: 0, ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}) }} />
                 {allColumns.map(p => {
                   const c = getColor(p.color)
-                  const pt = tasks.filter(t => t.projectId === p.id)
+                  const pt = tasks.filter(t => t.projectId === p.id && !t.done)
                   const isCol = collapsed[p.id]
                   return (
                     <div key={p.id} onClick={() => toggleCollapse(p.id)} style={{

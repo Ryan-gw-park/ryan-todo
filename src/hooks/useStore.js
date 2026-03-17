@@ -46,8 +46,11 @@ function applyTransitionRules(currentTask, patch) {
     if (resolved.done && !currentTask.done) {
       resolved.prevCategory = currentTask.category
     }
-    // R4: done=false → prevCategory 초기화
+    // R4: done=false → prevCategory 초기화 + category='done' 방어
     if (!resolved.done && currentTask.done) {
+      if (currentTask.category === 'done' && !('category' in resolved)) {
+        resolved.category = currentTask.prevCategory || 'backlog'
+      }
       resolved.prevCategory = ''
     }
   }
