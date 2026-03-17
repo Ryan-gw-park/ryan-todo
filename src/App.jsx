@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import useStore from './hooks/useStore'
 import { useAlarmEngine } from './hooks/useAlarmEngine'
@@ -11,6 +11,7 @@ import LoginScreen from './components/shared/LoginScreen'
 import MobileTopBar from './components/layout/MobileTopBar'
 import FAB from './components/layout/FAB'
 import Toast from './components/shared/Toast'
+import UpdateToast from './components/shared/UpdateToast'
 import { ViewSkeleton, LoadingSpinner } from './components/shared/Skeleton'
 import { SyncProviderWrapper } from './sync/SyncContext'
 import Sidebar from './components/layout/Sidebar'
@@ -141,6 +142,7 @@ export default function App() {
   }, [])
 
   const [authError, setAuthError] = useState('')
+  const sessionRef = useRef(null)
 
   // Auth state management
   useEffect(() => {
@@ -151,6 +153,7 @@ export default function App() {
     // Check current session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s)
+      sessionRef.current = s
       if (s) {
         const meta = s.user.user_metadata
         setUserName(meta?.full_name || meta?.name || s.user.email?.split('@')[0] || '')
@@ -160,9 +163,17 @@ export default function App() {
 
     // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => {
+      (event, s) => {
         setAuthError('')
+        // TOKEN_REFRESHED: 토큰 갱신은 세션 참조만 조용히 업데이트
+        // Supabase 클라이언트가 내부적으로 토큰을 관리하므로 React state 변경 불필요
+        if (event === 'TOKEN_REFRESHED') {
+          sessionRef.current = s
+          return
+        }
+        // SIGNED_IN, SIGNED_OUT, USER_UPDATED 등은 기존대로 처리
         setSession(s)
+        sessionRef.current = s
         if (s) {
           const meta = s.user.user_metadata
           setUserName(meta?.full_name || meta?.name || s.user.email?.split('@')[0] || '')
@@ -179,8 +190,10 @@ export default function App() {
   }, [userName])
 
   // Load team state + data when authenticated (스냅샷은 이미 복원됨 → 백그라운드 갱신)
+  // boolean 비교로 TOKEN_REFRESHED 시 불필요한 재실행 방지
+  const isAuthenticated = !!session
   useEffect(() => {
-    if (connected && session) {
+    if (connected && isAuthenticated) {
       initTeamState().then(() => {
         // 스냅샷의 teamId와 실제 teamId가 다르면 스냅샷 데이터 무효화
         const { snapshotTeamId, snapshotRestored } = useStore.getState()
@@ -195,7 +208,7 @@ export default function App() {
         useStore.getState().loadAll()
       })
     }
-  }, [connected, session])
+  }, [connected, isAuthenticated])
 
   // Auth 실패 시 스냅샷 화면에서 로그인으로 전환
   useEffect(() => {
@@ -208,9 +221,12 @@ export default function App() {
   // InviteAccept 내부에서 getDb()로 직접 Supabase 클라이언트를 가져오므로 connected 상태 불필요
   if (location.pathname.startsWith('/invite/')) {
     return (
-      <Suspense fallback={<LoadingSpinner />}>
-        <InviteAccept />
-      </Suspense>
+      <>
+        <UpdateToast />
+        <Suspense fallback={<LoadingSpinner />}>
+          <InviteAccept />
+        </Suspense>
+      </>
     )
   }
 
@@ -223,15 +239,18 @@ export default function App() {
   // Auth 실패 시 위 useEffect에서 clearSnapshot() 호출 → snapshotRestored=false → 로그인 화면
   if (snapshotRestored) {
     return (
-      <Routes>
-        <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
-        <Route path="/mode-select" element={<Suspense fallback={<LoadingSpinner />}><ModeSelect /></Suspense>} />
-        <Route path="/invite/:token" element={<Suspense fallback={<LoadingSpinner />}><InviteAccept /></Suspense>} />
-        <Route path="/team/settings" element={<Suspense fallback={<LoadingSpinner />}><TeamSettings /></Suspense>} />
-        <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><MyProfile /></Suspense>} />
-        <Route path="/help" element={<Suspense fallback={<LoadingSpinner />}><HelpPage /></Suspense>} />
-        <Route path="/*" element={<SyncProviderWrapper><AppShell mobile={mobile} /></SyncProviderWrapper>} />
-      </Routes>
+      <>
+        <UpdateToast />
+        <Routes>
+          <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
+          <Route path="/mode-select" element={<Suspense fallback={<LoadingSpinner />}><ModeSelect /></Suspense>} />
+          <Route path="/invite/:token" element={<Suspense fallback={<LoadingSpinner />}><InviteAccept /></Suspense>} />
+          <Route path="/team/settings" element={<Suspense fallback={<LoadingSpinner />}><TeamSettings /></Suspense>} />
+          <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><MyProfile /></Suspense>} />
+          <Route path="/help" element={<Suspense fallback={<LoadingSpinner />}><HelpPage /></Suspense>} />
+          <Route path="/*" element={<SyncProviderWrapper><AppShell mobile={mobile} /></SyncProviderWrapper>} />
+        </Routes>
+      </>
     )
   }
 
@@ -272,14 +291,17 @@ export default function App() {
 
   // Step 9: Authenticated routes (스냅샷 없는 정상 흐름)
   return (
-    <Routes>
-      <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
-      <Route path="/mode-select" element={<Suspense fallback={<LoadingSpinner />}><ModeSelect /></Suspense>} />
-      <Route path="/invite/:token" element={<Suspense fallback={<LoadingSpinner />}><InviteAccept /></Suspense>} />
-      <Route path="/team/settings" element={<Suspense fallback={<LoadingSpinner />}><TeamSettings /></Suspense>} />
-      <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><MyProfile /></Suspense>} />
-      <Route path="/help" element={<Suspense fallback={<LoadingSpinner />}><HelpPage /></Suspense>} />
-      <Route path="/*" element={<SyncProviderWrapper><AppShell mobile={mobile} /></SyncProviderWrapper>} />
-    </Routes>
+    <>
+      <UpdateToast />
+      <Routes>
+        <Route path="/onboarding" element={<Suspense fallback={<LoadingSpinner />}><Onboarding /></Suspense>} />
+        <Route path="/mode-select" element={<Suspense fallback={<LoadingSpinner />}><ModeSelect /></Suspense>} />
+        <Route path="/invite/:token" element={<Suspense fallback={<LoadingSpinner />}><InviteAccept /></Suspense>} />
+        <Route path="/team/settings" element={<Suspense fallback={<LoadingSpinner />}><TeamSettings /></Suspense>} />
+        <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><MyProfile /></Suspense>} />
+        <Route path="/help" element={<Suspense fallback={<LoadingSpinner />}><HelpPage /></Suspense>} />
+        <Route path="/*" element={<SyncProviderWrapper><AppShell mobile={mobile} /></SyncProviderWrapper>} />
+      </Routes>
+    </>
   )
 }

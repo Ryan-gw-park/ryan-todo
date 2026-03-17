@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 
-// SW 등록 + 자동 업데이트 (프로덕션만)
+// SW 등록 + 업데이트 감지 (프로덕션만)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -20,27 +20,19 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         }
       })
 
-      // 3) 새 SW가 waiting 상태로 들어오면 reload
+      // 3) 새 SW 감지 → 토스트 이벤트 dispatch (자동 reload 제거)
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing
         if (!newWorker) return
 
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            window.location.reload()
+            window.dispatchEvent(new CustomEvent('sw-update-available'))
           }
         })
       })
     }).catch(err => {
       console.error('SW registration failed:', err)
-    })
-
-    // 4) controller 변경 감지 — 다른 탭에서 SW 업데이트된 경우
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!window.__swReloading) {
-        window.__swReloading = true
-        window.location.reload()
-      }
     })
   })
 }

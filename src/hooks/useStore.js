@@ -127,6 +127,30 @@ function mapTask(r) {
   }
 }
 
+// ─── 배열 동일성 비교 (id + updated_at 기준, O(n)) ───
+function isArrayEqual(a, b) {
+  if (!a || !b) return false
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  const aKeys = new Set(a.map(item => `${item.id}_${item.updated_at}`))
+  for (const item of b) {
+    if (!aKeys.has(`${item.id}_${item.updated_at}`)) return false
+  }
+  return true
+}
+
+// ─── User Task Settings fetch (set() 없이 데이터만 반환) ───
+async function _fetchUserTaskSettings(teamId) {
+  if (!teamId) return []
+  const d = getDb()
+  const userId = _cachedUserId
+  if (!d || !userId) return []
+  const { data } = await d.from('user_task_settings')
+    .select('task_id, highlight_color')
+    .eq('user_id', userId)
+  return (data || []).map(r => ({ taskId: r.task_id, highlightColor: r.highlight_color }))
+}
+
 // ─── Collapse state Supabase sync (debounced) ───
 let _collapseSaveTimer = null
 function _saveCollapseState(state) {
@@ -298,11 +322,12 @@ const useStore = create((set, get) => ({
         }
       }
 
-      const [pr, trResult, mr, uiR] = await Promise.all([
+      const [pr, trResult, mr, uiR, taskSettings] = await Promise.all([
         projectsQuery,
         tasksQuery,
         d.from('memos').select(MEMO_COLUMNS).order('sort_order'),
         d.from('ui_state').select('collapse_state').eq('id', 'default').maybeSingle(),
+        _fetchUserTaskSettings(teamId),
       ])
       if (pr.error) throw pr.error
 
@@ -343,13 +368,13 @@ const useStore = create((set, get) => ({
       const tasks = tr.data.map(mapTask)
       const memos = mr.error ? [] : mr.data.map(mapMemo)
 
-      set({
-        projects,
-        tasks,
-        memos,
-        collapseState: cs,
-        syncStatus: 'ok',
-      })
+      // 스냅샷 → 서버 전환 시 변경분만 set하여 불필요한 리렌더 방지
+      const current = get()
+      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: taskSettings }
+      if (!isArrayEqual(current.tasks, tasks)) patch.tasks = tasks
+      if (!isArrayEqual(current.projects, projects)) patch.projects = projects
+      if (!isArrayEqual(current.memos, memos)) patch.memos = memos
+      set(patch)
 
       // 스냅샷 저장 (PWA 로딩 속도 개선)
       try {
@@ -357,11 +382,6 @@ const useStore = create((set, get) => ({
         localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
       } catch (e) {
         // localStorage 용량 초과 시 무시
-      }
-
-      // 팀 모드: 개인별 강조 색상 로드
-      if (teamId) {
-        get().loadUserTaskSettings()
       }
     } catch (e) {
       console.error('[Ryan Todo] loadAll:', e)
