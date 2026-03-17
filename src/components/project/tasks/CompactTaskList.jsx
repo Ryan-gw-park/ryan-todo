@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { DndContext, DragOverlay, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import useStore from '../../../hooks/useStore'
 import useProjectTimelineData from '../../../hooks/useProjectTimelineData'
 import useTeamMembers from '../../../hooks/useTeamMembers'
@@ -9,7 +10,7 @@ import { getColor } from '../../../utils/colors'
 /**
  * CompactTaskList - 마일스톤별 그룹핑된 컴팩트 태스크 목록
  * - 마일스톤 헤더 + 접기/펼치기
- * - 1줄 태스크 행 + 노트 인라인 확장
+ * - 1줄 태스크 행 + 인라인 제목 편집 + 드래그앤드랍
  * - InlineAdd로 마일스톤에 태스크 추가
  */
 export default function CompactTaskList({ projectId }) {
@@ -71,6 +72,45 @@ export default function CompactTaskList({ projectId }) {
     updateTask(taskId, { notes })
   }
 
+  // 제목 업데이트
+  const handleUpdateTitle = useCallback((taskId, text) => {
+    updateTask(taskId, { text })
+  }, [updateTask])
+
+  // DnD
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const sensors = useSensors(pointerSensor, touchSensor)
+  const [activeTask, setActiveTask] = useState(null)
+
+  const allTasks = useMemo(() => [...tasks, ...unlinkedTasks], [tasks, unlinkedTasks])
+
+  const handleDragStart = useCallback((event) => {
+    const data = event.active.data.current
+    if (data?.type === 'compact-task') {
+      const t = allTasks.find(t => t.id === data.taskId)
+      if (t) setActiveTask(t)
+    }
+  }, [allTasks])
+
+  const handleDragEnd = useCallback((event) => {
+    setActiveTask(null)
+    const { active, over } = event
+    if (!over) return
+    const activeData = active.data.current
+    const overData = over.data.current
+    if (activeData?.type === 'compact-task' && overData?.type === 'compact-task-drop') {
+      const targetMsId = overData.milestoneId
+      const newKeyMilestoneId = (targetMsId === '__backlog__' || targetMsId === null) ? null : targetMsId
+      const currentMsId = activeData.sourceMsId === '__backlog__' ? null : activeData.sourceMsId
+      if (currentMsId !== newKeyMilestoneId) {
+        updateTask(activeData.taskId, { keyMilestoneId: newKeyMilestoneId })
+      }
+    }
+  }, [updateTask])
+
+  const handleDragCancel = useCallback(() => setActiveTask(null), [])
+
   if (loading) {
     return (
       <div style={{ padding: 20, color: '#a09f99', fontSize: 13 }}>
@@ -80,227 +120,233 @@ export default function CompactTaskList({ projectId }) {
   }
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }}>
-      {/* 전체 접기/펼치기 툴바 */}
-      {allIds.length > 0 && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          padding: '6px 12px',
-          borderBottom: '1px solid #f0efe8',
-        }}>
-          <button
-            onClick={toggleAll}
-            style={{
-              fontSize: 11,
-              color: '#888780',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '2px 6px',
-              borderRadius: 4,
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f0efe8'}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-          >
-            {allCollapsed ? '▸ 전체 펼치기' : '▾ 전체 접기'}
-          </button>
-        </div>
-      )}
-
-      {/* 마일스톤별 섹션 */}
-      {milestones.map(ms => {
-        const msTasks = getTasksByMilestone(ms.id)
-        const isCollapsed = collapsed[ms.id]
-        const doneCnt = msTasks.filter(t => t.done).length
-        const totalCnt = msTasks.length
-
-        return (
-          <div key={ms.id} style={{ borderBottom: '1px solid #f0efe8' }}>
-            {/* Milestone header */}
-            <div
-              onClick={() => toggleMilestone(ms.id)}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div style={{ flex: 1, overflow: 'auto', maxWidth: 960, margin: '0 auto', width: '100%' }}>
+        {/* 전체 접기/펼치기 툴바 */}
+        {allIds.length > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '6px 12px',
+            borderBottom: '1px solid #f0efe8',
+          }}>
+            <button
+              onClick={toggleAll}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 12px',
-                cursor: 'pointer',
-                background: '#fafaf8',
+                fontSize: 11, color: '#888780', background: 'none',
+                border: 'none', cursor: 'pointer', padding: '2px 6px',
+                borderRadius: 4, fontFamily: 'inherit',
               }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0efe8'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
-              {/* Chevron */}
-              <span style={{
-                fontSize: 10,
-                color: '#a09f99',
-                transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.15s',
-                width: 12,
-              }}>
-                ▾
-              </span>
+              {allCollapsed ? '▸ 전체 펼치기' : '▾ 전체 접기'}
+            </button>
+          </div>
+        )}
 
-              {/* Color dot */}
-              <div style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: ms.color || '#1D9E75',
-                flexShrink: 0,
-              }} />
+        {/* 마일스톤별 섹션 */}
+        {milestones.map(ms => {
+          const msTasks = getTasksByMilestone(ms.id)
+          const isCollapsed = collapsed[ms.id]
+          const doneCnt = msTasks.filter(t => t.done).length
+          const totalCnt = msTasks.length
 
-              {/* Title */}
-              <span style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: '#2C2C2A',
-                flex: 1,
-              }}>
-                {ms.title || '제목 없음'}
-              </span>
-
-              {/* Progress */}
-              {totalCnt > 0 && (
-                <span style={{
-                  fontSize: 11,
-                  color: '#a09f99',
-                }}>
-                  {doneCnt}/{totalCnt}
-                </span>
-              )}
-            </div>
-
-            {/* Tasks */}
-            {!isCollapsed && (
-              <div>
-                {msTasks.length === 0 ? (
-                  <div style={{
-                    padding: '8px 12px 8px 48px',
-                    fontSize: 12,
-                    color: '#c4c2ba',
-                    fontStyle: 'italic',
-                  }}>
-                    할일 없음
-                  </div>
-                ) : (
-                  msTasks.map(task => (
-                    <CompactTaskRow
-                      key={task.id}
-                      task={task}
-                      expanded={expandedTasks[task.id]}
-                      onToggleExpand={toggleTaskExpand}
-                      onToggleDone={handleToggleDone}
-                      onClickTask={handleClickTask}
-                      onUpdateNote={handleUpdateNote}
-                      milestoneColor={ms.color}
-                      assigneeName={memberMap[task.assigneeId]}
+          return (
+            <MilestoneSection
+              key={ms.id}
+              milestoneId={ms.id}
+              isCollapsed={isCollapsed}
+              onToggle={() => toggleMilestone(ms.id)}
+              color={ms.color || '#1D9E75'}
+              title={ms.title || '제목 없음'}
+              doneCnt={doneCnt}
+              totalCnt={totalCnt}
+              isBacklog={false}
+            >
+              {!isCollapsed && (
+                <div>
+                  {msTasks.length === 0 ? (
+                    <div style={{
+                      padding: '8px 12px 8px 48px', fontSize: 12,
+                      color: '#c4c2ba', fontStyle: 'italic',
+                    }}>
+                      할일 없음
+                    </div>
+                  ) : (
+                    msTasks.map(task => (
+                      <CompactTaskRow
+                        key={task.id}
+                        task={task}
+                        expanded={expandedTasks[task.id]}
+                        onToggleExpand={toggleTaskExpand}
+                        onToggleDone={handleToggleDone}
+                        onClickTask={handleClickTask}
+                        onUpdateNote={handleUpdateNote}
+                        onUpdateTitle={handleUpdateTitle}
+                        onToggleMilestone={() => toggleMilestone(ms.id)}
+                        milestoneId={ms.id}
+                        milestoneColor={ms.color}
+                        assigneeName={memberMap[task.assigneeId]}
+                      />
+                    ))
+                  )}
+                  <div style={{ padding: '4px 12px 8px 36px' }}>
+                    <InlineAdd
+                      projectId={projectId}
+                      category="backlog"
+                      color={color}
+                      extraFields={{ keyMilestoneId: ms.id }}
                     />
-                  ))
-                )}
+                  </div>
+                </div>
+              )}
+            </MilestoneSection>
+          )
+        })}
 
-                {/* InlineAdd */}
+        {/* 백로그 (미연결 태스크) */}
+        {unlinkedTasks.length > 0 && (
+          <MilestoneSection
+            milestoneId="__backlog__"
+            isCollapsed={collapsed['__backlog__']}
+            onToggle={() => toggleMilestone('__backlog__')}
+            color="#b4b2a9"
+            title="백로그"
+            doneCnt={0}
+            totalCnt={unlinkedTasks.length}
+            isBacklog={true}
+          >
+            {!collapsed['__backlog__'] && (
+              <div>
+                {unlinkedTasks.map(task => (
+                  <CompactTaskRow
+                    key={task.id}
+                    task={task}
+                    expanded={expandedTasks[task.id]}
+                    onToggleExpand={toggleTaskExpand}
+                    onToggleDone={handleToggleDone}
+                    onClickTask={handleClickTask}
+                    onUpdateNote={handleUpdateNote}
+                    onUpdateTitle={handleUpdateTitle}
+                    onToggleMilestone={() => toggleMilestone('__backlog__')}
+                    milestoneId="__backlog__"
+                    milestoneColor={null}
+                    assigneeName={memberMap[task.assigneeId]}
+                  />
+                ))}
                 <div style={{ padding: '4px 12px 8px 36px' }}>
                   <InlineAdd
                     projectId={projectId}
                     category="backlog"
                     color={color}
-                    extraFields={{ keyMilestoneId: ms.id }}
                   />
                 </div>
               </div>
             )}
+          </MilestoneSection>
+        )}
+
+        {/* 빈 상태 */}
+        {milestones.length === 0 && unlinkedTasks.length === 0 && (
+          <div style={{
+            padding: 40, textAlign: 'center', color: '#a09f99', fontSize: 13,
+          }}>
+            마일스톤 또는 할일이 없습니다.
+            <br />
+            마일스톤 탭에서 마일스톤을 추가하세요.
           </div>
-        )
-      })}
+        )}
+      </div>
 
-      {/* 백로그 (미연결 태스크) */}
-      {unlinkedTasks.length > 0 && (
-        <div style={{ borderBottom: '1px solid #f0efe8' }}>
-          {/* Backlog header */}
-          <div
-            onClick={() => toggleMilestone('__backlog__')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 12px',
-              cursor: 'pointer',
-              background: '#fafaf8',
-            }}
-          >
-            <span style={{
-              fontSize: 10,
-              color: '#a09f99',
-              transform: collapsed['__backlog__'] ? 'rotate(-90deg)' : 'rotate(0deg)',
-              transition: 'transform 0.15s',
-              width: 12,
-            }}>
-              ▾
-            </span>
-            <div style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: '#b4b2a9',
-              flexShrink: 0,
-            }} />
-            <span style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: '#888780',
-              fontStyle: 'italic',
-              flex: 1,
-            }}>
-              백로그
-            </span>
-            <span style={{ fontSize: 11, color: '#a09f99' }}>
-              {unlinkedTasks.length}
-            </span>
-          </div>
+      {/* Drag overlay */}
+      <DragOverlay dropAnimation={null}>
+        {activeTask ? <TaskDragOverlay task={activeTask} /> : null}
+      </DragOverlay>
+    </DndContext>
+  )
+}
 
-          {/* Backlog tasks */}
-          {!collapsed['__backlog__'] && (
-            <div>
-              {unlinkedTasks.map(task => (
-                <CompactTaskRow
-                  key={task.id}
-                  task={task}
-                  expanded={expandedTasks[task.id]}
-                  onToggleExpand={toggleTaskExpand}
-                  onToggleDone={handleToggleDone}
-                  onClickTask={handleClickTask}
-                  onUpdateNote={handleUpdateNote}
-                  milestoneColor={null}
-                  assigneeName={memberMap[task.assigneeId]}
-                />
-              ))}
+/** Milestone section with droppable */
+function MilestoneSection({ milestoneId, isCollapsed, onToggle, color, title, doneCnt, totalCnt, isBacklog, children }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `compact-ms-drop-${milestoneId}`,
+    data: { type: 'compact-task-drop', milestoneId },
+  })
 
-              <div style={{ padding: '4px 12px 8px 36px' }}>
-                <InlineAdd
-                  projectId={projectId}
-                  category="backlog"
-                  color={color}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 빈 상태 */}
-      {milestones.length === 0 && unlinkedTasks.length === 0 && (
-        <div style={{
-          padding: 40,
-          textAlign: 'center',
-          color: '#a09f99',
-          fontSize: 13,
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        borderBottom: '1px solid #f0efe8',
+        background: isOver ? '#f0fdf4' : 'transparent',
+        boxShadow: isOver ? 'inset 0 0 0 1.5px #1D9E75' : 'none',
+        transition: 'background .1s, box-shadow .15s',
+      }}
+    >
+      {/* Milestone header */}
+      <div
+        onClick={onToggle}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 12px', cursor: 'pointer', background: '#fafaf8',
+        }}
+      >
+        <span style={{
+          fontSize: 10, color: '#a09f99',
+          transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.15s', width: 12,
         }}>
-          마일스톤 또는 할일이 없습니다.
-          <br />
-          마일스톤 탭에서 마일스톤을 추가하세요.
-        </div>
-      )}
+          ▾
+        </span>
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: color, flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: 13, fontWeight: 500, flex: 1,
+          color: isBacklog ? '#888780' : '#2C2C2A',
+          fontStyle: isBacklog ? 'italic' : 'normal',
+        }}>
+          {title}
+        </span>
+        {totalCnt > 0 && (
+          <span style={{ fontSize: 11, color: '#a09f99' }}>
+            {isBacklog ? totalCnt : `${doneCnt}/${totalCnt}`}
+          </span>
+        )}
+      </div>
+
+      {children}
+    </div>
+  )
+}
+
+/** Drag overlay for tasks */
+function TaskDragOverlay({ task }) {
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px',
+      background: '#fff', borderRadius: 6, fontSize: 13,
+      border: '1px solid #e0ddd6', boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+      cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap', maxWidth: 300,
+    }}>
+      <div style={{
+        width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+        border: task.done ? 'none' : '1.5px solid #1D9E75',
+        background: task.done ? '#1D9E75' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontSize: 8,
+      }}>
+        {task.done && '✓'}
+      </div>
+      <span style={{ color: '#2C2C2A', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.text}</span>
     </div>
   )
 }
