@@ -5,8 +5,10 @@ import { useState, useEffect, useRef } from 'react'
  * @param {string} name - 현재 제목
  * @param {function} onSave - (newText) => void
  * @param {boolean} compact - 축소 모드
+ * @param {string} textColor - 텍스트 색상 (기본: #2C2C2A)
+ * @param {boolean} allowWrap - 2줄 줄바꿈 허용 (매트릭스용)
  */
-export default function TitleZone({ name, onSave, compact }) {
+export default function TitleZone({ name, onSave, compact, textColor = '#2C2C2A', allowWrap = false }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
   const inputRef = useRef(null)
@@ -57,17 +59,31 @@ export default function TitleZone({ name, onSave, compact }) {
         onMouseDown={(e) => e.stopPropagation()}
         style={{
           fontSize: compact ? 12 : 13,
-          color: '#2C2C2A',
+          color: textColor,
           border: 'none',
           borderBottom: '1.5px solid #85B7EB',
           background: 'transparent',
           outline: 'none',
-          width: '100%',
+          maxWidth: '70%',
+          width: 'auto',
+          minWidth: 100,
           padding: 0,
           fontFamily: 'inherit',
         }}
       />
     )
+  }
+
+  // 2줄 줄바꿈 + ellipsis 스타일 (매트릭스용)
+  const wrapStyle = allowWrap ? {
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+  } : {
+    whiteSpace: 'nowrap',
+    display: 'inline-block',
   }
 
   return (
@@ -76,19 +92,20 @@ export default function TitleZone({ name, onSave, compact }) {
       onMouseDown={(e) => e.stopPropagation()}
       style={{
         fontSize: compact ? 12 : 13,
-        color: '#2C2C2A',
+        color: textColor,
         cursor: 'text',
-        whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        display: 'inline-block',
+        maxWidth: '70%',
         padding: '1px 4px',
         margin: '-1px -4px',
         borderRadius: 3,
         transition: 'background 0.1s',
+        ...wrapStyle,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'
+        const hoverBg = textColor === '#fff' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.04)'
+        e.currentTarget.style.background = hoverBg
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent'

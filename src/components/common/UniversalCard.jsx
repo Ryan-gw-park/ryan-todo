@@ -2,6 +2,7 @@ import { useState } from 'react'
 import TitleZone from './TitleZone'
 import StatusZone from './StatusZone'
 import DetailZone from './DetailZone'
+import { getContrastTextColor } from '../../utils/colors'
 
 /**
  * UniversalCard — 프로젝트/마일스톤/할일 공통 카드 컴포넌트
@@ -16,8 +17,9 @@ import DetailZone from './DetailZone'
  * @param {function} renderMeta - () => ReactNode
  * @param {function} renderExpanded - () => ReactNode
  * @param {boolean} compact - 축소 모드
+ * @param {boolean} allowWrap - 제목 2줄 줄바꿈 허용 (매트릭스용)
  * @param {string} className - 추가 CSS 클래스
- * @param {object} style - 추가 인라인 스타일
+ * @param {object} style - 추가 인라인 스타일 (background 있으면 텍스트 색상 자동 계산)
  *
  * DnD passthrough (from useSortable):
  * @param {function} dragRef - ref
@@ -32,11 +34,16 @@ export default function UniversalCard({
   onTitleSave, onStatusToggle, onDetailOpen,
   renderMeta, renderExpanded,
   compact = false,
+  allowWrap = false,
   className = '', style: extraStyle,
   // DnD passthrough
   dragRef, dragStyle, dragListeners, dragAttributes, isDragging,
 }) {
   const [hovered, setHovered] = useState(false)
+
+  // 배경색 기반 텍스트 색상 자동 계산
+  const bgColor = extraStyle?.background
+  const textColor = getContrastTextColor(bgColor)
 
   const handleBodyClick = (e) => {
     // 제목/상태/상세 영역에서 stopPropagation 했으므로 여기까지 오면 본문 클릭
@@ -80,6 +87,8 @@ export default function UniversalCard({
           name={data.name}
           onSave={onTitleSave}
           compact={compact}
+          textColor={textColor}
+          allowWrap={allowWrap}
         />
 
         {/* 메타 행 */}

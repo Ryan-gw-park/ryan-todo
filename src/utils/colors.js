@@ -36,3 +36,40 @@ export function getBulletStyle(level, color) {
   if (level >= 4) return null
   return BULLET_STYLES[level](color)
 }
+
+/**
+ * 배경색 기반 텍스트 색상 자동 계산 (WCAG 휘도 공식)
+ * @param {string} bgColor - 배경색 (hex 또는 rgb)
+ * @returns {string} - 적절한 텍스트 색상 (#fff 또는 #2C2C2A)
+ */
+export function getContrastTextColor(bgColor) {
+  if (!bgColor) return '#2C2C2A'
+
+  // Parse hex color
+  let r, g, b
+  if (bgColor.startsWith('#')) {
+    const hex = bgColor.slice(1)
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16)
+      g = parseInt(hex[1] + hex[1], 16)
+      b = parseInt(hex[2] + hex[2], 16)
+    } else {
+      r = parseInt(hex.slice(0, 2), 16)
+      g = parseInt(hex.slice(2, 4), 16)
+      b = parseInt(hex.slice(4, 6), 16)
+    }
+  } else if (bgColor.startsWith('rgb')) {
+    const match = bgColor.match(/\d+/g)
+    if (match) {
+      r = parseInt(match[0])
+      g = parseInt(match[1])
+      b = parseInt(match[2])
+    }
+  }
+
+  if (r === undefined) return '#2C2C2A'
+
+  // WCAG relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.5 ? '#2C2C2A' : '#fff'
+}

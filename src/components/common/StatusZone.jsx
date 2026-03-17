@@ -24,7 +24,7 @@ export default function StatusZone({ type, data, onToggle }) {
           style={{
             width: 14, height: 14, borderRadius: 3,
             border: data.done ? '1.5px solid #1D9E75' : '1.5px solid #c4c2ba',
-            background: data.done ? '#1D9E75' : 'transparent',
+            background: data.done ? '#1D9E75' : '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', transition: 'all 0.1s',
           }}

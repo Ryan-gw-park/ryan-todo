@@ -270,6 +270,7 @@ function MatrixCard({ task, color, isDone }) {
       onTitleSave={handleTitleSave}
       onStatusToggle={() => toggleDone(task.id)}
       onDetailOpen={() => openDetail(task)}
+      allowWrap
       dragRef={setNodeRef}
       dragStyle={{
         transition: isDragging ? 'none' : transition,
