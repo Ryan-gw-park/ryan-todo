@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import useStore from '../../hooks/useStore'
-import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
-import { useKeyMilestones } from '../../hooks/useKeyMilestones'
+import { getDb } from '../../utils/supabase'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { COLOR_OPTIONS, getColor } from '../../utils/colors'
 
@@ -22,7 +21,8 @@ export default function ProjectSettingsModal() {
   const activeModal = useStore(s => s.activeModal)
   const projectId = activeModal?.projectId
   const project = useStore(s => s.projects.find(p => p.id === projectId))
-  const tasks = useStore(s => s.tasks.filter(t => t.projectId === projectId))
+  const allTasks = useStore(s => s.tasks)
+  const tasks = useMemo(() => allTasks.filter(t => t.projectId === projectId), [allTasks, projectId])
   const updateProject = useStore(s => s.updateProject)
   const deleteProject = useStore(s => s.deleteProject)
   const closeModal = useStore(s => s.closeModal)
@@ -31,9 +31,48 @@ export default function ProjectSettingsModal() {
   const currentTeamId = useStore(s => s.currentTeamId)
   const userName = useStore(s => s.userName)
 
-  // Milestones
-  const { pkm } = useProjectKeyMilestone(projectId)
-  const { milestones } = useKeyMilestones(pkm?.id, projectId)
+  // Milestones — direct fetch to avoid hook re-render loops
+  const [milestones, setMilestones] = useState([])
+  useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+    const db = getDb()
+    if (!db) return
+
+    ;(async () => {
+      // 1. Get or create project_key_milestone
+      let pkmId = null
+      const { data: pkm, error: pkmErr } = await db
+        .from('project_key_milestones')
+        .select('id')
+        .eq('project_id', projectId)
+        .single()
+
+      if (pkmErr && pkmErr.code !== 'PGRST116') {
+        console.error('[ProjectSettingsModal] pkm fetch failed:', pkmErr.message)
+        return
+      }
+      pkmId = pkm?.id || null
+
+      if (!pkmId) return // no milestones for this project
+      if (cancelled) return
+
+      // 2. Fetch milestones
+      const { data: ms, error: msErr } = await db
+        .from('key_milestones')
+        .select('*')
+        .eq('pkm_id', pkmId)
+        .order('sort_order', { ascending: true })
+
+      if (msErr) {
+        console.error('[ProjectSettingsModal] milestones fetch failed:', msErr.message)
+        return
+      }
+      if (!cancelled) setMilestones(ms || [])
+    })()
+
+    return () => { cancelled = true }
+  }, [projectId])
 
   // Team members for owner display
   const [members, setMembers] = useState([])
