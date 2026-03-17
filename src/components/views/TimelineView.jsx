@@ -105,7 +105,8 @@ const SCALES = [
   { key: 'year', label: '연간' },
 ]
 
-export default function TimelineView() {
+export default function TimelineView({ projectId = null }) {
+  const isProjectMode = !!projectId
   const { projects, tasks, openDetail, updateTask, reorderTasks, moveTaskTo, collapseState, toggleCollapse: storeToggle, currentTeamId } = useStore()
   const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
@@ -119,9 +120,10 @@ export default function TimelineView() {
   const [activeId, setActiveId] = useState(null)
 
   // ★ Loop-28: 뷰 깊이 + 필터 상태
-  const [timelineDepth, setTimelineDepth] = useState('project')  // 'project' | 'milestone' | 'task'
+  const [timelineDepth, setTimelineDepth] = useState(isProjectMode ? 'milestone' : 'project')  // 'project' | 'milestone' | 'task'
   const [selProjects, setSelProjects] = useState(null)  // null = 전체
   const [selMembers, setSelMembers] = useState(null)    // null = 전체
+  const [showAssigneeOnBar, setShowAssigneeOnBar] = useState(false)
 
   // ★ Loop-28: 마일스톤 데이터 가져오기
   const projectIds = useMemo(() => filteredProjects.map(p => p.id), [filteredProjects])
@@ -180,21 +182,24 @@ export default function TimelineView() {
   /* ─── Data ─── */
   // Loop-28: 필터 적용된 프로젝트
   const displayProjects = useMemo(() => {
+    if (isProjectMode) return filteredProjects.filter(p => p.id === projectId)
     if (!selProjects) return filteredProjects
     return filteredProjects.filter(p => selProjects.includes(p.id))
-  }, [filteredProjects, selProjects])
+  }, [filteredProjects, selProjects, isProjectMode, projectId])
 
   // Loop-28: 필터 적용된 할일
   const displayTasks = useMemo(() => {
     let result = filteredTasks.filter(t => !t.done && !t.deletedAt && t.category !== 'done')
-    if (selProjects) {
+    if (isProjectMode) {
+      result = result.filter(t => t.projectId === projectId)
+    } else if (selProjects) {
       result = result.filter(t => selProjects.includes(t.projectId))
     }
     if (selMembers) {
       result = result.filter(t => !t.assigneeId || selMembers.includes(t.assigneeId))
     }
     return result
-  }, [filteredTasks, selProjects, selMembers])
+  }, [filteredTasks, selProjects, selMembers, isProjectMode, projectId])
 
   const projectRows = useMemo(() => {
     return displayProjects.map(p => {
@@ -290,9 +295,10 @@ export default function TimelineView() {
   const ROW_H = 30
 
   return (
-    <div style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        {/* ── Header ── */}
+    <div style={{ padding: isProjectMode ? 0 : (isMobile ? '20px 0 100px' : '40px 48px'), height: isProjectMode ? '100%' : undefined, display: isProjectMode ? 'flex' : undefined, flexDirection: isProjectMode ? 'column' : undefined }}>
+      <div style={{ maxWidth: isProjectMode ? undefined : 1400, margin: isProjectMode ? 0 : '0 auto', flex: isProjectMode ? 1 : undefined, display: isProjectMode ? 'flex' : undefined, flexDirection: isProjectMode ? 'column' : undefined }}>
+        {/* ── Header (글로벌 모드만) ── */}
+        {!isProjectMode && (
         <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
@@ -323,6 +329,32 @@ export default function TimelineView() {
             <button onClick={goToday} style={{ ...navBtnStyle, background: '#ef4444', color: 'white', border: 'none', fontWeight: 600 }}>오늘</button>
           </div>
         </div>
+        )}
+
+        {/* ── 프로젝트 모드: 간이 네비 + 스케일 바 ── */}
+        {isProjectMode && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', borderBottom: '0.5px solid #e8e6df',
+            background: '#fafaf8', flexShrink: 0,
+          }}>
+            <button onClick={() => navigate(-1)} style={{ ...navBtnStyle, padding: '3px 8px', fontSize: 11 }}>◀</button>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#37352f', minWidth: 80, textAlign: 'center' }}>{periodLabel}</span>
+            <button onClick={() => navigate(1)} style={{ ...navBtnStyle, padding: '3px 8px', fontSize: 11 }}>▶</button>
+            <button onClick={goToday} style={{ ...navBtnStyle, padding: '3px 8px', fontSize: 11, background: '#ef4444', color: 'white', border: 'none', fontWeight: 600 }}>오늘</button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
+              {SCALES.map(s => (
+                <button key={s.key} onClick={() => setScale(s.key)} style={{
+                  padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                  background: scale === s.key ? '#37352f' : 'transparent',
+                  color: scale === s.key ? 'white' : '#888',
+                  border: 'none',
+                }}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Loop-28: 뷰 깊이 + 필터 바 ── */}
         <TimelineFilters
@@ -334,11 +366,14 @@ export default function TimelineView() {
           members={memberList}
           selMembers={selMembers}
           onMembersChange={setSelMembers}
+          projectId={projectId}
+          showAssigneeOnBar={showAssigneeOnBar}
+          onToggleAssigneeOnBar={currentTeamId ? () => setShowAssigneeOnBar(v => !v) : undefined}
         />
 
         {/* ── Timeline grid ── */}
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div style={{ display: 'flex', overflow: 'hidden', background: 'white' }}>
+          <div style={{ display: 'flex', overflow: 'hidden', background: 'white', flex: isProjectMode ? 1 : undefined }}>
             {/* Left panel */}
             <div style={{ width: panelW, flexShrink: 0, borderRight: '1px solid #f0f0f0', background: 'white', zIndex: 5 }}>
               {/* Month header spacer */}
@@ -350,7 +385,7 @@ export default function TimelineView() {
               </div>
               {/* Project rows */}
               {projectRows.map(({ project, color, tasks: pts, milestones: pMs }) => {
-                const isCollapsed = collapsed[project.id]
+                const isCollapsed = !isProjectMode && collapsed[project.id]
                 // depth='project'일 때는 프로젝트 수준 할일만 표시 (기존 동작)
                 // depth='milestone' 또는 'task'일 때는 마일스톤 그룹핑
                 const showMilestones = timelineDepth !== 'project'
@@ -370,7 +405,8 @@ export default function TimelineView() {
 
                 return (
                   <ProjectDropZone key={project.id} id={`project:${project.id}`} isOver={false}>
-                    {/* Project header */}
+                    {/* Project header (글로벌 모드만) */}
+                    {!isProjectMode && (
                     <div
                       onClick={() => storeToggle('timeline', project.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 4px', cursor: 'pointer', height: ROW_H, boxSizing: 'border-box', borderBottom: '1px solid #f0f0f0' }}
@@ -379,6 +415,7 @@ export default function TimelineView() {
                       <div style={{ width: 8, height: 8, borderRadius: 2, background: color.dot, flexShrink: 0 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
                     </div>
+                    )}
 
                     {/* depth='project': 기존 방식 (프로젝트 바로 아래 할일) */}
                     {!isCollapsed && !showMilestones && (
@@ -500,7 +537,7 @@ export default function TimelineView() {
 
                 {/* Project task rows with blocks */}
                 {projectRows.map(({ project, color, tasks: pts, milestones: pMs }) => {
-                  const isCollapsed = collapsed[project.id]
+                  const isCollapsed = !isProjectMode && collapsed[project.id]
                   const showMilestones = timelineDepth !== 'project'
                   const showTasks = timelineDepth === 'task'
 
@@ -518,7 +555,8 @@ export default function TimelineView() {
 
                   return (
                     <div key={project.id}>
-                      {/* Project header row — empty in grid */}
+                      {/* Project header row — empty in grid (글로벌 모드만) */}
+                      {!isProjectMode && (
                       <div style={{ height: ROW_H, position: 'relative' }}>
                         <WeekendShading columns={columns} colW={colW} h={ROW_H} />
                         {todayCol >= 0 && (
@@ -529,6 +567,7 @@ export default function TimelineView() {
                           }} />
                         )}
                       </div>
+                      )}
 
                       {/* depth='project': 기존 방식 */}
                       {!isCollapsed && !showMilestones && pts.map(task => (
@@ -545,6 +584,8 @@ export default function TimelineView() {
                           openDetail={openDetail}
                           updateTask={updateTask}
                           isDragging={activeId === task.id}
+                          assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null}
+                          showAssigneeOnBar={showAssigneeOnBar}
                         />
                       ))}
 
@@ -586,6 +627,8 @@ export default function TimelineView() {
                                     openDetail={openDetail}
                                     updateTask={updateTask}
                                     isDragging={activeId === task.id}
+                                    assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null}
+                                    showAssigneeOnBar={showAssigneeOnBar}
                                   />
                                 ))}
                               </div>
@@ -619,6 +662,8 @@ export default function TimelineView() {
                                   openDetail={openDetail}
                                   updateTask={updateTask}
                                   isDragging={activeId === task.id}
+                                  assigneeName={currentTeamId && task.assigneeId ? memberMap[task.assigneeId] : null}
+                                  showAssigneeOnBar={showAssigneeOnBar}
                                 />
                               ))}
                             </div>
@@ -727,7 +772,7 @@ function WeekendShading({ columns, colW, h }) {
 }
 
 /* ─── Task row: block rendering + drag/resize (right grid) ─── */
-function TaskRow({ task, color, columns, colW, scale, todayCol, dateToCol, rowH, openDetail, updateTask, isDragging }) {
+function TaskRow({ task, color, columns, colW, scale, todayCol, dateToCol, rowH, openDetail, updateTask, isDragging, assigneeName, showAssigneeOnBar }) {
   const rowRef = useRef(null)
   const [dragState, setDragState] = useState(null)
 
@@ -891,9 +936,19 @@ function TaskRow({ task, color, columns, colW, scale, todayCol, dateToCol, rowH,
           fontSize: 12, fontWeight: 500, color: color.text,
           padding: '0 4px',
           whiteSpace: 'nowrap', pointerEvents: 'none',
+          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
           {task.text}
         </span>
+        {showAssigneeOnBar && assigneeName && (
+          <span style={{
+            fontSize: 10, color: `${color.text}99`, fontWeight: 500,
+            whiteSpace: 'nowrap', pointerEvents: 'none',
+            padding: '0 4px', flexShrink: 0,
+          }}>
+            {assigneeName}
+          </span>
+        )}
         <div style={{ width: 4, height: '100%', cursor: 'col-resize', flexShrink: 0 }} />
       </div>
     </div>
