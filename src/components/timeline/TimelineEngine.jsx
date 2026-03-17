@@ -13,7 +13,9 @@ import TimelineToolbar from './TimelineToolbar'
 import TimelineLeftPanel from './TimelineLeftPanel'
 import TimelineGrid from './TimelineGrid'
 
-const LEFT_PANEL = 220
+const LEFT_PANEL_DEFAULT = 260
+const LEFT_PANEL_MIN = 140
+const LEFT_PANEL_MAX = 500
 const LEFT_PANEL_MOBILE = 130
 
 /**
@@ -32,7 +34,8 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
   } = useStore()
   const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
-  const panelW = isMobile ? LEFT_PANEL_MOBILE : LEFT_PANEL
+  const [panelW, setPanelW] = useState(isMobile ? LEFT_PANEL_MOBILE : LEFT_PANEL_DEFAULT)
+  const [resizing, setResizing] = useState(false)
 
   const today = useMemo(() => new Date(), [])
   const [baseDate, setBaseDate] = useState(() => startOfMonth(today))
@@ -180,6 +183,26 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
     }
   }, [depthFilter, tree.map(n => n.id).join(',')])
 
+  // ── Panel resize handler ──
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault()
+    setResizing(true)
+    const startX = e.clientX
+    const startW = panelW
+
+    const onMove = (ev) => {
+      const newW = Math.max(LEFT_PANEL_MIN, Math.min(LEFT_PANEL_MAX, startW + (ev.clientX - startX)))
+      setPanelW(newW)
+    }
+    const onUp = () => {
+      setResizing(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [panelW])
+
   const toggleExpand = useCallback((id) => {
     setExpandedIds(prev => {
       const next = new Set(prev)
@@ -311,7 +334,20 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
                 isProjectMode={isProjectMode}
               />
 
-              {/* Month header spacer sync */}
+              {/* Resize handle */}
+              <div
+                onMouseDown={handleResizeStart}
+                style={{
+                  width: 5, flexShrink: 0, cursor: 'col-resize',
+                  background: resizing ? '#3b82f6' : 'transparent',
+                  transition: resizing ? 'none' : 'background 0.15s',
+                  zIndex: 10, position: 'relative',
+                }}
+                onMouseEnter={e => { if (!resizing) e.currentTarget.style.background = '#d0d0d0' }}
+                onMouseLeave={e => { if (!resizing) e.currentTarget.style.background = 'transparent' }}
+              />
+
+              {/* Right grid area */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {/* Month header spacer for left panel alignment */}
                 {scale !== 'month' && (

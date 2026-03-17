@@ -224,7 +224,7 @@ function BarRow({
             border: barStyle.border,
             borderRadius: node.type === 'project' ? 5 : 4,
             cursor: isTask ? (dragState ? 'grabbing' : 'grab') : 'default',
-            display: 'flex', alignItems: 'center', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', overflow: 'visible',
             boxShadow: dragState ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
             opacity: dragState ? 0.85 : noDates ? 0.4 : 1,
             transition: dragState ? 'none' : 'box-shadow 0.15s, opacity 0.15s',
@@ -261,14 +261,13 @@ function BarRow({
           {/* Resize handle (left) */}
           {isTask && <div style={{ width: 4, height: '100%', cursor: 'col-resize', flexShrink: 0 }} />}
 
-          {/* Label */}
+          {/* Label — always show full text (overflow visible) */}
           <span style={{
             fontSize: node.type === 'project' ? 12 : node.type === 'milestone' ? 11 : 11,
             fontWeight: node.type === 'project' ? 600 : 500,
             color: barStyle.textColor,
             padding: '0 4px',
             whiteSpace: 'nowrap', pointerEvents: 'none',
-            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
             textDecoration: barStyle.strikethrough ? 'line-through' : 'none',
             position: 'relative', zIndex: 1,
           }}>

@@ -143,7 +143,7 @@ export function getBarStyles(node) {
   if (node.type === 'project') {
     return {
       fill: ramp.stops[50],
-      border: `0.5px ${node.inherited ? 'dashed' : 'solid'} ${ramp.stops[600]}`,
+      border: `0.5px solid ${ramp.stops[600]}`,
       progressFill: ramp.stops[400],
       progressOpacity: 0.3,
       textColor: ramp.stops[800],
@@ -162,13 +162,13 @@ export function getBarStyles(node) {
     }
   }
 
-  // Task: solid 200 stop
+  // Task: 400 fill + white text for high contrast
   return {
-    fill: ramp.stops[200],
+    fill: ramp.stops[400],
     border: 'none',
     progressFill: 'none',
     progressOpacity: 0,
-    textColor: ramp.stops[800],
+    textColor: '#fff',
   }
 }
 
