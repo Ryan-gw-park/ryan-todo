@@ -128,7 +128,7 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
   )
 }
 
-/* ── Task row (sortable for DnD) ── */
+/* ── Task row (sortable for DnD) using UniversalCard compact ── */
 function SortableTaskRow({ node, onOpenDetail, isDragging }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: node.id })
   const rowH = ROW_HEIGHTS.task
@@ -140,26 +140,21 @@ function SortableTaskRow({ node, onOpenDetail, isDragging }) {
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        padding: `0 4px 0 ${4 + indent + 16}px`,
-        height: rowH, display: 'flex', alignItems: 'center', gap: 8,
-        cursor: 'grab', boxSizing: 'border-box',
-        opacity: isDragging ? 0.3 : 1,
-        background: 'transparent',
+        paddingLeft: 4 + indent + 16,
+        height: rowH, display: 'flex', alignItems: 'center',
+        boxSizing: 'border-box',
       }}
       {...attributes}
       {...listeners}
-      onClick={(e) => { e.stopPropagation(); onOpenDetail(node.raw) }}
-      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = 'rgba(0,0,0,0.02)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      <span style={{
-        fontSize: 12, color: node.done ? '#bbb' : '#555',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        flex: 1, minWidth: 0,
-        textDecoration: node.done ? 'line-through' : 'none',
-      }}>
-        {node.name}
-      </span>
+      <UniversalCard
+        type="task"
+        data={{ id: node.id, name: node.name, done: node.done }}
+        compact
+        onDetailOpen={() => onOpenDetail(node.raw)}
+        isDragging={isDragging}
+        style={{ flex: 1, minWidth: 0, cursor: 'grab' }}
+      />
 
       <span style={{
         fontSize: 10, color: '#aaa', fontWeight: 500,

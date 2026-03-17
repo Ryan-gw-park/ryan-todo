@@ -3,6 +3,7 @@ import useStore from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { getDb } from '../../utils/supabase'
 import { getColor, COLOR_OPTIONS } from '../../utils/colors'
+import UniversalCard from '../common/UniversalCard'
 
 const MS_STATUS = [
   { key: 'not_started', label: '시작 전', bg: '#F1EFE8', text: '#444441', border: '#B4B2A9' },
@@ -248,46 +249,32 @@ export default function MilestoneDetailModal() {
               <div
                 key={task.id}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+                  padding: '2px 8px',
                   borderBottom: i < linkedTasks.length - 1 ? '1px solid #f0efe8' : 'none',
-                  cursor: 'pointer',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#fafaf8'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
-                {/* Checkbox */}
-                <div
-                  onClick={e => { e.stopPropagation(); toggleDone(task.id) }}
+                <UniversalCard
+                  type="task"
+                  data={{ id: task.id, name: task.text, done: task.done }}
+                  onStatusToggle={() => toggleDone(task.id)}
+                  onDetailOpen={() => handleTaskClick(task)}
+                  compact
                   style={{
-                    width: 16, height: 16, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
-                    border: task.done ? 'none' : '1.5px solid #1D9E75',
-                    background: task.done ? '#1D9E75' : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9,
+                    ...(task.done ? { opacity: 0.5 } : {}),
                   }}
-                >
-                  {task.done && '✓'}
-                </div>
-                {/* Task name */}
-                <span
-                  onClick={() => handleTaskClick(task)}
-                  style={{
-                    fontSize: 13, flex: 1, color: task.done ? '#a09f99' : '#2C2C2A',
-                    textDecoration: task.done ? 'line-through' : 'none',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}
-                >
-                  {task.text || '제목 없음'}
-                </span>
-                {/* Category chip */}
-                {!task.done && (
-                  <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: cat.bg, color: cat.text, whiteSpace: 'nowrap' }}>
-                    {cat.label}
-                  </span>
-                )}
-                {/* Assignee */}
-                {task.assigneeId && (
-                  <span style={{ fontSize: 11, color: '#888' }}>{getMemberName(task.assigneeId) || ''}</span>
-                )}
+                  renderMeta={() => (
+                    <>
+                      {!task.done && (
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: cat.bg, color: cat.text, whiteSpace: 'nowrap' }}>
+                          {cat.label}
+                        </span>
+                      )}
+                      {task.assigneeId && (
+                        <span style={{ fontSize: 11, color: '#888' }}>{getMemberName(task.assigneeId) || ''}</span>
+                      )}
+                    </>
+                  )}
+                />
               </div>
             )
           })}

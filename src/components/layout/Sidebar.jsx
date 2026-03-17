@@ -368,7 +368,7 @@ function ProjectItem({ project, isActive, onClick, collapsed }) {
           {hovered && (
             <span
               onClick={e => { e.stopPropagation(); openModal({ type: 'projectSettings', projectId: project.id }) }}
-              style={{ fontSize: 12, color: '#b4b2a9', padding: '0 2px', cursor: 'pointer', flexShrink: 0 }}
+              style={{ fontSize: 15, color: '#b4b2a9', padding: '0 4px', cursor: 'pointer', flexShrink: 0 }}
               onMouseEnter={e => e.currentTarget.style.color = '#666'}
               onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
             >

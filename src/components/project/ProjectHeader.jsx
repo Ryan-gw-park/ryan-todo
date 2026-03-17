@@ -51,7 +51,7 @@ export default function ProjectHeader({ project, currentTab, onTabChange }) {
       </span>
       <span
         onClick={() => openModal({ type: 'projectSettings', projectId: project.id })}
-        style={{ fontSize: 14, color: '#b4b2a9', cursor: 'pointer', padding: '0 4px' }}
+        style={{ fontSize: 17, color: '#b4b2a9', cursor: 'pointer', padding: '0 4px' }}
         onMouseEnter={e => e.currentTarget.style.color = '#666'}
         onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
         title="프로젝트 설정"

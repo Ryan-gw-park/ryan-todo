@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import useStore from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import ProjectFilter from '../shared/ProjectFilter'
-import TaskItem from '../shared/TaskItem'
 import { getColor } from '../../utils/colors'
+import UniversalCard from '../common/UniversalCard'
 
 // 카테고리 순서 + 아이콘
 const CAT_ORDER = ['today', 'next', 'backlog', 'done']
@@ -21,10 +21,20 @@ const HIGHLIGHT_COLORS = {
 }
 
 export default function AllTasksView() {
-  const { tasks, projects, collapseState, toggleCollapse, setCollapseGroup, currentTeamId } = useStore()
+  const { tasks, projects, collapseState, toggleCollapse, setCollapseGroup, currentTeamId, updateTask, toggleDone, openDetail } = useStore()
   const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const collapsed = collapseState.allTasks || {}
   const isMobile = window.innerWidth < 768
+
+  // 펼침 상태
+  const [expandedIds, setExpandedIds] = useState(new Set())
+  const toggleExpand = useCallback((id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }, [])
 
   // 팀원 이름 조회 (팀 모드일 때)
   const [memberMap, setMemberMap] = useState({})
@@ -117,24 +127,36 @@ export default function AllTasksView() {
                       const hlColor = hlColorKey && HIGHLIGHT_COLORS[hlColorKey]
                       return (
                         <div key={t.id} style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 4,
-                          background: hlColor ? hlColor.bg : 'transparent',
-                          borderRadius: 6,
-                          padding: '2px 8px',
+                          display: 'flex', alignItems: 'center', gap: 4,
                           marginBottom: 1,
                         }}>
-                          <span style={{ fontSize: 11, marginTop: 6, flexShrink: 0, width: 16, textAlign: 'center', color: hlColor ? '#fff' : undefined }}>
+                          <span style={{ fontSize: 11, flexShrink: 0, width: 16, textAlign: 'center', color: hlColor ? '#fff' : undefined }}>
                             {CAT_ICON[t.category] || ''}
                           </span>
-                          <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                            <div style={{ flex: 1 }}>
-                              <TaskItem task={t} compact hlColor={hlColor?.bg} />
-                            </div>
-                            {assigneeName && (
-                              <span style={{ fontSize: 11, color: hlColor ? 'rgba(255,255,255,0.8)' : '#aaa', fontWeight: 500, flexShrink: 0, marginLeft: 4 }}>
-                                {assigneeName}
-                              </span>
-                            )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <UniversalCard
+                              type="task"
+                              data={{ id: t.id, name: t.text, done: t.done }}
+                              expanded={expandedIds.has(t.id)}
+                              onToggleExpand={() => toggleExpand(t.id)}
+                              onTitleSave={(text) => updateTask(t.id, { text })}
+                              onStatusToggle={() => toggleDone(t.id)}
+                              onDetailOpen={() => openDetail(t)}
+                              style={{
+                                ...(hlColor ? { background: hlColor.bg, color: '#fff', borderRadius: 6 } : {}),
+                                ...(t.done ? { opacity: 0.45 } : {}),
+                              }}
+                              renderMeta={assigneeName ? () => (
+                                <span style={{ fontSize: 11, color: hlColor ? 'rgba(255,255,255,0.8)' : '#aaa', fontWeight: 500 }}>
+                                  {assigneeName}
+                                </span>
+                              ) : undefined}
+                              renderExpanded={t.notes ? () => (
+                                <div style={{ fontSize: 12, color: '#888', lineHeight: 1.4 }}>
+                                  {t.notes.length > 100 ? t.notes.slice(0, 100) + '…' : t.notes}
+                                </div>
+                              ) : undefined}
+                            />
                           </div>
                         </div>
                       )

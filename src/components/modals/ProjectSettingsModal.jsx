@@ -3,6 +3,7 @@ import useStore from '../../hooks/useStore'
 import { getDb } from '../../utils/supabase'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { COLOR_OPTIONS, getColor } from '../../utils/colors'
+import UniversalCard from '../common/UniversalCard'
 
 const STATUS_OPTIONS = [
   { key: 'active', label: '진행 중', bg: '#EAF3DE', text: '#27500A', border: '#97C459' },
@@ -259,35 +260,37 @@ export default function ProjectSettingsModal() {
                 return (
                   <div
                     key={ms.id}
-                    onClick={() => handleMilestoneClick(ms.id)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer',
+                      padding: '2px 8px',
                       borderBottom: i < visibleMs.length - 1 ? '1px solid #f0efe8' : 'none',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#fafaf8'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: ms.color || '#1D9E75', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, flex: 1, color: '#2C2C2A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ms.title || '제목 없음'}
-                    </span>
-                    {ms.owner_id && (
-                      <span style={{ fontSize: 11, color: '#888' }}>{getMemberName(ms.owner_id) || ''}</span>
-                    )}
-                    {msStatus && (
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: msStatus.bg, color: msStatus.text, border: `1px solid ${msStatus.border}`, whiteSpace: 'nowrap' }}>
-                        {msStatus.label}
-                      </span>
-                    )}
-                    {msTasks.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                        <div style={{ width: 40, height: 4, borderRadius: 2, background: '#f0efe8' }}>
-                          <div style={{ height: '100%', borderRadius: 2, background: ms.color || '#5DCAA5', width: `${msProgress}%` }} />
-                        </div>
-                        <span style={{ fontSize: 10, color: '#a09f99' }}>{msProgress}%</span>
-                      </div>
-                    )}
-                    <span style={{ fontSize: 12, color: '#c4c2ba' }}>›</span>
+                    <UniversalCard
+                      type="milestone"
+                      data={{ id: ms.id, name: ms.title, color: ms.color || '#1D9E75' }}
+                      onDetailOpen={() => handleMilestoneClick(ms.id)}
+                      compact
+                      renderMeta={() => (
+                        <>
+                          {ms.owner_id && (
+                            <span style={{ fontSize: 11, color: '#888' }}>{getMemberName(ms.owner_id) || ''}</span>
+                          )}
+                          {msStatus && (
+                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: msStatus.bg, color: msStatus.text, border: `1px solid ${msStatus.border}`, whiteSpace: 'nowrap' }}>
+                              {msStatus.label}
+                            </span>
+                          )}
+                          {msTasks.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                              <div style={{ width: 40, height: 4, borderRadius: 2, background: '#f0efe8' }}>
+                                <div style={{ height: '100%', borderRadius: 2, background: ms.color || '#5DCAA5', width: `${msProgress}%` }} />
+                              </div>
+                              <span style={{ fontSize: 10, color: '#a09f99' }}>{msProgress}%</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    />
                   </div>
                 )
               })}

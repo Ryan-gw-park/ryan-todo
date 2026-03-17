@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -7,13 +7,14 @@ import useMatrixConfig from '../../hooks/useMatrixConfig'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { getDb } from '../../utils/supabase'
 import { getColor } from '../../utils/colors'
-import { SettingsIcon, CheckIcon, UndoIcon } from '../shared/Icons'
+import { SettingsIcon, CheckIcon } from '../shared/Icons'
 import { parseDateFromText } from '../../utils/dateParser'
 import InlineAdd from '../shared/InlineAdd'
 import ColorPicker from '../shared/ColorPicker'
 import RowConfigSettings from '../shared/RowConfigSettings'
 import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
+import UniversalCard from '../common/UniversalCard'
 
 // Custom collision: pointerWithin → prefer task cards for reorder, fall back to category zone for cross-cell
 function matrixCollision(args) {
@@ -787,72 +788,26 @@ function CompletedRow({ columns, tasks: doneTasks, isMobile, LW, COL_GAP, COL_MI
 
 /* ═══ Team Matrix Card — DnD + highlight color + mobile menu ═══ */
 function TeamMatrixCard({ task, readOnly, isDone }) {
-  const { toggleDone, updateTask, openDetail, deleteTask } = useStore()
+  const { toggleDone, updateTask, openDetail } = useStore()
   const isMobile = window.innerWidth < 768
 
   // DnD (only for editable cards)
-  const sortableResult = useSortable({ id: task.id, disabled: readOnly, transition: { duration: 120, easing: 'ease' } })
-  const { attributes, listeners, setNodeRef, transform, transition: sortTransition, isDragging } = sortableResult
+  const { attributes, listeners, setNodeRef, transform, transition: sortTransition, isDragging } = useSortable({ id: task.id, disabled: readOnly, transition: { duration: 120, easing: 'ease' } })
 
-  const [editing, setEditing] = useState(false)
-  const [text, setText] = useState(task.text)
-  const [hovering, setHovering] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
-  const inputRef = useRef(null)
-  const longPressTimer = useRef(null)
+  const [expanded, setExpanded] = useState(false)
 
-  useEffect(() => { setText(task.text) }, [task.text])
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      const el = inputRef.current
-      el.focus()
-      el.style.height = 'auto'
-      el.style.height = el.scrollHeight + 'px'
-    }
-  }, [editing])
+  const handleTitleSave = useCallback((text) => {
+    const { startDate, dueDate } = parseDateFromText(text)
+    const patch = { text }
+    if (startDate) patch.startDate = startDate
+    if (dueDate) patch.dueDate = dueDate
+    updateTask(task.id, patch)
+  }, [task.id, updateTask])
 
-  const saveText = useCallback(() => {
-    const trimmed = text.trim()
-    if (trimmed && trimmed !== task.text) {
-      const { startDate, dueDate } = parseDateFromText(trimmed)
-      const patch = { text: trimmed }
-      if (startDate) patch.startDate = startDate
-      if (dueDate) patch.dueDate = dueDate
-      updateTask(task.id, patch)
-    }
-    if (!trimmed) setText(task.text)
-    setEditing(false)
-  }, [text, task.text, task.id, updateTask])
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveText() }
-    if (e.key === 'Escape') { setText(task.text); setEditing(false) }
-  }
-
-  // Highlight color override — 팀 모드: 개인별, 개인 모드: tasks 직접
+  // Highlight color override
   const hlColorKey = useStore.getState().getHighlightColor(task.id)
   const hlColor = hlColorKey && HIGHLIGHT_COLORS[hlColorKey]
-  const cardBg = hlColor ? hlColor.bg : '#ffffff'
-  const cardTextColor = hlColor ? '#ffffff' : (isDone ? '#999' : '#37352f')
-
-  const style = {
-    background: cardBg,
-    borderRadius: 8,
-    padding: '8px 10px',
-    border: hlColor ? 'none' : '1px solid rgba(0,0,0,0.06)',
-    boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
-    marginBottom: 6,
-    transition: isDragging ? 'none' : [sortTransition, 'box-shadow 0.15s'].filter(Boolean).join(', '),
-    opacity: isDone ? 0.5 : isDragging ? 0.3 : 1,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    zIndex: isDragging ? 100 : undefined,
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 6,
-    cursor: isDragging ? 'grabbing' : 'default',
-  }
 
   const handleContextMenu = (e) => {
     if (readOnly) return
@@ -860,23 +815,8 @@ function TeamMatrixCard({ task, readOnly, isDone }) {
     setShowColorPicker(true)
   }
 
-  const mobileHandlers = (isMobile && !readOnly) ? {
-    onTouchStart: () => { longPressTimer.current = setTimeout(() => setShowMenu(true), 500) },
-    onTouchEnd: () => clearTimeout(longPressTimer.current),
-    onTouchMove: () => clearTimeout(longPressTimer.current),
-  } : {}
-
   return (
-    <div
-      ref={!readOnly ? setNodeRef : undefined}
-      style={style}
-      {...(!readOnly && !isMobile ? listeners : {})}
-      {...(!readOnly ? attributes : {})}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-      onContextMenu={handleContextMenu}
-      {...mobileHandlers}
-    >
+    <div onContextMenu={handleContextMenu} style={{ position: 'relative' }}>
       {/* Color picker popover */}
       {showColorPicker && (
         <ColorPicker
@@ -887,96 +827,40 @@ function TeamMatrixCard({ task, readOnly, isDone }) {
         />
       )}
 
-      {/* Checkbox */}
-      <div
-        onClick={e => { e.stopPropagation(); if (!readOnly) toggleDone(task.id) }}
-        style={{ paddingTop: 1, flexShrink: 0, cursor: readOnly ? 'default' : 'pointer', opacity: readOnly ? 0.4 : 1 }}
-      >
-        {isDone
-          ? <div style={{ width: 14, height: 14, borderRadius: 3, background: hlColor ? 'rgba(255,255,255,0.3)' : '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: hlColor ? '#fff' : '#66bb6a' }}>
-              <UndoIcon />
-            </div>
-          : <CheckIcon checked={false} size={14} />
-        }
-      </div>
-
-      {/* Text */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {!readOnly && editing ? (
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-            onKeyDown={handleKeyDown}
-            onBlur={saveText}
-            rows={1}
-            style={{ width: '100%', fontSize: 13, lineHeight: '19px', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit', background: 'transparent', color: cardTextColor, boxSizing: 'border-box', resize: 'none', overflow: 'hidden' }}
-          />
-        ) : (
-          <div
-            onClick={() => { if (!readOnly && !isDragging) setEditing(true) }}
-            style={{ fontSize: 13, fontWeight: 500, lineHeight: '19px', color: cardTextColor, textDecoration: isDone ? 'line-through' : 'none', cursor: readOnly ? 'default' : 'text', minHeight: 19 }}
-          >
-            {task.text}
+      <UniversalCard
+        type="task"
+        data={{ id: task.id, name: task.text, done: task.done }}
+        expanded={expanded}
+        onToggleExpand={() => setExpanded(v => !v)}
+        onTitleSave={!readOnly ? handleTitleSave : undefined}
+        onStatusToggle={!readOnly ? () => toggleDone(task.id) : undefined}
+        onDetailOpen={() => openDetail(task)}
+        dragRef={!readOnly ? setNodeRef : undefined}
+        dragStyle={{
+          transition: isDragging ? 'none' : [sortTransition, 'box-shadow 0.15s'].filter(Boolean).join(', '),
+          transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+          zIndex: isDragging ? 100 : undefined,
+        }}
+        dragListeners={!readOnly && !isMobile ? listeners : undefined}
+        dragAttributes={!readOnly ? attributes : undefined}
+        isDragging={isDragging}
+        style={{
+          background: hlColor ? hlColor.bg : '#ffffff',
+          borderRadius: 8,
+          padding: '4px 6px',
+          border: hlColor ? 'none' : '1px solid rgba(0,0,0,0.06)',
+          boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+          marginBottom: 6,
+          opacity: isDone ? 0.5 : undefined,
+          ...(hlColor ? { color: '#fff' } : {}),
+        }}
+        renderExpanded={task.notes ? () => (
+          <div style={{ fontSize: 12, color: hlColor ? 'rgba(255,255,255,0.8)' : '#888', lineHeight: 1.4 }}>
+            {task.notes.length > 80 ? task.notes.slice(0, 80) + '…' : task.notes}
           </div>
-        )}
-      </div>
-
-      {/* Read-only indicator — clickable to open detail */}
-      {readOnly && (
-        <span
-          onClick={e => { e.stopPropagation(); openDetail(task) }}
-          style={{ fontSize: 11, color: hlColor ? 'rgba(255,255,255,0.6)' : '#ccc', flexShrink: 0, paddingTop: 2, cursor: 'pointer' }}
-        >👁</span>
-      )}
-
-      {/* Detail button (hover, desktop) */}
-      {!isMobile && (
-        <button
-          onClick={e => { e.stopPropagation(); openDetail(task) }}
-          style={{
-            position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-            opacity: hovering ? 1 : 0, transition: 'opacity 0.15s',
-            width: 22, height: 22, borderRadius: 4, background: hlColor ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.04)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: hlColor ? '#fff' : '#999', cursor: 'pointer', border: 'none', padding: 0, flexShrink: 0,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = hlColor ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.08)'; e.currentTarget.style.color = hlColor ? '#fff' : '#555' }}
-          onMouseLeave={e => { e.currentTarget.style.background = hlColor ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.04)'; e.currentTarget.style.color = hlColor ? '#fff' : '#999' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      )}
-
-      {/* Mobile context menu */}
-      {isMobile && !readOnly && showMenu && (
-        <MobileContextMenu task={task} onClose={() => setShowMenu(false)} openDetail={openDetail} deleteTask={deleteTask} />
-      )}
+        ) : undefined}
+      />
     </div>
-  )
-}
-
-/* ═══ Mobile Context Menu ═══ */
-function MobileContextMenu({ task, onClose, openDetail, deleteTask }) {
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} />
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
-        background: 'white', borderRadius: '16px 16px 0 0', padding: '8px 0 20px',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.12)',
-      }}>
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#ddd', margin: '0 auto 12px' }} />
-        <button onClick={() => { onClose(); openDetail(task) }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: 15, color: '#37352f', cursor: 'pointer', fontFamily: 'inherit' }}>
-          📄 상세 보기
-        </button>
-        <button onClick={() => { onClose(); if (confirm('삭제하시겠습니까?')) deleteTask(task.id) }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 20px', background: 'none', border: 'none', fontSize: 15, color: '#e53935', cursor: 'pointer', fontFamily: 'inherit' }}>
-          🗑 삭제
-        </button>
-      </div>
-    </>
   )
 }
 
