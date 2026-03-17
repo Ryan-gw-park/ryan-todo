@@ -58,10 +58,10 @@ export default function CompactTaskRow({
     }
   }
 
-  // Click on empty area → toggle milestone collapse
+  // Click on empty area → toggle task expand/collapse
   const handleEmptyAreaClick = (e) => {
     if (e.target === e.currentTarget) {
-      onToggleMilestone?.()
+      onToggleExpand(task.id)
     }
   }
 
@@ -215,15 +215,19 @@ export default function CompactTaskRow({
           onClick={(e) => { e.stopPropagation(); onClickTask?.(task) }}
           onPointerDown={e => e.stopPropagation()}
           style={{
-            width: 22, height: 22,
+            width: 24, height: 24,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
-            color: '#c4c2ba', fontSize: 13, flexShrink: 0,
-            opacity: hover ? 1 : 0, transition: 'opacity 0.1s',
+            background: hover ? '#f0efe8' : 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+            color: '#888780', fontSize: 11, flexShrink: 0,
+            opacity: hover ? 1 : 0, transition: 'opacity 0.1s, background 0.1s',
           }}
           title="상세 보기"
+          onMouseEnter={e => e.currentTarget.style.background = '#e8e6df'}
+          onMouseLeave={e => e.currentTarget.style.background = hover ? '#f0efe8' : 'none'}
         >
-          →
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 4l4 4-4 4" />
+          </svg>
         </button>
       </div>
 
