@@ -81,15 +81,17 @@ export default function TitleZone({ name, onSave, compact }) {
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        display: 'block',
+        display: 'inline-block',
+        padding: '1px 4px',
+        margin: '-1px -4px',
+        borderRadius: 3,
+        transition: 'background 0.1s',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.textDecoration = 'underline'
-        e.currentTarget.style.textDecorationColor = '#e8e6df'
-        e.currentTarget.style.textUnderlineOffset = '2px'
+        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.textDecoration = 'none'
+        e.currentTarget.style.background = 'transparent'
       }}
     >
       {name || '제목 없음'}

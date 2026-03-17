@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ROW_HEIGHTS, INDENTS, getBarStyles } from '../../utils/timelineUtils'
 import { getColor } from '../../utils/colors'
+import UniversalCard from '../common/UniversalCard'
 
 const ASSIGNEE_W = 50
 const PROGRESS_W = 32

@@ -142,15 +142,11 @@ export default function AllTasksView() {
                               onTitleSave={(text) => updateTask(t.id, { text })}
                               onStatusToggle={() => toggleDone(t.id)}
                               onDetailOpen={() => openDetail(t)}
+                              compact
                               style={{
                                 ...(hlColor ? { background: hlColor.bg, color: '#fff', borderRadius: 6 } : {}),
                                 ...(t.done ? { opacity: 0.45 } : {}),
                               }}
-                              renderMeta={assigneeName ? () => (
-                                <span style={{ fontSize: 11, color: hlColor ? 'rgba(255,255,255,0.8)' : '#aaa', fontWeight: 500 }}>
-                                  {assigneeName}
-                                </span>
-                              ) : undefined}
                               renderExpanded={t.notes ? () => (
                                 <div style={{ fontSize: 12, color: '#888', lineHeight: 1.4 }}>
                                   {t.notes.length > 100 ? t.notes.slice(0, 100) + '…' : t.notes}
@@ -158,6 +154,16 @@ export default function AllTasksView() {
                               ) : undefined}
                             />
                           </div>
+                          {assigneeName && (
+                            <span style={{
+                              fontSize: 10, color: hlColor ? '#fff' : '#888', fontWeight: 500,
+                              background: hlColor ? 'rgba(255,255,255,0.2)' : '#f0efe8',
+                              padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+                              maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {assigneeName}
+                            </span>
+                          )}
                         </div>
                       )
                     })}
