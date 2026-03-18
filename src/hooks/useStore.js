@@ -181,14 +181,14 @@ function mapTask(r) {
   }
 }
 
-// ─── 배열 동일성 비교 (id + updated_at 기준, O(n)) ───
+// ─── 배열 동일성 비교 (id + updatedAt 기준, O(n)) ───
 function isArrayEqual(a, b) {
   if (!a || !b) return false
   if (a === b) return true
   if (a.length !== b.length) return false
-  const aKeys = new Set(a.map(item => `${item.id}_${item.updated_at}`))
+  const aKeys = new Set(a.map(item => `${item.id}_${item.updatedAt}`))
   for (const item of b) {
-    if (!aKeys.has(`${item.id}_${item.updated_at}`)) return false
+    if (!aKeys.has(`${item.id}_${item.updatedAt}`)) return false
   }
   return true
 }
