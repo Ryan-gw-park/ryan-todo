@@ -16,7 +16,6 @@ import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
 import MSBadge from '../common/MSBadge'
-import { useMilestonesByProjects } from '../../hooks/useMilestonesByProjects'
 
 const MilestoneMatrixView = lazy(() => import('./MilestoneMatrixView'))
 
@@ -53,9 +52,8 @@ export default function TeamMatrixView() {
   const COL_MIN = isMobile ? 200 : 0
   const [matrixMode, setMatrixMode] = useState('task') // 'task' | 'milestone'
 
-  // 마일스톤 데이터 (할일 모드 MS 뱃지용)
-  const projectIds = useMemo(() => projects.map(p => p.id), [projects])
-  const { milestones } = useMilestonesByProjects(projectIds)
+  // 마일스톤 데이터 (할일 모드 MS 뱃지용) — store에서 loadAll 시 함께 로딩됨
+  const milestones = useStore(s => s.milestones)
   const msMap = useMemo(() => {
     const m = {}
     milestones.forEach(ms => { m[ms.id] = ms })

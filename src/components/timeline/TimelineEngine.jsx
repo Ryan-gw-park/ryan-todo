@@ -3,7 +3,6 @@ import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useS
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
-import { useMilestonesByProjects } from '../../hooks/useMilestonesByProjects'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import {
   buildTimelineTree, flattenVisibleRows, getColumns, getMonthHeaders,
@@ -69,9 +68,8 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
     })
   }, [currentTeamId])
 
-  // ── Milestones ──
-  const projectIds = useMemo(() => filteredProjects.map(p => p.id), [filteredProjects])
-  const { milestones: allMilestones } = useMilestonesByProjects(projectIds)
+  // ── Milestones (store에서 loadAll 시 함께 로딩됨) ──
+  const allMilestones = useStore(s => s.milestones)
 
   // ── Column computation ──
   const colW = COL_WIDTHS[scale]

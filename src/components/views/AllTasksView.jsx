@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import useStore from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
-import { useMilestonesByProjects } from '../../hooks/useMilestonesByProjects'
 import ProjectFilter from '../shared/ProjectFilter'
 import { getColor } from '../../utils/colors'
 import ProgressBar from '../common/ProgressBar'
@@ -27,9 +26,8 @@ export default function AllTasksView() {
     })
   }, [currentTeamId])
 
-  // 마일스톤 로드 (모든 보이는 프로젝트)
-  const projectIds = useMemo(() => filteredProjects.map(p => p.id), [filteredProjects])
-  const { milestones } = useMilestonesByProjects(projectIds)
+  // 마일스톤 (store에서 loadAll 시 함께 로딩됨)
+  const milestones = useStore(s => s.milestones)
 
   // 마일스톤 lookup map
   const msMap = useMemo(() => {

@@ -242,6 +242,7 @@ const useStore = create((set, get) => ({
   projects: [],
   tasks: [],
   memos: [],
+  milestones: [],
   syncStatus: 'ok',
   currentView: 'today',
   detailTask: null,
@@ -326,6 +327,7 @@ const useStore = create((set, get) => ({
       tasks: [],
       projects: [],
       memos: [],
+      milestones: [],
     })
     try { localStorage.removeItem(SNAPSHOT_KEY) } catch (e) {}
   },
@@ -436,9 +438,24 @@ const useStore = create((set, get) => ({
       const tasks = tr.data.map(mapTask)
       const memos = mr.error ? [] : mr.data.map(mapMemo)
 
+      // 마일스톤: 프로젝트 ID 기반으로 한번에 로딩 (별도 렌더 사이클 방지)
+      let milestones = []
+      const projectIdsList = projects.map(p => p.id)
+      if (projectIdsList.length > 0) {
+        try {
+          const msResult = await d.from('key_milestones')
+            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by')
+            .in('project_id', projectIdsList)
+            .order('sort_order')
+          milestones = msResult.data || []
+        } catch (e) {
+          // 마일스톤 로딩 실패해도 다른 데이터 반영에 영향 없음
+        }
+      }
+
       // 스냅샷 → 서버 전환 시 변경분만 set하여 불필요한 리렌더 방지
       const current = get()
-      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: taskSettings }
+      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: taskSettings, milestones }
       if (!isArrayEqual(current.tasks, tasks)) patch.tasks = tasks
       if (!isArrayEqual(current.projects, projects)) patch.projects = projects
       if (!isArrayEqual(current.memos, memos)) patch.memos = memos

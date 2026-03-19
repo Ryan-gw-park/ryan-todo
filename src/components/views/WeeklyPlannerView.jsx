@@ -4,7 +4,6 @@ import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import useProjectFilter from '../../hooks/useProjectFilter'
-import { useMilestonesByProjects } from '../../hooks/useMilestonesByProjects'
 import { getColor } from '../../utils/colors'
 import ProjectFilter from '../shared/ProjectFilter'
 import ProgressBar from '../common/ProgressBar'
@@ -83,9 +82,8 @@ export default function WeeklyPlannerView() {
     return m
   }, [projects])
 
-  // ─── Milestones (for backlog sidebar) ───
-  const projectIds = useMemo(() => filteredProjects.map(p => p.id), [filteredProjects])
-  const { milestones } = useMilestonesByProjects(projectIds)
+  // ─── Milestones (store에서 loadAll 시 함께 로딩됨) ───
+  const milestones = useStore(s => s.milestones)
 
   // ─── Grid data: tasks in this week ───
   const weekTasksByCell = useMemo(() => {
