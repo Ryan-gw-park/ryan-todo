@@ -89,6 +89,16 @@ personal project: team_id IS NULL     AND user_id IS NOT NULL
 
 Violating these fails INSERT/UPDATE silently on the DB side.
 
+### Trigger: validate_task_project_consistency (Loop-35K)
+
+```
+- Personal project (projects.team_id = NULL) → task.scope must be 'private'
+- Team project (projects.team_id = uuid) → task.scope must be 'team' or 'assigned',
+  and task.team_id must match projects.team_id
+- project_id NULL or referencing nonexistent project → skip (no FK)
+- Violation raises EXCEPTION (Supabase returns error to client)
+```
+
 ---
 
 ## Known Divergences

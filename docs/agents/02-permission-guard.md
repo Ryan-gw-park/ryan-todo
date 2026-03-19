@@ -95,7 +95,7 @@ USING (team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()))
 
 | ID | Severity | Description |
 |----|----------|-------------|
-| KD-2.1 | **HIGH** | `team_tasks_member_assign` policy: permissive OR gives all team members full UPDATE on all columns. Relies on FE canEdit only |
+| KD-2.1 | **HIGH** | `team_tasks_member_assign` policy: permissive OR gives all team members full UPDATE on all columns. Relies on FE canEdit only. **부분 완화**: Loop-35K `validate_task_project_consistency` 트리거로 team/project 불일치는 DB 레벨에서 차단됨. 단, 같은 팀 내에서의 과도한 UPDATE 권한 문제는 여전히 존재 |
 | KD-2.2 | MEDIUM | `projects_team_update` open to all members. Should restrict to owner/creator |
 | KD-2.3 | MEDIUM | `comments_select` filters by team_id without scope check. May expose comments on private tasks |
 | KD-2.4 | LOW | `team_invitations` missing DELETE policy. Frontend `delete()` silently denied by RLS |
