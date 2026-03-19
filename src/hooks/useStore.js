@@ -444,7 +444,7 @@ const useStore = create((set, get) => ({
       if (projectIdsList.length > 0) {
         try {
           const msResult = await d.from('key_milestones')
-            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by')
+            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by, parent_id, depth')
             .in('project_id', projectIdsList)
             .order('sort_order')
           milestones = msResult.data || []
@@ -736,6 +736,115 @@ const useStore = create((set, get) => ({
       if (error) console.error('[Ryan Todo] deleteMemo:', error)
     }
     get().showToast('메모가 삭제됐습니다')
+  },
+
+  // ─── Milestone CRUD (Loop-37: 계층형 마일스톤) ───
+  addMilestone: async (projectId, pkmId, title, parentId = null) => {
+    const d = db()
+    if (!d) return null
+    const userId = getCachedUserId()
+    const parentMs = parentId ? get().milestones.find(m => m.id === parentId) : null
+    const depth = parentMs ? (parentMs.depth || 0) + 1 : 0
+    const siblings = get().milestones.filter(m => m.project_id === projectId && m.parent_id === parentId)
+    const sortOrder = siblings.length
+
+    const { data, error } = await d.from('key_milestones')
+      .insert({
+        pkm_id: pkmId,
+        project_id: projectId,
+        title,
+        parent_id: parentId,
+        depth,
+        sort_order: sortOrder,
+        created_by: userId,
+        owner_id: null,
+        status: 'not_started',
+      })
+      .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by, parent_id, depth')
+      .single()
+    if (error) { console.error('[useStore] addMilestone:', error); return null }
+    if (data) set({ milestones: [...get().milestones, data] })
+    return data
+  },
+
+  updateMilestone: async (id, patch) => {
+    const d = db()
+    if (!d) return
+    // 로컬 즉시 반영
+    set(s => ({ milestones: s.milestones.map(m => m.id === id ? { ...m, ...patch } : m) }))
+    const { error } = await d.from('key_milestones')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) console.error('[useStore] updateMilestone:', error)
+  },
+
+  deleteMilestone: async (id) => {
+    const d = db()
+    if (!d) return
+    // CASCADE 삭제: 하위 MS도 DB에서 자동 삭제 → 로컬에서도 제거
+    const toDelete = new Set()
+    const walk = (targetId) => {
+      toDelete.add(targetId)
+      get().milestones.filter(m => m.parent_id === targetId).forEach(m => walk(m.id))
+    }
+    walk(id)
+    set(s => ({ milestones: s.milestones.filter(m => !toDelete.has(m.id)) }))
+    const { error } = await d.from('key_milestones').delete().eq('id', id)
+    if (error) console.error('[useStore] deleteMilestone:', error)
+  },
+
+  reorderMilestones: async (reordered) => {
+    const d = db()
+    if (!d) return
+    // 로컬 즉시 반영
+    const reorderedMap = new Map(reordered.map((m, i) => [m.id, i]))
+    set(s => ({
+      milestones: s.milestones.map(m => reorderedMap.has(m.id)
+        ? { ...m, sort_order: reorderedMap.get(m.id) }
+        : m
+      )
+    }))
+    // DB 업데이트
+    for (let i = 0; i < reordered.length; i++) {
+      await d.from('key_milestones')
+        .update({ sort_order: i, updated_at: new Date().toISOString() })
+        .eq('id', reordered[i].id)
+    }
+  },
+
+  moveMilestone: async (id, newParentId) => {
+    const d = db()
+    if (!d) return
+    const parentMs = newParentId ? get().milestones.find(m => m.id === newParentId) : null
+    const depth = parentMs ? (parentMs.depth || 0) + 1 : 0
+    const projectId = get().milestones.find(m => m.id === id)?.project_id
+    const siblings = get().milestones.filter(m => m.project_id === projectId && m.parent_id === newParentId && m.id !== id)
+    const sortOrder = siblings.length
+
+    // 하위 노드 depth도 재귀 업데이트
+    const updates = []
+    const walkDepth = (targetId, parentDepth) => {
+      get().milestones.filter(m => m.parent_id === targetId).forEach(child => {
+        const newD = parentDepth + 1
+        updates.push({ id: child.id, depth: newD })
+        walkDepth(child.id, newD)
+      })
+    }
+    walkDepth(id, depth)
+
+    set(s => ({
+      milestones: s.milestones.map(m => {
+        if (m.id === id) return { ...m, parent_id: newParentId, depth, sort_order: sortOrder }
+        const upd = updates.find(u => u.id === m.id)
+        if (upd) return { ...m, depth: upd.depth }
+        return m
+      })
+    }))
+
+    await d.from('key_milestones').update({ parent_id: newParentId, depth, sort_order: sortOrder, updated_at: new Date().toISOString() }).eq('id', id)
+    for (const u of updates) {
+      await d.from('key_milestones').update({ depth: u.depth, updated_at: new Date().toISOString() }).eq('id', u.id)
+    }
   },
 
   // ─── Project Filter (Loop-20.2) ───

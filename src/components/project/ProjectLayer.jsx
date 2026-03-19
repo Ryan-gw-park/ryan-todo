@@ -1,14 +1,9 @@
 import useStore from '../../hooks/useStore'
-import ProjectHeader from './ProjectHeader'
-import CompactMilestoneTab from './CompactMilestoneTab'
-import TasksTab from './TasksTab'
-import TimelineView from '../views/TimelineView'
+import UnifiedProjectHeader from './UnifiedProjectHeader'
+import UnifiedProjectView from './UnifiedProjectView'
 
 export default function ProjectLayer() {
-  const {
-    selectedProjectId, projects,
-    projectLayerTab, setProjectLayerTab,
-  } = useStore()
+  const { selectedProjectId, projects } = useStore()
 
   const project = projects.find(p => p.id === selectedProjectId)
   if (!project) {
@@ -19,23 +14,14 @@ export default function ProjectLayer() {
     )
   }
 
-  const tab = projectLayerTab
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <ProjectHeader
-        project={project}
-        currentTab={tab}
-        onTabChange={setProjectLayerTab}
-      />
+      <UnifiedProjectHeader project={project} />
 
-      {/* 탭 콘텐츠 — 탭별 maxWidth 적용 */}
+      {/* Loop-37: 단일 통합 뷰 */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#fff' }}>
-        <div style={{ maxWidth: tab === 'ptimeline' ? 1400 : 1100, margin: '0 auto', width: '100%', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          {tab === 'milestone' && <CompactMilestoneTab projectId={selectedProjectId} />}
-          {tab === 'tasks' && <TasksTab projectId={selectedProjectId} />}
-          {/* Loop-30: 통합 TimelineView 사용 */}
-          {tab === 'ptimeline' && <TimelineView projectId={selectedProjectId} />}
+        <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <UnifiedProjectView projectId={selectedProjectId} />
         </div>
       </div>
     </div>
