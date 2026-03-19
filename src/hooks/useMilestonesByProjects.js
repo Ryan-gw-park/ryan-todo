@@ -31,7 +31,7 @@ export function useMilestonesByProjects(projectIds) {
     setLoading(true)
     const { data, error } = await db
       .from('key_milestones')
-      .select('*')
+      .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by')
       .in('project_id', projectIds)
       .order('sort_order', { ascending: true })
 

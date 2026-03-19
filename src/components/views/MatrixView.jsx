@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -7,12 +7,26 @@ import { SettingsIcon } from '../shared/Icons'
 import { parseDateFromText } from '../../utils/dateParser'
 import InlineAdd from '../shared/InlineAdd'
 import UniversalCard from '../common/UniversalCard'
+import MSBadge from '../common/MSBadge'
+import { useMilestonesByProjects } from '../../hooks/useMilestonesByProjects'
+
+const MilestoneMatrixView = lazy(() => import('../matrix/MilestoneMatrixView'))
 
 export default function MatrixView() {
   const { projects: rawProjects, tasks, setShowProjectMgr, moveTaskTo, reorderTasks, collapseState, toggleCollapse: storeToggle, sortProjectsLocally } = useStore()
   const projects = sortProjectsLocally(rawProjects)
   const isMobile = window.innerWidth < 768
   const LW = isMobile ? 80 : 110
+  const [matrixMode, setMatrixMode] = useState('task') // 'task' | 'milestone'
+
+  // 마일스톤 데이터 (할일 모드 MS 뱃지용)
+  const projectIds = useMemo(() => projects.map(p => p.id), [projects])
+  const { milestones } = useMilestonesByProjects(projectIds)
+  const msMap = useMemo(() => {
+    const m = {}
+    milestones.forEach(ms => { m[ms.id] = ms })
+    return m
+  }, [milestones])
   const COL_GAP = 10
   const COL_MIN = isMobile ? 200 : 0
 
@@ -81,13 +95,38 @@ export default function MatrixView() {
     return () => window.removeEventListener('view-focus', handler)
   }, [])
 
+  // 마일스톤 모드 → 별도 컴포넌트
+  if (matrixMode === 'milestone') {
+    return (
+      <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+          <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <ModePill active={matrixMode} onChange={setMatrixMode} />
+            </div>
+            <button onClick={() => setShowProjectMgr(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500 }}>
+              <SettingsIcon /> 프로젝트 관리
+            </button>
+          </div>
+          <Suspense fallback={<div style={{ textAlign: 'center', color: '#999', padding: 40 }}>로딩...</div>}>
+            <MilestoneMatrixView projects={projects} milestones={milestones} tasks={tasks} />
+          </Suspense>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>매트릭스 뷰</h1>
-            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <ModePill active={matrixMode} onChange={setMatrixMode} />
+            <div>
+              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>매트릭스 뷰</h1>
+              <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
+            </div>
           </div>
           <button onClick={() => setShowProjectMgr(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
@@ -204,7 +243,7 @@ export default function MatrixView() {
                                   ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {catTasks.length}건</div>
                                   : (
                                     <SortableContext items={catTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                      {catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} />)}
+                                      {catTasks.map(task => <MatrixCard key={task.id} task={task} color={c} isDone={isDone} milestone={msMap[task.keyMilestoneId]} />)}
                                     </SortableContext>
                                   )
                                 }
@@ -246,7 +285,7 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
 }
 
 /* ─── Task card using UniversalCard ─── */
-function MatrixCard({ task, color, isDone }) {
+function MatrixCard({ task, color, isDone, milestone }) {
   const { toggleDone, updateTask, openDetail } = useStore()
   const isMobile = window.innerWidth < 768
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
@@ -288,12 +327,31 @@ function MatrixCard({ task, color, isDone }) {
         marginBottom: 6,
         opacity: isDone ? 0.5 : undefined,
       }}
+      renderMeta={milestone ? () => <MSBadge milestone={milestone} /> : undefined}
       renderExpanded={task.notes ? () => (
         <div style={{ fontSize: 12, color: '#888', lineHeight: 1.4 }}>
           {task.notes.length > 80 ? task.notes.slice(0, 80) + '…' : task.notes}
         </div>
       ) : undefined}
     />
+  )
+}
+
+/* ─── Mode toggle pill ─── */
+function ModePill({ active, onChange }) {
+  const items = [{ key: 'task', label: '할일 모드' }, { key: 'milestone', label: '마일스톤 모드' }]
+  return (
+    <div style={{ display: 'flex', gap: 2, background: '#fafaf8', borderRadius: 8, padding: 2 }}>
+      {items.map(it => (
+        <button key={it.key} onClick={() => onChange(it.key)} style={{
+          border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+          fontWeight: active === it.key ? 600 : 400,
+          background: active === it.key ? '#fff' : 'transparent',
+          color: active === it.key ? '#37352f' : '#a09f99',
+          boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+        }}>{it.label}</button>
+      ))}
+    </div>
   )
 }
 
