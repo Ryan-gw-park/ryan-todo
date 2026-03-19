@@ -37,6 +37,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
         display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 22, minHeight: 30,
         background: selected ? 'rgba(55, 53, 47, 0.06)' : 'transparent',
         borderRadius: selected ? 3 : 0,
+        ...(selected ? { userSelect: 'none', WebkitUserSelect: 'none' } : {}),
       }}
       className="bullet-row"
     >

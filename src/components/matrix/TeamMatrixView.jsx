@@ -451,6 +451,7 @@ export default function TeamMatrixView() {
                     activeId={activeId}
                     collapsed={collapsed}
                     extraFields={currentTeamId ? { scope: 'assigned', assigneeId: userId } : undefined}
+                    msMap={msMap}
                   />
                 )
               })}
@@ -489,6 +490,7 @@ export default function TeamMatrixView() {
                           COL_MIN={COL_MIN}
                           collapsed={collapsed}
                           isOwner={isOwner}
+                          msMap={msMap}
                         />
                       </>
                     ) : (
@@ -563,6 +565,7 @@ export default function TeamMatrixView() {
                     activeId={activeId}
                     collapsed={collapsed}
                     extraFields={currentTeamId ? { scope: 'team' } : undefined}
+                    msMap={msMap}
                   />
                   {completedRow && (
                     <CompletedRow
@@ -576,6 +579,7 @@ export default function TeamMatrixView() {
                       collapsed={collapsed}
                       doneCollapsed={doneCollapsed}
                       storeToggle={storeToggle}
+                      msMap={msMap}
                     />
                   )}
                 </>
@@ -662,7 +666,7 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
 }
 
 /* ═══ Task Row with DnD — editable rows (나 섹션, 남은 할일) ═══ */
-function TaskRowWithDnd({ label, emoji, columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN, category, activeId, collapsed, extraFields }) {
+function TaskRowWithDnd({ label, emoji, columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN, category, activeId, collapsed, extraFields, msMap }) {
   return (
     <div style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
       <div style={{
@@ -721,7 +725,7 @@ function TaskRowWithDnd({ label, emoji, columns, tasks: rowTasks, isMobile, LW, 
 }
 
 /* ═══ Member Detail Row — 팀장: 편집 가능, 팀원: 읽기전용 ═══ */
-function ReadOnlyRow({ columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN, collapsed, isOwner }) {
+function ReadOnlyRow({ columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN, collapsed, isOwner, msMap }) {
   return (
     <div style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
       <div style={{
@@ -772,7 +776,7 @@ function ReadOnlyRow({ columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN,
 }
 
 /* ═══ Completed Row — 프로젝트별 접기/펼치기 ═══ */
-function CompletedRow({ columns, tasks: doneTasks, isMobile, LW, COL_GAP, COL_MIN, activeId, collapsed, doneCollapsed, storeToggle }) {
+function CompletedRow({ columns, tasks: doneTasks, isMobile, LW, COL_GAP, COL_MIN, activeId, collapsed, doneCollapsed, storeToggle, msMap }) {
   return (
     <div style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
       <div style={{

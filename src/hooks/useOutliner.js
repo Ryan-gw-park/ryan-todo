@@ -289,5 +289,5 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
     focus(lastIdx, lastPos)
   }, [setNodes, focus, pushUndo])
 
-  return { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection }
+  return { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection, pushUndo }
 }

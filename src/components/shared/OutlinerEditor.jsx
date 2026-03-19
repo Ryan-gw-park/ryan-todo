@@ -78,7 +78,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   }
 
   /* ── Outliner keyboard / focus ── */
-  const { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
+  const { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection, pushUndo } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
 
   /* ── Wire selection change callback ── */
   useEffect(() => {
@@ -108,12 +108,13 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
 
   /* ── Text change (per-keystroke) ── */
   const handleTextChange = useCallback((idx, text) => {
+    pushUndo()
     setNodes(prev => {
       const n = [...prev]
       n[idx] = { ...n[idx], text }
       return n
     })
-  }, [])
+  }, [pushUndo])
 
   /* ── Button handlers ── */
   const handleDelete = useCallback((idx) => {
@@ -140,7 +141,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   }, [])
 
   /* ── Mouse selection (shift+click + drag) ── */
-  const dragState = useRef(null) // { anchor: idx, active: boolean }
+  const dragState = useRef(null) // { anchor: idx, active: boolean, started: boolean, startY: number }
 
   const handleRowMouseDown = useCallback((e, idx) => {
     // Shift+Click: 범위 선택
@@ -160,23 +161,28 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
       return
     }
 
-    // 텍스트 영역(textarea)에서 시작된 클릭은 드래그 선택 안 함
+    // button 클릭은 무시 (들여쓰기/삭제 버튼)
     const tag = e.target.tagName?.toLowerCase()
-    if (tag === 'textarea' || tag === 'input' || tag === 'button') {
-      if (selectedSet.size > 0) clearSelection()
-      return
-    }
+    if (tag === 'button') return
 
-    // 불릿 영역에서 드래그 시작
-    e.preventDefault()
-    dragState.current = { anchor: idx, active: true }
-    selectionRef.current = [idx, idx]
-    setSelectedSet(new Set([idx]))
-  }, [selectedSet, clearSelection, selectionRef])
+    // 드래그 준비 (textarea 포함). 아직 선택을 시작하지는 않음 — 다른 행 진입 시 시작
+    dragState.current = { anchor: idx, active: true, started: false, startY: e.clientY }
+  }, [clearSelection, selectionRef])
 
   const handleRowMouseEnter = useCallback((idx) => {
     if (!dragState.current?.active) return
     const { anchor } = dragState.current
+
+    // 같은 행이면 아직 시작 안 함
+    if (idx === anchor && !dragState.current.started) return
+
+    // 다른 행에 진입 → 드래그 선택 시작
+    if (!dragState.current.started) {
+      dragState.current.started = true
+      // textarea의 네이티브 text selection 제거
+      window.getSelection()?.removeAllRanges()
+    }
+
     const min = Math.min(anchor, idx), max = Math.max(anchor, idx)
     const s = new Set()
     for (let i = min; i <= max; i++) s.add(i)
@@ -187,11 +193,25 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   useEffect(() => {
     const handleMouseUp = () => {
       if (dragState.current?.active) {
-        dragState.current.active = false
+        // 드래그 선택이 시작되었으면 textarea 포커스 차단
+        if (dragState.current.started) {
+          window.getSelection()?.removeAllRanges()
+        }
+        dragState.current = null
+      }
+    }
+    // mousemove: 드래그가 시작되면 네이티브 text selection 억제
+    const handleMouseMove = () => {
+      if (dragState.current?.active && dragState.current.started) {
+        window.getSelection()?.removeAllRanges()
       }
     }
     document.addEventListener('mouseup', handleMouseUp)
-    return () => document.removeEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousemove', handleMouseMove)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousemove', handleMouseMove)
+    }
   }, [])
 
   return (
