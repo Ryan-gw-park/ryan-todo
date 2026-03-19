@@ -14,6 +14,7 @@ import { getNextAlarmTime } from '../../utils/alarm'
 import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
+import MSBadge from '../common/MSBadge'
 
 const HIGHLIGHT_COLORS = {
   red:    { bg: '#E53E3E' },
@@ -30,6 +31,13 @@ export default function TodayView() {
   const isMobile = window.innerWidth < 768
 
   const [activeId, setActiveId] = useState(null)
+  const [showMs, setShowMs] = useState(false)
+  const milestones = useStore(s => s.milestones)
+  const msMap = useMemo(() => {
+    const m = {}
+    milestones.forEach(ms => { m[ms.id] = ms })
+    return m
+  }, [milestones])
   const collapsed = collapseState.today || {}
   const allCollapsed = filteredProjects.every(p => collapsed[p.id])
 
@@ -142,6 +150,10 @@ export default function TodayView() {
           </div>
           <div className="today-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ProjectFilter />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#a09f99', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+              <input type="checkbox" checked={showMs} onChange={e => setShowMs(e.target.checked)} style={{ margin: 0 }} />
+              MS
+            </label>
             <button
             onClick={toggleAll}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#999', fontFamily: 'inherit', padding: '4px 0', whiteSpace: 'nowrap' }}
@@ -179,7 +191,7 @@ export default function TodayView() {
                 .filter(t => t.projectId === p.id && t.category === 'today' && !t.done)
                 .sort((a, b) => a.sortOrder - b.sortOrder)
               return (
-                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} />
+                <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} showMs={showMs} msMap={msMap} />
               )
             })}
           </div>
@@ -194,10 +206,11 @@ export default function TodayView() {
 }
 
 /* ─── Project card with drop zone ─── */
-function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse }) {
+function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onToggleCollapse, showMs, msMap }) {
   const { isOver, setNodeRef } = useDroppable({ id: `project:${project.id}` })
   const showHighlight = isOver && activeId
   const isMobile = window.innerWidth < 768
+  const isEmpty = todayTasks.length === 0
 
   const [expandedIds, setExpandedIds] = useState(new Set())
   const toggleExpand = useCallback((id) => {
@@ -215,32 +228,28 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
       transition: 'border 0.15s, background 0.15s',
       ...(showHighlight ? { background: color.header } : {}),
     }}>
-      <div style={{ background: color.header, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={onToggleCollapse}>
+      <div style={{ background: color.header, padding: isEmpty ? '10px 16px' : '12px 16px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={onToggleCollapse}>
         <div style={{ width: 10, height: 10, borderRadius: 3, background: color.dot }} />
         <span style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: color.text }}>{project.name}</span>
         <span style={{ fontSize: 11, color: color.text, background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '2px 8px', fontWeight: 600, marginLeft: 'auto' }}>{todayTasks.length}</span>
-        <span style={{ color: color.text, opacity: 0.5, fontSize: 12, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+        {isEmpty && <InlineAddSimple projectId={project.id} color={color} compact />}
+        {!isEmpty && <span style={{ color: color.text, opacity: 0.5, fontSize: 12, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>}
       </div>
-      {!isCollapsed && (
+      {!isCollapsed && !isEmpty && (
         <div style={{ padding: '10px 16px' }}>
-          {todayTasks.length === 0 ? (
-            <div style={{ padding: '12px 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: '#bbb', marginBottom: 8 }}>오늘 할 일이 없습니다</div>
-              <InlineAddSimple projectId={project.id} color={color} />
-            </div>
-          ) : (
-            <SortableContext items={todayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              {todayTasks.map(tk => (
-                <SortableTaskItem
-                  key={tk.id}
-                  task={tk}
-                  expanded={expandedIds.has(tk.id)}
-                  onToggleExpand={() => toggleExpand(tk.id)}
-                />
-              ))}
-              <InlineAddSimple projectId={project.id} color={color} />
-            </SortableContext>
-          )}
+          <SortableContext items={todayTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            {todayTasks.map(tk => (
+              <SortableTaskItem
+                key={tk.id}
+                task={tk}
+                expanded={expandedIds.has(tk.id)}
+                onToggleExpand={() => toggleExpand(tk.id)}
+                showMs={showMs}
+                msMap={msMap}
+              />
+            ))}
+            <InlineAddSimple projectId={project.id} color={color} />
+          </SortableContext>
         </div>
       )}
     </div>
@@ -248,7 +257,7 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
 }
 
 /* ─── Sortable task item using UniversalCard ─── */
-function SortableTaskItem({ task, expanded, onToggleExpand }) {
+function SortableTaskItem({ task, expanded, onToggleExpand, showMs, msMap }) {
   const { toggleDone, updateTask, openDetail } = useStore()
   const isMobile = window.innerWidth < 768
   const {
@@ -288,6 +297,7 @@ function SortableTaskItem({ task, expanded, onToggleExpand }) {
         marginBottom: 1, borderRadius: 6,
         ...(hlColor ? { background: hlColor.bg, color: '#fff' } : {}),
       }}
+      renderMeta={showMs && task.keyMilestoneId && msMap[task.keyMilestoneId] ? () => <MSBadge milestone={msMap[task.keyMilestoneId]} /> : undefined}
       renderExpanded={task.notes ? () => (
         <div style={{ fontSize: 12, color: '#888', lineHeight: 1.4 }}>
           {task.notes.length > 100 ? task.notes.slice(0, 100) + '…' : task.notes}
@@ -298,7 +308,7 @@ function SortableTaskItem({ task, expanded, onToggleExpand }) {
 }
 
 /* ─── Inline add (simplified for Today view) ─── */
-function InlineAddSimple({ projectId, color }) {
+function InlineAddSimple({ projectId, color, compact }) {
   const { addTask } = useStore()
   const [active, setActive] = useState(false)
   const [text, setText] = useState('')
@@ -316,10 +326,13 @@ function InlineAddSimple({ projectId, color }) {
   if (!active) {
     return (
       <button
-        onClick={() => { setActive(true); setText('') }}
-        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#c8c8c8', fontSize: 12, width: '100%', borderRadius: 4, transition: 'all 0.15s', fontFamily: 'inherit' }}
-        onMouseEnter={e => { e.currentTarget.style.color = color.text; e.currentTarget.style.background = 'rgba(0,0,0,0.03)' }}
-        onMouseLeave={e => { e.currentTarget.style.color = '#c8c8c8'; e.currentTarget.style.background = 'none' }}
+        onClick={(e) => { e.stopPropagation(); setActive(true); setText('') }}
+        style={compact
+          ? { background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'inherit', padding: '2px 6px', whiteSpace: 'nowrap', borderRadius: 4, transition: 'color 0.15s' }
+          : { display: 'flex', alignItems: 'center', gap: 5, padding: '4px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#c8c8c8', fontSize: 12, width: '100%', borderRadius: 4, transition: 'all 0.15s', fontFamily: 'inherit' }
+        }
+        onMouseEnter={e => { e.currentTarget.style.color = compact ? '#fff' : color.text; if (!compact) e.currentTarget.style.background = 'rgba(0,0,0,0.03)' }}
+        onMouseLeave={e => { e.currentTarget.style.color = compact ? 'rgba(255,255,255,0.6)' : '#c8c8c8'; if (!compact) e.currentTarget.style.background = 'none' }}
       >
         + 추가
       </button>
@@ -327,13 +340,13 @@ function InlineAddSimple({ projectId, color }) {
   }
 
   return (
-    <div style={{ padding: '4px 0' }}>
+    <div style={{ padding: compact ? '0' : '4px 0' }} onClick={e => e.stopPropagation()}>
       <input
         ref={ref} value={text} onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setActive(false) }}
         onBlur={() => { if (!text.trim()) setActive(false) }}
         placeholder="할일을 입력하세요..."
-        style={{ width: '100%', padding: '6px 8px', fontSize: 13, border: `1.5px solid ${color.dot}`, borderRadius: 6, outline: 'none', background: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        style={{ width: compact ? 140 : '100%', padding: '6px 8px', fontSize: 13, border: `1.5px solid ${color.dot}`, borderRadius: 6, outline: 'none', background: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
       />
     </div>
   )

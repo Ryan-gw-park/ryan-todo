@@ -97,7 +97,7 @@ export default function MatrixView() {
   if (matrixMode === 'milestone') {
     return (
       <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+        <div>
           <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <ModePill active={matrixMode} onChange={setMatrixMode} />
@@ -117,7 +117,7 @@ export default function MatrixView() {
 
   return (
     <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <div>
         <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <ModePill active={matrixMode} onChange={setMatrixMode} />

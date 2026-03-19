@@ -224,7 +224,7 @@ export default function WeeklyPlannerView() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div data-view="weekly" style={{ padding: '40px 48px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ maxWidth: 1600, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
           {/* ─── Header ─── */}
           <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>

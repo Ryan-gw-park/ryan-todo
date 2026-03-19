@@ -29,12 +29,14 @@ export default function ProjectLayer() {
         onTabChange={setProjectLayerTab}
       />
 
-      {/* 탭 콘텐츠 */}
+      {/* 탭 콘텐츠 — 탭별 maxWidth 적용 */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#fff' }}>
-        {tab === 'milestone' && <CompactMilestoneTab projectId={selectedProjectId} />}
-        {tab === 'tasks' && <TasksTab projectId={selectedProjectId} />}
-        {/* Loop-30: 통합 TimelineView 사용 */}
-        {tab === 'ptimeline' && <TimelineView projectId={selectedProjectId} />}
+        <div style={{ maxWidth: tab === 'ptimeline' ? 1400 : 1100, margin: '0 auto', width: '100%', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {tab === 'milestone' && <CompactMilestoneTab projectId={selectedProjectId} />}
+          {tab === 'tasks' && <TasksTab projectId={selectedProjectId} />}
+          {/* Loop-30: 통합 TimelineView 사용 */}
+          {tab === 'ptimeline' && <TimelineView projectId={selectedProjectId} />}
+        </div>
       </div>
     </div>
   )

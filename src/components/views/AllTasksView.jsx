@@ -47,7 +47,7 @@ export default function AllTasksView() {
 
   return (
     <div data-view="allTasks" style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      <div style={{ maxWidth: 800, margin: '0 auto' }}>
         {/* 상단 */}
         <div className="today-header" style={{ marginBottom: isMobile ? 16 : 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="today-greeting" style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
