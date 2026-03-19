@@ -34,6 +34,7 @@ const GLOBAL_VIEWS = [
   { key: 'allTasks', label: '전체 할일',  icon: '📑' },
   { key: 'matrix',   label: '매트릭스',   icon: '⊞' },
   { key: 'timeline', label: '타임라인',   icon: '▤' },
+  { key: 'weekly',   label: '주간 플래너', icon: '📅' },
   { key: 'memory',   label: '노트',       icon: '✎' },
 ]
 

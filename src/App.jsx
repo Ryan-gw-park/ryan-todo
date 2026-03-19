@@ -24,6 +24,7 @@ const ProjectView = lazy(() => import('./components/views/ProjectView'))
 const TimelineView = lazy(() => import('./components/views/TimelineView'))
 const MemoryView = lazy(() => import('./components/views/MemoryView'))
 const TeamMatrixView = lazy(() => import('./components/matrix/TeamMatrixView'))
+const WeeklyPlannerView = lazy(() => import('./components/views/WeeklyPlannerView'))
 const ProjectLayer = lazy(() => import('./components/project/ProjectLayer'))
 const TeamSettings = lazy(() => import('./components/team/TeamSettings'))
 const Onboarding = lazy(() => import('./components/team/Onboarding'))
@@ -60,7 +61,7 @@ function AppShell({ mobile }) {
   }, [])
 
   // Keyboard shortcuts
-  const VIEW_ORDER = ['today', 'matrix', 'project', 'timeline', 'memory']
+  const VIEW_ORDER = ['today', 'matrix', 'project', 'timeline', 'weekly', 'memory']
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') { closeDetail() }
@@ -81,12 +82,12 @@ function AppShell({ mobile }) {
 
   // Loop-20: 팀 모드에서 매트릭스 뷰 분기
   const teamId = useStore(s => s.currentTeamId)
-  const views = { today: TodayView, allTasks: AllTasksView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, memory: MemoryView, projectLayer: ProjectLayer }
+  const views = { today: TodayView, allTasks: AllTasksView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, weekly: WeeklyPlannerView, memory: MemoryView, projectLayer: ProjectLayer }
   const ViewComponent = views[currentView] || TodayView
 
   // 모바일에서 matrix/timeline 접근 시 today로 리다이렉트
   useEffect(() => {
-    if (mobile && (currentView === 'matrix' || currentView === 'timeline')) {
+    if (mobile && (currentView === 'matrix' || currentView === 'timeline' || currentView === 'weekly')) {
       setView('today')
     }
   }, [currentView, mobile])

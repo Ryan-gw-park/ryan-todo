@@ -10,6 +10,7 @@ const VIEW_NAMES = {
   matrix: '매트릭스',
   project: '프로젝트',
   timeline: '타임라인',
+  weekly: '주간 플래너',
   memory: '노트',
 }
 

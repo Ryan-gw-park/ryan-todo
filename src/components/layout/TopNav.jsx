@@ -12,6 +12,7 @@ const VIEWS = [
   { id: 'matrix', label: '매트릭스', icon: ViewIcons.matrix },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
   { id: 'timeline', label: '타임라인', icon: ViewIcons.timeline },
+  { id: 'weekly', label: '주간 플래너', icon: '📅' },
   { id: 'memory', label: '노트', icon: ViewIcons.memory },
 ]
 
