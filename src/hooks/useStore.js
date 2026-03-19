@@ -11,6 +11,9 @@ const MEMO_COLUMNS = 'id, title, notes, color, sort_order, created_at, updated_a
 const SNAPSHOT_KEY = 'ryan-todo-snapshot'
 const SNAPSHOT_MAX_AGE = 24 * 60 * 60 * 1000 // 24시간
 
+// ─── Loop-35J: loadAll 중복 실행 방지 플래그 ───
+let _loadAllRunning = false
+
 /**
  * @typedef {Object} TaskAlarm
  * @property {boolean} enabled
@@ -350,8 +353,11 @@ const useStore = create((set, get) => ({
 
   // ─── Load All ───
   loadAll: async () => {
+    // Loop-35J: 중복 실행 방지 — StrictMode 이중 호출 + 탭 복귀 경쟁 조건 차단
+    if (_loadAllRunning) return
+    _loadAllRunning = true
     const d = db()
-    if (!d) { set({ syncStatus: 'error' }); return }
+    if (!d) { _loadAllRunning = false; set({ syncStatus: 'error' }); return }
     set({ syncStatus: 'syncing' })
     try {
       const teamId = get().currentTeamId
@@ -448,6 +454,8 @@ const useStore = create((set, get) => ({
     } catch (e) {
       console.error('[Ryan Todo] loadAll:', e)
       set({ syncStatus: 'error' })
+    } finally {
+      _loadAllRunning = false
     }
   },
 
