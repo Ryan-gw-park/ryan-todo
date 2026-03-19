@@ -183,6 +183,10 @@ export default function TeamMatrixView() {
           expectedScope = 'team'
           expectedAssignee = null
         }
+      } else {
+        // Loop-35I: 개인 프로젝트 타겟 — scope='private'로 전환
+        expectedScope = 'private'
+        expectedAssignee = null
       }
       const expectedDone = targetCategory === 'done'
 
@@ -207,6 +211,11 @@ export default function TeamMatrixView() {
           patch.scope = 'team'
           patch.assigneeId = null
         }
+      } else {
+        // Loop-35I: 개인 프로젝트 타겟 — scope='private'로 전환, teamId 해제
+        patch.scope = 'private'
+        patch.teamId = null
+        patch.assigneeId = null
       }
 
       // Loop-31: done 처리 — 완료 행 drop 시 done=true, 미완료 행 drop 시 done=false
@@ -247,6 +256,11 @@ export default function TeamMatrixView() {
           patch.scope = 'team'
           patch.assigneeId = null
         }
+      } else {
+        // Loop-35I: 개인 프로젝트 타겟 — scope='private'로 전환, teamId 해제
+        patch.scope = 'private'
+        patch.teamId = null
+        patch.assigneeId = null
       }
 
       // Loop-31: done 처리 — 대상 task의 done 상태 기준
