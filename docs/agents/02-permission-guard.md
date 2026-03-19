@@ -58,7 +58,20 @@ Comments and notifications reference tasks via `task_id`. Linking to a `private`
 
 When creating comments/notifications: verify target task's scope is `'team'` or `'assigned'`.
 
-### B6. Use RLS helper functions
+### B6. Cross-scope transition on DnD
+
+When a task crosses the team↔personal boundary via DnD (or any move operation), scope MUST be adjusted:
+
+```
+team/assigned → personal project: scope='private', teamId=null, assigneeId=null
+private → team project (today/next): scope='assigned', assigneeId=userId
+private → team project (backlog): scope='team', assigneeId=null
+```
+
+Missing scope transition = BLOCK (task becomes invisible in filters).
+Established in Loop-35I.
+
+### B7. Use RLS helper functions
 
 When writing new RLS policies, use existing SECURITY DEFINER functions. Direct subqueries are forbidden.
 
