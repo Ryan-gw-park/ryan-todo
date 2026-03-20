@@ -1,6 +1,8 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
 import useStore from '../../hooks/useStore'
 import { collectLeaves, getNodePath, countTasksRecursive } from '../../utils/milestoneTree'
+
+const TimelineEngine = lazy(() => import('../timeline/TimelineEngine'))
 
 const S = {
   textPrimary: '#37352f',
@@ -163,30 +165,43 @@ export default function ProjectTaskPanel({
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '8px 14px', borderBottom: `0.5px solid ${S.border}`, background: '#fafaf8', flexShrink: 0,
       }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: S.textSecondary }}>할일</span>
-        <div style={{ display: 'flex', gap: 2, background: '#fff', borderRadius: 6, padding: 2, marginLeft: 8 }}>
-          {['전체', '선택'].map(m => (
+        <div style={{ display: 'flex', gap: 2, background: '#fff', borderRadius: 6, padding: 2 }}>
+          {[
+            { key: '전체', label: '전체 할일' },
+            { key: '선택', label: '선택 항목' },
+            { key: '타임라인', label: '타임라인' },
+          ].map(m => (
             <button
-              key={m}
-              onClick={() => onModeChange(m)}
+              key={m.key}
+              onClick={() => onModeChange(m.key)}
               style={{
                 border: 'none', borderRadius: 5, padding: '3px 12px', fontSize: 11,
                 fontFamily: 'inherit', cursor: 'pointer',
-                fontWeight: rightMode === m ? 600 : 400,
-                background: rightMode === m ? '#f0efeb' : 'transparent',
-                color: rightMode === m ? S.textPrimary : S.textTertiary,
+                fontWeight: rightMode === m.key ? 600 : 400,
+                background: rightMode === m.key ? '#f0efeb' : 'transparent',
+                color: rightMode === m.key ? S.textPrimary : S.textTertiary,
               }}
             >
-              {m === '전체' ? '전체 할일' : '선택 항목'}
+              {m.label}
             </button>
           ))}
         </div>
         <span style={{ fontSize: 11, color: S.textTertiary, marginLeft: 'auto' }}>
-          {rightMode === '전체' ? `${allTaskCount}건` : selectedTasks.length > 0 ? `${selectedTasks.length}건` : ''}
+          {rightMode === '전체' ? `${allTaskCount}건` : rightMode === '선택' && selectedTasks.length > 0 ? `${selectedTasks.length}건` : ''}
         </span>
       </div>
 
+      {/* 타임라인 모드 */}
+      {rightMode === '타임라인' && (
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <Suspense fallback={<div style={{ padding: 24, textAlign: 'center', color: S.textTertiary, fontSize: 12 }}>로딩 중...</div>}>
+            <TimelineEngine rootLevel="milestone" projectId={projectId} initialScale="month" initialDepth="task" />
+          </Suspense>
+        </div>
+      )}
+
       {/* 할일 목록 */}
+      {rightMode !== '타임라인' && (
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {rightMode === '전체' ? (
           /* ─── 전체 할일 모드 ─── */
@@ -297,9 +312,12 @@ export default function ProjectTaskPanel({
           )
         )}
       </div>
+      )}
 
-      {/* 백로그 영역 */}
-      <BacklogSection tasks={tasks} projectId={projectId} onToggle={toggleDone} onOpen={openDetail} />
+      {/* 백로그 영역 (타임라인 모드 아닐 때만) */}
+      {rightMode !== '타임라인' && (
+        <BacklogSection tasks={tasks} projectId={projectId} onToggle={toggleDone} onOpen={openDetail} />
+      )}
     </div>
   )
 }

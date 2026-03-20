@@ -9,7 +9,7 @@ const COL_W_FIRST = 160
 const COL_W_REST = 150
 
 /* ═══ Sortable Tree Row ═══ */
-function SortableTreeRow({ row, ri, isSelected, expanded, onSelectLeaf, onToggleExpand, tasks, rendered, onAddChild, editingId, onStartEdit, onFinishEdit }) {
+function SortableTreeRow({ row, ri, isSelected, expanded, onSelectLeaf, onToggleExpand, tasks, rendered, onAddChild, onDelete, editingId, onStartEdit, onFinishEdit }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.leafId + '-' + ri })
   const isMobile = window.innerWidth < 768
 
@@ -58,6 +58,7 @@ function SortableTreeRow({ row, ri, isSelected, expanded, onSelectLeaf, onToggle
             isExpanded={isExpanded}
             onToggleExpand={onToggleExpand}
             onAddChild={onAddChild}
+            onDelete={onDelete}
             editingId={editingId}
             onStartEdit={onStartEdit}
             onFinishEdit={onFinishEdit}
@@ -69,7 +70,7 @@ function SortableTreeRow({ row, ri, isSelected, expanded, onSelectLeaf, onToggle
 }
 
 /* ═══ Tree Cell ═══ */
-function TreeCell({ cell, ci, isDepth0, nodeCount, hasChildren, isExpanded, onToggleExpand, onAddChild, editingId, onStartEdit, onFinishEdit }) {
+function TreeCell({ cell, ci, isDepth0, nodeCount, hasChildren, isExpanded, onToggleExpand, onAddChild, onDelete, editingId, onStartEdit, onFinishEdit }) {
   const [hovered, setHovered] = useState(false)
   const inputRef = useRef(null)
 
@@ -146,16 +147,26 @@ function TreeCell({ cell, ci, isDepth0, nodeCount, hasChildren, isExpanded, onTo
         )}
       </div>
 
-      {/* hover 시 + 추가 */}
+      {/* hover 시 + 추가 / 삭제 */}
       {hovered && !isEditing && (
-        <span
-          onClick={(e) => { e.stopPropagation(); onAddChild(cell.id, hasChildren) }}
-          style={{ position: 'absolute', right: 4, top: 6, fontSize: 10, color: '#a09f99', cursor: 'pointer', background: '#f5f4f0', borderRadius: 4, padding: '1px 5px' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#37352f'}
-          onMouseLeave={e => e.currentTarget.style.color = '#a09f99'}
-        >
-          {hasChildren ? '+ 하위' : '+ 할일'}
-        </span>
+        <div style={{ position: 'absolute', right: 4, top: 6, display: 'flex', gap: 4 }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); onAddChild(cell.id, hasChildren) }}
+            style={{ fontSize: 10, color: '#a09f99', cursor: 'pointer', background: '#f5f4f0', borderRadius: 4, padding: '1px 5px' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#37352f'}
+            onMouseLeave={e => e.currentTarget.style.color = '#a09f99'}
+          >
+            {hasChildren ? '+ 하위' : '+ 할일'}
+          </span>
+          <span
+            onClick={(e) => { e.stopPropagation(); onDelete(cell.id, cell.title) }}
+            style={{ fontSize: 10, color: '#a09f99', cursor: 'pointer', background: '#f5f4f0', borderRadius: 4, padding: '1px 5px' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#c53030'}
+            onMouseLeave={e => e.currentTarget.style.color = '#a09f99'}
+          >
+            삭제
+          </span>
+        </div>
       )}
     </div>
   )
@@ -168,9 +179,11 @@ export default function HierarchicalTree({
 }) {
   const addMilestone = useStore(s => s.addMilestone)
   const updateMilestone = useStore(s => s.updateMilestone)
+  const deleteMilestone = useStore(s => s.deleteMilestone)
   const reorderMilestones = useStore(s => s.reorderMilestones)
   const addTask = useStore(s => s.addTask)
   const openDetail = useStore(s => s.openDetail)
+  const openConfirmDialog = useStore(s => s.openConfirmDialog)
 
   const [editingId, setEditingId] = useState(null)
   const [addingTaskLeafId, setAddingTaskLeafId] = useState(null)
@@ -209,27 +222,52 @@ export default function HierarchicalTree({
     const oldIdx = sortableIds.indexOf(active.id)
     const newIdx = sortableIds.indexOf(over.id)
     if (oldIdx === -1 || newIdx === -1) return
+
     // 같은 부모 내 순서 변경만 지원 (부모 변경은 별도 moveMilestone)
     const oldRow = rows[oldIdx]
     const newRow = rows[newIdx]
     if (oldRow && newRow) {
       // 리프 노드의 실제 milestone을 찾아서 reorder
-      const leafNode = oldRow.node
-      const targetNode = newRow.node
+      const leafCell = oldRow.cells.find(c => c?.isLeaf)
+      const targetCell = newRow.cells.find(c => c?.isLeaf)
+      if (!leafCell || !targetCell) return
+
+      const leafNode = leafCell._node
+      const targetNode = targetCell._node
       if (leafNode && targetNode && leafNode.parent_id === targetNode.parent_id) {
         const parentId = leafNode.parent_id
-        const siblings = tree.flatMap(function flatSiblings(nodes) {
+        // 같은 parent_id를 가진 형제 노드들 수집
+        const collectSiblings = (nodes) => {
           const result = []
           nodes.forEach(n => {
-            if (n.parent_id === parentId || (!parentId && !n.parent_id)) result.push(n)
-            if (n.children) result.push(...flatSiblings(n.children))
+            if (parentId === null || parentId === undefined) {
+              if (!n.parent_id) result.push(n)
+            } else {
+              if (n.parent_id === parentId) result.push(n)
+            }
+            if (n.children) result.push(...collectSiblings(n.children))
           })
           return result
-        }([]))
-        // 이 경우 store reorderMilestones 사용
+        }
+        const siblings = collectSiblings(tree).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        const siblingOldIdx = siblings.findIndex(s => s.id === leafNode.id)
+        const siblingNewIdx = siblings.findIndex(s => s.id === targetNode.id)
+        if (siblingOldIdx !== -1 && siblingNewIdx !== -1) {
+          const reordered = arrayMove(siblings, siblingOldIdx, siblingNewIdx)
+          reorderMilestones(reordered)
+        }
       }
     }
   }, [sortableIds, rows, tree, reorderMilestones])
+
+  const handleDelete = useCallback((nodeId, title) => {
+    openConfirmDialog({
+      title: '마일스톤 삭제',
+      message: `"${title || '제목 없음'}"을(를) 삭제하시겠습니까?\n하위 마일스톤도 모두 삭제됩니다.`,
+      confirmText: '삭제',
+      onConfirm: () => deleteMilestone(nodeId),
+    })
+  }, [deleteMilestone, openConfirmDialog])
 
   const handleAddChild = useCallback(async (nodeId, hasChildren) => {
     if (!pkmId) return
@@ -296,6 +334,7 @@ export default function HierarchicalTree({
               tasks={tasks}
               rendered={rendered}
               onAddChild={handleAddChild}
+              onDelete={handleDelete}
               editingId={editingId}
               onStartEdit={handleStartEdit}
               onFinishEdit={handleFinishEdit}
