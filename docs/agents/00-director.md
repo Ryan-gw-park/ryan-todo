@@ -7,6 +7,8 @@
 
 ## Execution Protocol
 
+Work instructions must be written in English. Agent review reports are output in Korean.
+
 ### Phase 1: Scope Analysis
 
 Read the Loop document and determine which agents are affected using this checklist:
