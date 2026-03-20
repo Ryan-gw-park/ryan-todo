@@ -22,6 +22,21 @@ Read the Loop document and determine which agents are affected using this checkl
 
 **Skip irrelevant agents.** Do not run all 6 every time.
 
+### R-SPLIT: Work Instruction Size Gate
+
+Before dispatching to agents, check work instruction line count.
+
+- ≤ 100 lines: execute as single Loop
+- 101–200 lines: WARN — recommend split, proceed if Ryan approves
+- > 200 lines: BLOCK — must split into Sub-Loops (≤ 100 lines each)
+
+Sub-Loop rules:
+- Numbered Loop-XX.1, .2, .3, ...
+- Each has own scope, checklist, commit
+- Each independently verifiable (build + check)
+- Earlier Sub-Loops committed before starting next
+- Director reports split plan and awaits Ryan approval
+
 ### Phase 2: Agent Dispatch
 
 Read each relevant agent's `.md` file and compare every phase/item in the Loop document against that agent's **BLOCK rules**.
@@ -64,6 +79,17 @@ After implementation is complete, the Director runs a second pass:
 4. Violations found → output fix instructions (hotfix)
 5. No violations → output "Agent Lint PASS"
 ```
+
+### R-PRECOMMIT: Pre-Commit Verification Gate
+
+After Agent Lint PASS, before git commit:
+
+1. Extract all checklist items from work instruction
+2. Verify each with grep, file read, or build
+3. Report ✅/❌ per item
+4. BLOCK commit if any ❌ — fix and re-verify first
+
+If no checklist in work instruction, Director generates 3–5 items from 목표 section.
 
 ---
 
