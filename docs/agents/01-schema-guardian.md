@@ -99,6 +99,14 @@ Violating these fails INSERT/UPDATE silently on the DB side.
 - Violation raises EXCEPTION (Supabase returns error to client)
 ```
 
+### B8: key_milestones Hierarchical Columns (Loop-37)
+
+- `parent_id` (uuid, nullable, FK to self ON DELETE CASCADE) — NULL = root level
+- `depth` (integer, default 0) — cached depth for query convenience
+- New child MS must set parent_id = parent's id, depth = parent's depth + 1
+- Deletion cascades to all descendants (ON DELETE CASCADE)
+- Index: idx_key_milestones_parent, idx_key_milestones_depth
+
 ---
 
 ## Known Divergences
@@ -110,6 +118,7 @@ Violating these fails INSERT/UPDATE silently on the DB side.
 | KD-1.3 | MEDIUM | `team_members` table missing `updated_at` column. Prerequisite for adding to SYNC_TABLES |
 | KD-1.4 | LOW | `push_subscriptions.user_id` is `text` type (not uuid). RLS uses `::uuid` cast as workaround |
 | KD-1.5 | LOW | `comments.task_id` and `notifications.task_id` have no FK constraint (intentional, but orphan records possible) |
+| KD-1.6 | LOW | milestones depth column is cached and may drift from actual parent chain. Frontend should recompute depth from parent_id chain if inconsistency suspected |
 
 ---
 

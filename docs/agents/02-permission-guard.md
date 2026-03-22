@@ -89,6 +89,17 @@ USING (team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()))
 | `get_my_owner_team_ids()` | SETOF uuid | Team IDs where I'm an owner |
 | `get_my_team_member_ids()` | SETOF uuid | User IDs of teammates |
 
+### B8: Cross-Scope Transition Policy (Loop-35I/35K)
+
+- Team task → personal project DnD: scope must change to 'private',
+  team_id=NULL, assignee_id=NULL
+- Personal task → team project DnD: scope must change to 'team' or 'assigned',
+  team_id must match project's team_id
+- DB trigger `validate_task_project_consistency` enforces this at DB level
+- Frontend must also validate before calling updateTask to avoid trigger errors
+- Personal project tasks cannot be assigned to other team members
+  (frontend shows toast: "개인 프로젝트 할일은 본인에게만 배정 가능합니다")
+
 ---
 
 ## Known Divergences
@@ -102,6 +113,8 @@ USING (team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()))
 | KD-2.5 | LOW | `notifications` missing DELETE policy. Relies on server-side purge |
 | KD-2.6 | LOW | `ui_state` uses `USING(true)` — no team isolation |
 | KD-2.7 | INFO | `companies` table: RLS enabled + zero policies = full deny (currently unused) |
+| KD-2.8 | LOW | Weekly Planner cross-member DnD (Loop-36B) allows reassigning tasks to other team members by changing assigneeId. Intentional for team collaboration but follows same over-permissive pattern as KD-2.1 |
+| KD-2.9 | LOW | Hierarchical milestone deletion (Loop-37) cascades to all descendants. No separate permission check for deleting child milestones — if user can delete parent, all children are deleted. Matches ON DELETE CASCADE behavior |
 
 ---
 

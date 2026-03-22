@@ -69,6 +69,36 @@ When adding a dependency to `package.json`:
 - Prefer dynamic import (`React.lazy` or `import()`) where possible
 - Review whether it should be added to `vite.config` manualChunks
 
+### B8. loadAll Concurrency Guard (Loop-35J)
+
+The _loadAllRunning flag in useStore.js MUST NOT be removed.
+It prevents:
+1. React StrictMode double-fire in dev mode
+2. Tab visibility restoration racing with auth-flow loadAll
+3. Optimistic updates being overwritten by concurrent loadAll
+
+Pattern:
+```
+if (_loadAllRunning) return;
+_loadAllRunning = true;
+try { ... } finally { _loadAllRunning = false; }
+```
+
+### B9. milestones in loadAll (Loop-36A)
+
+key_milestones data is loaded in the global loadAll Promise.all.
+Query: select('id, title, color, status, sort_order, pkm_id, owner_id, start_date, due_date, parent_id, depth')
+Do NOT load milestones in separate useEffect or custom hook for global views.
+Project-specific hooks (useKeyMilestones etc.) may still exist for specialized queries
+but the global store.milestones is the primary source for all views.
+
+### B10. Inline Gantt — No Additional Queries (Loop-37)
+
+UnifiedProjectView timeline mode renders gantt bars from store.milestones + store.tasks.
+No additional Supabase queries for timeline data.
+All date calculations (toX, computeGroupSpan) are pure frontend functions in
+src/utils/ganttHelpers.js — no network calls.
+
 ---
 
 ## Known Divergences
@@ -83,6 +113,8 @@ When adding a dependency to `package.json`:
 | KD-6.6 | LOW | lastSync not persisted. Even brief tab switches trigger full reload |
 | KD-6.7 | LOW | Optimistic update failure: no rollback, console.error only |
 | KD-6.8 | LOW | `TASK_COLUMNS = '*'` — needs explicit column list after schema stabilization |
+| KD-6.9 | LOW | WeeklyPlannerView (Loop-36B) filters tasks by dueDate for the selected week. Frontend-only filter on store.tasks. Performance concern if tasks grow very large (1000+) |
+| KD-6.10 | LOW | ganttHelpers.js (Loop-37) contains pure utility functions (toX, getWeekDates, computeGroupSpan). Shared between UnifiedProjectView and potentially global TimelineView — convergence target for future cleanup |
 
 ---
 
@@ -111,6 +143,21 @@ PollingSyncProvider
 ├── Inactive tab: stop on visibilitychange, resume with loadAll()
 └── Error handling: console.error, retry next cycle
 ```
+
+### loadAll Architecture (updated Loop-37)
+
+loadAll now fetches in single Promise.all:
+- tasks
+- projects
+- memos
+- notifications
+- milestones (key_milestones) — added Loop-36A
+- userTaskSettings — integrated Loop-35J
+
+Single set() call after all fetches complete — prevents multi-render flicker.
+
+_loadAllRunning guard (Loop-35J): module-level boolean flag prevents concurrent
+loadAll execution. Handles StrictMode double-fire and tab restoration race conditions.
 
 ---
 

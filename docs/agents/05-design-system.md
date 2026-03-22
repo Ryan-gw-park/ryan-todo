@@ -69,6 +69,43 @@ Using a different breakpoint value in new components = BLOCK.
 Touchable elements (buttons, checkboxes, tabs) must be minimum **44px × 44px**.
 Apply iOS 16px font-size (zoom prevention) and `env(safe-area-inset-bottom)`.
 
+### B8. View Content Width Specifications (Loop-36C)
+
+Each view must have an explicit max-width strategy:
+- Narrow views (list/edit): maxWidth + margin:'0 auto' + padding:'0 24px'
+- Full-width views (grid/chart): padding:'0 24px' only
+- Mobile (<768px): padding:'0 12px'
+
+Defined widths:
+
+| View | max-width |
+|------|-----------|
+| TodayView | 960px |
+| AllTasksView | 800px |
+| MemoryView (list) | 960px |
+| MemoryView (fullscreen edit) | 720px |
+| ProjectView (milestone/tasks) | 1100px |
+| ProjectView (timeline) | 1400px |
+| MatrixView | full |
+| TimelineView | full |
+| WeeklyPlannerView | full |
+
+New views MUST specify their width in the work instruction.
+
+### B9. Note Fullscreen Mode (Loop-36C)
+
+- MemoryView has two modes: list (card grid) and fullscreen (single note edit)
+- Fullscreen mode: max-width 720px, centered, ← back button, Escape to return
+- Content must not touch browser edges — always maintain left/right padding
+
+### B10. Project View Unified Layout (Loop-37)
+
+- Left tree area: sticky (position:sticky, left:0), opaque background (#fff)
+- Column widths: individually resizable per depth (min 80px, max 300px)
+- Main divider: draggable to adjust left/right ratio
+- No table borders in tree — tree-style rendering with column alignment
+- Gantt bars: semi-transparent MS bar (top) + solid task bar (below), same row
+
 ---
 
 ## Known Divergences
@@ -82,6 +119,8 @@ Apply iOS 16px font-size (zoom prevention) and `env(safe-area-inset-bottom)`.
 | KD-5.5 | LOW | TouchSensor delay inconsistency (TeamMatrixView 120ms vs rest 200ms) — overlaps Agent 04 |
 | KD-5.6 | LOW | HelpPage contains `borderLeft: '3px solid #f0c36d'` — banned pattern |
 | KD-5.7 | INFO | Identical style objects repeated across many files (modal backdrop, button defaults, etc.) |
+| KD-5.8 | LOW | TodayView empty project cards (Loop-36C) — 0-task cards show header-only with inline "+ 추가". Existing cards with tasks render normally |
+| KD-5.9 | LOW | MS badge display in TodayView (Loop-36C) is togglable ("MS 표시" checkbox). Default is OFF to maintain "지금 당장" focus of today view |
 
 ---
 

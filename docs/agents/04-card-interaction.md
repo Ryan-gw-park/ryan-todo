@@ -67,6 +67,13 @@ parseDateFromText(text) → auto-extract startDate/dueDate
 
 Never nest DndContext inside another DndContext. Using multiple SortableContexts within a single DndContext is allowed.
 
+### B7. Inline Gantt Bars (Loop-37)
+
+Project view timeline mode renders gantt bars directly inside row divs.
+This is NOT a DndContext — bars are positioned with CSS absolute positioning.
+Bar drag/resize uses manual mousedown/mousemove/mouseup events (same pattern as TimelineGrid).
+Do NOT wrap these in a DndContext — mouse events will conflict.
+
 ---
 
 ## Known Divergences
@@ -81,18 +88,29 @@ Never nest DndContext inside another DndContext. Using multiple SortableContexts
 | KD-4.6 | LOW | TitleZone onBlur always calls save() — unintended saves possible |
 | KD-4.7 | LOW | MilestoneTaskChip has drag listeners + onClick simultaneously attached |
 | KD-4.8 | INFO | TimelineGrid uses raw mousedown/up (no dnd-kit — separate paradigm) |
+| KD-4.9 | LOW | UnifiedProjectView inline gantt bars use manual mouse events for bar drag/resize, while tree area uses dnd-kit for milestone reordering. Spatial separation (right panel vs left panel) prevents conflict |
+| KD-4.10 | LOW | WeeklyPlannerView (Loop-36B) introduces cross-scope DnD: dragging a task to a different team member's row changes assigneeId. Must validate: personal project tasks cannot be assigned to other members |
 
-**Current 8 DndContext inventory:**
+**DndContext Inventory (updated Loop-37):**
 
-| File | Collision | Pointer dist | Touch delay |
-|------|-----------|-------------|-------------|
-| MatrixView | rectIntersection (default) | 3px | 200ms |
-| TeamMatrixView | custom matrixCollision | 3px | 120ms |
-| TodayView | closestCenter | 3px | 200ms |
-| TimelineEngine | — | — | — |
-| CompactTaskList | pointerWithin | 3px | 200ms |
-| MilestoneOutlinerView ×2 | closestCenter | **not set** | **not set** |
-| CompactMilestoneTab | pointerWithin | 3px | 200ms |
+| View | DndContext | Sensors | Collision |
+|------|-----------|---------|-----------|
+| TodayView | SortableContext | pointer:3, touch:200/5 | closestCenter |
+| MatrixView | DndContext | pointer:3, touch:120/5 | pointerWithin |
+| TeamMatrixView | DndContext | pointer:3, touch:200/5 | closestCenter |
+| CompactMilestoneTab | DndContext | pointer:3, touch:200/5 | pointerWithin |
+| WeeklyPlannerView | DndContext | pointer:3, touch:200/5 | closestCenter |
+| UnifiedProjectView | DndContext | pointer:3, touch:200/5 | closestCenter |
+
+WeeklyPlannerView DnD (Loop-36B):
+- Drag sources: backlog task items, grid task cards
+- Drop targets: day cells (memberId + date), backlog area
+- onDragEnd: updateTask(id, { dueDate, category, assigneeId })
+
+UnifiedProjectView DnD (Loop-37):
+- Drag sources: milestone nodes in tree
+- Drop targets: other positions in same parent, other parent nodes
+- onDragEnd: reorderMilestones or moveMilestone
 
 ---
 

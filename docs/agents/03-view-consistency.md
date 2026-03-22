@@ -11,29 +11,49 @@
 
 When a Loop modifies store data fields (tasks, projects, memos, milestones, etc.), the work instruction MUST include a checklist verifying correct behavior in **every view** that references that field.
 
-Current views (by `currentView` value):
+Complete View Inventory (updated Loop-37):
 
-```
-today        → TodayView
-allTasks     → AllTasksView
-matrix       → MatrixView / TeamMatrixView (teamId branch)
-project      → ProjectView
-timeline     → TimelineView
-memory       → MemoryView
-projectLayer → ProjectLayer (project detail: tasks/milestones/timeline/notes tabs)
-```
+Global views:
+1. TodayView — 오늘 할일
+2. AllTasksView — 전체 할일 (MS grouping, Loop-36A)
+3. MatrixView / TeamMatrixView — 매트릭스 (task mode + MS mode, Loop-36A)
+4. TimelineView — 글로벌 타임라인
+5. WeeklyPlannerView — 주간 플래너 (Loop-36B)
+6. MemoryView — 노트 (fullscreen mode, Loop-36C)
 
-**Example**: Adding a new field to the `tasks` array requires verification in at least TodayView, MatrixView, and ProjectLayer.
+Project views:
+7. UnifiedProjectView — 프로젝트 통합 뷰 (Loop-37)
+   - [전체 할일] mode: row-aligned task list
+   - [타임라인] mode: inline gantt bars (NOT TimelineGrid)
+
+Retired (files preserved, imports removed):
+- CompactMilestoneTab → replaced by UnifiedProjectView
+- TasksTab / CompactTaskList → replaced by UnifiedProjectView
+- Project TimelineView usage → replaced by inline gantt in UnifiedProjectView
+
+Detail/Modal:
+8. DetailPanel
+9. ProjectSettingsModal
+10. MilestoneDetailModal
+11. DeleteConfirmDialog
+
+**Example**: Adding a new field to the `tasks` array requires verification in at least TodayView, MatrixView, and UnifiedProjectView.
 
 ### B2. Sync all 3 navigation surfaces
 
 When adding or removing a view, ALL three surfaces must be updated:
 
-| Surface | Location | Role |
-|---------|----------|------|
-| Sidebar | Desktop left menu | Full view list |
-| BottomNav | Mobile bottom tabs | Primary views only |
-| Keyboard | Shortcut VIEW_ORDER | Ctrl+1~N switching |
+| Surface | Location | Views |
+|---------|----------|-------|
+| Sidebar | src/components/layout/Sidebar.jsx | 오늘할일, 전체할일, 매트릭스, 타임라인, 주간플래너, 노트 |
+| BottomNav | src/components/layout/BottomNav.jsx | 오늘할일, 전체할일, 매트릭스 (mobile subset) |
+| Keyboard | VIEW_ORDER array | today, allTasks, matrix, timeline, weekly, memory |
+
+When adding a new global view:
+1. Add to Sidebar
+2. Decide: add to BottomNav or explicitly exclude with comment
+3. Add to VIEW_ORDER for Ctrl+Shift+←/→ cycling
+4. Add React.lazy import in App.jsx
 
 Missing any one = BLOCK.
 
@@ -87,6 +107,9 @@ function MatrixView() {
 | KD-3.8 | LOW | ProjectView active tab in `useState` (resets) vs ProjectLayer in store (persists) — UX inconsistency |
 | KD-3.9 | LOW | TodayView greeting hardcodes "Ryan". Store `userName` not used |
 | KD-3.10 | LOW | Optimistic update failure: no rollback, `loadAll()` silently reverts |
+| KD-3.11 | LOW | WeeklyPlannerView (Loop-36B) may not be in BottomNav for mobile. Explicit decision needed — weekly planner may not be usable on mobile screen |
+| KD-3.12 | LOW | UnifiedProjectView (Loop-37) has two right-panel modes [전체 할일][타임라인]. The timeline mode uses inline gantt bars, NOT the global TimelineGrid. Changes to one do NOT automatically apply to the other |
+| KD-3.13 | INFO | Layout width specifications (Loop-36C): TodayView 960px, AllTasksView 800px, MatrixView full, TimelineView full, MemoryView list 960px / fullscreen 720px, ProjectView milestone/tasks 1100px / timeline 1400px, WeeklyPlannerView full |
 
 ---
 

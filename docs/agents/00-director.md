@@ -7,7 +7,13 @@
 
 ## Execution Protocol
 
-Work instructions must be written in English. Agent review reports are output in Korean.
+### Language Policy
+- Work instructions: English
+- Agent documents: English
+- CLAUDE.md: English
+- Code identifiers: English
+- Agent review reports (output): Korean
+- User-facing text in app: Korean
 
 ### Phase 1: Scope Analysis
 
