@@ -115,6 +115,54 @@ export function flattenTree(tree, defaultColor) {
 }
 
 /**
+ * 트리를 flat rows로 변환 (v8 mockup 구조: 각 행 = 1개 task)
+ * 리프에 연결된 task 수만큼 행을 생성
+ * @param {Array} tree - 트리 루트 배열
+ * @param {Array} tasks - store의 tasks 배열
+ * @param {string} projectId - 프로젝트 ID
+ * @param {string} defaultColor - 기본 색상
+ * @returns {{ rows, maxDepth }}
+ */
+export function flattenTreeWithTasks(tree, tasks, projectId, defaultColor) {
+  const rows = []
+  const maxDepth = getMaxDepth(tree)
+  const projectTasks = tasks.filter(t => t.projectId === projectId && !t.deletedAt)
+
+  const walk = (nodes, path, depth, color) => {
+    nodes.forEach(n => {
+      const c = n.color || color
+      const hasChildren = n.children && n.children.length > 0
+      if (hasChildren) {
+        walk(n.children, [...path, { id: n.id, title: n.title, color: c, isLeaf: false, _node: n }], depth + 1, c)
+      } else {
+        const cells = [...path, { id: n.id, title: n.title, color: c, isLeaf: true, _node: n }]
+        while (cells.length < maxDepth) cells.push(null)
+
+        // 리프에 연결된 할일 찾기
+        const leafTasks = projectTasks.filter(t => t.keyMilestoneId === n.id)
+        const subRowCount = Math.max(leafTasks.length, 1)
+
+        for (let i = 0; i < subRowCount; i++) {
+          rows.push({
+            leafId: n.id,
+            cells: i === 0 ? cells : cells.map(() => null), // rowspan simulation
+            task: leafTasks[i] || null,
+            isFirstSubRow: i === 0,
+            subRowCount: i === 0 ? subRowCount : 0,
+            color: c,
+            leafNode: n,
+            taskIndex: i,
+          })
+        }
+      }
+    })
+  }
+
+  walk(tree, [], 0, defaultColor || '#888')
+  return { rows, maxDepth }
+}
+
+/**
  * 노드에서 루트까지의 경로 문자열 생성
  * @param {string} nodeId
  * @param {Array} milestones - flat milestones 배열
