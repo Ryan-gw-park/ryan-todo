@@ -238,3 +238,36 @@ export function computeGroupSpan(node) {
     end: ends.length > 0 ? ends.sort().reverse()[0] : null,
   }
 }
+
+/**
+ * Get ancestor path string for a milestone (Loop-38)
+ * @param {string} msId - milestone ID
+ * @param {Array} milestones - flat milestones array
+ * @returns {string|null} "법인설립 > 지점설립" or null if depth=0
+ */
+export function getMsPath(msId, milestones) {
+  const parts = []
+  let cur = milestones.find(m => m.id === msId)
+  while (cur?.parent_id) {
+    const parent = milestones.find(m => m.id === cur.parent_id)
+    if (parent) {
+      parts.unshift(parent.title)
+      cur = parent
+    } else break
+  }
+  return parts.length > 0 ? parts.join(' > ') : null
+}
+
+/**
+ * Filter milestones by depth level for a project (Loop-38)
+ * @param {Array} milestones - flat milestones array
+ * @param {string} projectId - project ID (pkmId or project_id)
+ * @param {string} depthFilter - 'all' | '0' | '1' | '2'
+ * @returns {Array} filtered milestones
+ */
+export function getVisibleMs(milestones, projectId, depthFilter) {
+  const projMs = milestones.filter(m => m.project_id === projectId)
+  if (depthFilter === 'all') return projMs
+  const d = parseInt(depthFilter)
+  return projMs.filter(m => (m.depth ?? 0) === d)
+}

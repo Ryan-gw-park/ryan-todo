@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -16,8 +16,8 @@ import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
 import MSBadge from '../common/MSBadge'
-
-const MilestoneMatrixView = lazy(() => import('./MilestoneMatrixView'))
+import CompactMsRow from '../common/CompactMsRow'
+import { getMsPath, getVisibleMs } from '../../utils/milestoneTree'
 
 // Custom collision: pointerWithin → prefer task cards for reorder, fall back to category zone for cross-cell
 function matrixCollision(args) {
@@ -50,9 +50,14 @@ export default function TeamMatrixView() {
   const LW = isMobile ? 80 : 110
   const COL_GAP = 10
   const COL_MIN = isMobile ? 200 : 0
-  const [matrixMode, setMatrixMode] = useState('task') // 'task' | 'milestone'
 
-  // 마일스톤 데이터 (할일 모드 MS 뱃지용) — store에서 loadAll 시 함께 로딩됨
+  // Loop-38: sub-view tabs + depth toggle
+  const [subView, setSubView] = useState('matrix') // 'matrix' | 'project' | 'member'
+  const [depthFilter, setDepthFilter] = useState('0') // 'all' | '0' | '1' | '2'
+  const [members, setMembers] = useState([])
+  const [showUnassigned, setShowUnassigned] = useState(false)
+
+  // 마일스톤 데이터
   const milestones = useStore(s => s.milestones)
   const msMap = useMemo(() => {
     const m = {}
@@ -112,17 +117,18 @@ export default function TeamMatrixView() {
         uid = user.id
       }
       if (!cancelled) setUserId(uid)
-      const [members, existingCfg] = await Promise.all([
+      const [fetchedMembers, existingCfg] = await Promise.all([
         useTeamMembers.getMembers(currentTeamId),
         useMatrixConfig.getConfig(uid, currentTeamId),
       ])
       if (cancelled) return
+      setMembers(fetchedMembers) // Loop-38: store members for sub-views
       let cfg = existingCfg
       if (cfg.length === 0) {
-        cfg = await useMatrixConfig.initConfig(uid, currentTeamId, members)
+        cfg = await useMatrixConfig.initConfig(uid, currentTeamId, fetchedMembers)
       }
       if (!cancelled) setConfig(cfg)
-      useMatrixConfig.syncMembers(uid, currentTeamId, members).then(async () => {
+      useMatrixConfig.syncMembers(uid, currentTeamId, fetchedMembers).then(async () => {
         if (!cancelled) {
           const refreshed = await useMatrixConfig.getConfig(uid, currentTeamId)
           setConfig(refreshed)
@@ -334,43 +340,14 @@ export default function TeamMatrixView() {
   const N = allColumns.length
   const rowCategoryMap = { me_today: 'today', me_next: 'next' }
 
-  // 마일스톤 모드 → 별도 컴포넌트
-  if (matrixMode === 'milestone') {
-    return (
-      <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-          <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <TeamModePill active={matrixMode} onChange={setMatrixMode} />
-            </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <ProjectFilter />
-              <button onClick={() => setShowRowConfig(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500 }}>
-                <SettingsIcon /> 뷰 관리
-              </button>
-            </div>
-          </div>
-          <Suspense fallback={<div style={{ textAlign: 'center', color: '#999', padding: 40 }}>로딩...</div>}>
-            <MilestoneMatrixView projects={filteredProjects} milestones={milestones} tasks={tasks} />
-          </Suspense>
-        </div>
-        {showRowConfig && <RowConfigSettings teamId={currentTeamId} userId={userId} onClose={() => setShowRowConfig(false)} onSave={cfg => { setConfig(cfg); setShowRowConfig(false) }} />}
-      </div>
-    )
-  }
-
   return (
     <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <TeamModePill active={matrixMode} onChange={setMatrixMode} />
-            <div>
-              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>매트릭스 뷰</h1>
-              <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
-            </div>
+        {/* Header row 1: title + project filter + settings */}
+        <div style={{ marginBottom: 12, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>매트릭스 뷰</h1>
+            <p style={{ fontSize: 13, color: '#999', marginTop: 2 }}>{dateStr}</p>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <ProjectFilter />
@@ -384,7 +361,47 @@ export default function TeamMatrixView() {
           </div>
         </div>
 
-        <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {/* Header row 2: sub-view tabs + depth toggle (Loop-38) */}
+        <div style={{ marginBottom: 20, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <SubViewPill active={subView} onChange={setSubView} />
+          <div style={{ width: 1, height: 20, background: '#e8e6df' }} />
+          <DepthToggle value={depthFilter} onChange={setDepthFilter} />
+        </div>
+
+        {/* Loop-38: conditional sub-view rendering */}
+        {subView === 'matrix' && (
+          <SubviewMatrix
+            projects={filteredProjects}
+            milestones={milestones}
+            tasks={tasks}
+            members={members}
+            depthFilter={depthFilter}
+            showUnassigned={showUnassigned}
+            setShowUnassigned={setShowUnassigned}
+          />
+        )}
+        {subView === 'project' && (
+          <SubviewProject
+            projects={filteredProjects}
+            milestones={milestones}
+            tasks={tasks}
+            members={members}
+            depthFilter={depthFilter}
+          />
+        )}
+        {subView === 'member' && (
+          <SubviewMember
+            projects={filteredProjects}
+            milestones={milestones}
+            tasks={tasks}
+            members={members}
+            userId={userId}
+            depthFilter={depthFilter}
+          />
+        )}
+
+        {/* Original task-mode grid (hidden when sub-view is active) */}
+        {false && <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
 
@@ -589,8 +606,7 @@ export default function TeamMatrixView() {
           <DragOverlay dropAnimation={null}>
             {activeTask ? <TaskOverlay task={activeTask} /> : null}
           </DragOverlay>
-        </DndContext>
-      </div>
+        </DndContext>}
 
       {/* Row Config Settings Modal */}
       {showRowConfig && userId && (
@@ -605,6 +621,7 @@ export default function TeamMatrixView() {
           }}
         />
       )}
+      </div>
     </div>
   )
 }
@@ -960,20 +977,418 @@ function MemberAvatar({ name, size = 22 }) {
   )
 }
 
-/* ═══ Team Mode Pill — task/milestone toggle ═══ */
-function TeamModePill({ active, onChange }) {
-  const items = [{ key: 'task', label: '할일 모드' }, { key: 'milestone', label: '마일스톤 모드' }]
+/* ═══ Sub-view Pill — [매트릭스][프로젝트별][담당자별] (Loop-38) ═══ */
+function SubViewPill({ active, onChange }) {
+  const items = [
+    { key: 'matrix', label: '매트릭스' },
+    { key: 'project', label: '프로젝트별' },
+    { key: 'member', label: '담당자별' },
+  ]
   return (
-    <div style={{ display: 'flex', gap: 2, background: '#fafaf8', borderRadius: 8, padding: 2 }}>
+    <div style={{ display: 'flex', gap: 1, background: '#f5f4f0', borderRadius: 7, padding: 2 }}>
       {items.map(it => (
         <button key={it.key} onClick={() => onChange(it.key)} style={{
-          border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+          border: 'none', borderRadius: 5, padding: '4px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer',
           fontWeight: active === it.key ? 600 : 400,
           background: active === it.key ? '#fff' : 'transparent',
           color: active === it.key ? '#37352f' : '#a09f99',
           boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
         }}>{it.label}</button>
       ))}
+    </div>
+  )
+}
+
+/* ═══ Depth Toggle — [전체][대분류][중분류][소분류] (Loop-38) ═══ */
+function DepthToggle({ value, onChange }) {
+  const items = [
+    { key: 'all', label: '전체' },
+    { key: '0', label: '대분류' },
+    { key: '1', label: '중분류' },
+    { key: '2', label: '소분류' },
+  ]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 10.5, color: '#a09f99' }}>표시 단위:</span>
+      <div style={{ display: 'flex', gap: 2 }}>
+        {items.map(it => (
+          <button key={it.key} onClick={() => onChange(it.key)} style={{
+            border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 10, fontFamily: 'inherit', cursor: 'pointer',
+            fontWeight: value === it.key ? 600 : 400,
+            background: value === it.key ? '#1e293b' : '#f5f4f0',
+            color: value === it.key ? '#fff' : '#a09f99',
+          }}>{it.label}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Loop-38.2: Sub-view Components
+═══════════════════════════════════════════════════════════ */
+
+const S = {
+  textPrimary: '#37352f',
+  textSecondary: '#6b6a66',
+  textTertiary: '#a09f99',
+  border: '#e8e6df',
+}
+
+function Dot({ color, size = 7 }) {
+  return <div style={{ width: size, height: size, borderRadius: '50%', background: color, flexShrink: 0 }} />
+}
+
+function Avatar({ member, size = 18 }) {
+  const initial = (member?.displayName || member?.name || '?')[0].toUpperCase()
+  const bg = member?.color || '#888'
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontSize: size * 0.42, fontWeight: 600, flexShrink: 0,
+    }}>
+      {initial}
+    </div>
+  )
+}
+
+// Helper: filter milestones by depth
+function filterByDepth(milestones, projectId, depthFilter) {
+  const projMs = milestones.filter(m => m.project_id === projectId)
+  if (depthFilter === 'all') return projMs
+  const d = parseInt(depthFilter)
+  // Flat projects (maxDepth 0) always show their milestones
+  const hasDeepMs = projMs.some(m => (m.depth ?? 0) > 0)
+  if (!hasDeepMs) return projMs // flat project, show all
+  return projMs.filter(m => (m.depth ?? 0) === d)
+}
+
+// Helper: get task count for milestone
+function getMsTaskCount(msId, tasks) {
+  return tasks.filter(t => t.keyMilestoneId === msId && !t.deletedAt).length
+}
+
+// Helper: get assignee member
+function getAssignee(ms, members) {
+  if (!ms.owner_id) return null
+  return members.find(m => m.userId === ms.owner_id) || null
+}
+
+/* ═══ SubviewMatrix — member × project grid ═══ */
+function SubviewMatrix({ projects, milestones, tasks, members, depthFilter, showUnassigned, setShowUnassigned }) {
+  const N = projects.length
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `90px repeat(${N}, 1fr)`, gap: 0 }}>
+      {/* Header row */}
+      <div style={{ borderBottom: `1px solid ${S.border}` }} />
+      {projects.map(p => {
+        const c = getColor(p.color)
+        const visibleMs = filterByDepth(milestones, p.id, depthFilter)
+        return (
+          <div key={p.id} style={{
+            background: `${c.dot}10`, padding: '7px 8px',
+            borderBottom: `1px solid ${S.border}`,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            <Dot color={c.dot} size={7} />
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: S.textPrimary }}>{p.name}</span>
+            <span style={{ fontSize: 9, color: S.textTertiary, marginLeft: 'auto' }}>{visibleMs.length}</span>
+          </div>
+        )
+      })}
+
+      {/* Member rows */}
+      {members.map(mem => (
+        <>
+          <div key={`label-${mem.id}`} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 4,
+            padding: '6px 4px', borderBottom: `0.5px solid ${S.border}`,
+          }}>
+            <Avatar member={mem} size={20} />
+            <span style={{ fontSize: 10.5, fontWeight: 600, color: S.textPrimary, lineHeight: 1.6 }}>
+              {mem.displayName || mem.name}
+            </span>
+          </div>
+          {projects.map(p => {
+            const c = getColor(p.color)
+            const visibleMs = filterByDepth(milestones, p.id, depthFilter).filter(m => m.owner_id === mem.userId)
+            return (
+              <div key={`${mem.id}-${p.id}`} style={{
+                padding: '4px 4px', borderBottom: `0.5px solid ${S.border}`, background: `${c.dot}03`,
+              }}>
+                {visibleMs.length === 0 ? (
+                  <span style={{ fontSize: 10, color: '#e0e0e0', padding: '4px 8px', display: 'block' }}>—</span>
+                ) : visibleMs.map(ms => (
+                  <CompactMsRow
+                    key={ms.id}
+                    milestone={ms}
+                    milestones={milestones}
+                    color={c.dot}
+                    taskCount={getMsTaskCount(ms.id, tasks)}
+                    assignee={getAssignee(ms, members)}
+                  />
+                ))}
+              </div>
+            )
+          })}
+        </>
+      ))}
+
+      {/* Unassigned row */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 3, padding: '6px 4px',
+        cursor: 'pointer', borderBottom: `0.5px solid ${S.border}`,
+      }} onClick={() => setShowUnassigned(!showUnassigned)}>
+        <span style={{ fontSize: 9, color: S.textTertiary }}>{showUnassigned ? '▾' : '▸'}</span>
+        <span style={{ fontSize: 10, color: S.textTertiary, fontStyle: 'italic' }}>미배정</span>
+      </div>
+      {projects.map(p => {
+        const c = getColor(p.color)
+        const unassigned = filterByDepth(milestones, p.id, depthFilter).filter(m => !m.owner_id)
+        return (
+          <div key={`un-${p.id}`} style={{
+            padding: '4px 4px', borderBottom: `0.5px solid ${S.border}`, background: `${c.dot}02`,
+          }}>
+            {!showUnassigned ? (
+              <span style={{ fontSize: 10, color: S.textTertiary, padding: '2px 8px' }}>
+                {unassigned.length > 0 ? `${unassigned.length}개` : '—'}
+              </span>
+            ) : unassigned.map(ms => (
+              <CompactMsRow
+                key={ms.id}
+                milestone={ms}
+                milestones={milestones}
+                color={c.dot}
+                taskCount={getMsTaskCount(ms.id, tasks)}
+                assignee={null}
+              />
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ═══ SubviewProject — 2-column project cards ═══ */
+function SubviewProject({ projects, milestones, tasks, members, depthFilter }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {projects.map(p => {
+        const c = getColor(p.color)
+        const visibleMs = filterByDepth(milestones, p.id, depthFilter)
+        const assigned = visibleMs.filter(m => m.owner_id)
+        const unassigned = visibleMs.filter(m => !m.owner_id)
+
+        // Group by member
+        const byMember = {}
+        assigned.forEach(m => {
+          const key = m.owner_id
+          if (!byMember[key]) byMember[key] = []
+          byMember[key].push(m)
+        })
+
+        return (
+          <div key={p.id} style={{
+            background: '#fff', borderRadius: 8, border: `0.5px solid ${S.border}`, overflow: 'hidden',
+          }}>
+            {/* Card header */}
+            <div style={{
+              background: `${c.dot}10`, padding: '8px 12px',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <Dot color={c.dot} size={8} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: S.textPrimary }}>{p.name}</span>
+              <span style={{ fontSize: 10, color: S.textTertiary, marginLeft: 'auto' }}>{visibleMs.length} MS</span>
+            </div>
+
+            {/* Card body */}
+            <div style={{ padding: '6px 8px' }}>
+              {Object.entries(byMember).map(([userId, msList]) => {
+                const mem = members.find(m => m.userId === userId)
+                return (
+                  <div key={userId} style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px' }}>
+                      <Avatar member={mem} size={16} />
+                      <span style={{ fontSize: 10.5, fontWeight: 600, color: S.textPrimary }}>
+                        {mem?.displayName || mem?.name || '?'}
+                      </span>
+                      <span style={{ fontSize: 9, color: S.textTertiary }}>{msList.length}개</span>
+                    </div>
+                    {msList.map(ms => (
+                      <CompactMsRow
+                        key={ms.id}
+                        milestone={ms}
+                        milestones={milestones}
+                        color={c.dot}
+                        taskCount={getMsTaskCount(ms.id, tasks)}
+                        assignee={mem}
+                      />
+                    ))}
+                  </div>
+                )
+              })}
+
+              {/* Unassigned section */}
+              {unassigned.length > 0 && (
+                <div style={{ marginTop: 4, paddingTop: 4, borderTop: `0.5px dashed ${S.border}` }}>
+                  <span style={{ fontSize: 9.5, color: S.textTertiary, fontStyle: 'italic', padding: '0 4px' }}>
+                    미배정 ({unassigned.length})
+                  </span>
+                  {unassigned.slice(0, 5).map(ms => (
+                    <CompactMsRow
+                      key={ms.id}
+                      milestone={ms}
+                      milestones={milestones}
+                      color={c.dot}
+                      taskCount={getMsTaskCount(ms.id, tasks)}
+                      assignee={null}
+                    />
+                  ))}
+                  {unassigned.length > 5 && (
+                    <span style={{ fontSize: 9, color: S.textTertiary, padding: '2px 8px' }}>
+                      ...외 {unassigned.length - 5}개
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Empty state */}
+              {assigned.length === 0 && unassigned.length === 0 && (
+                <span style={{ fontSize: 10, color: S.textTertiary, padding: 8, display: 'block', textAlign: 'center' }}>
+                  마일스톤 없음
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ═══ SubviewMember — member portfolio cards ═══ */
+function SubviewMember({ projects, milestones, tasks, members, userId, depthFilter }) {
+  const [showUnassignedCard, setShowUnassignedCard] = useState(false)
+
+  return (
+    <div>
+      {/* Member cards */}
+      {members.map(mem => {
+        const myMs = []
+        projects.forEach(p => {
+          const c = getColor(p.color)
+          const visibleMs = filterByDepth(milestones, p.id, depthFilter).filter(m => m.owner_id === mem.userId)
+          if (visibleMs.length) myMs.push({ project: p, color: c, ms: visibleMs })
+        })
+        const totalMs = myMs.reduce((a, g) => a + g.ms.length, 0)
+        const totalT = myMs.reduce((a, g) => a + g.ms.reduce((b, m) => b + getMsTaskCount(m.id, tasks), 0), 0)
+
+        return (
+          <div key={mem.id} style={{
+            marginBottom: 8, background: '#fff', borderRadius: 8,
+            border: `0.5px solid ${S.border}`, overflow: 'hidden',
+          }}>
+            {/* Card header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+              background: '#fafaf8', borderBottom: `0.5px solid ${S.border}`,
+            }}>
+              <Avatar member={mem} size={22} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: S.textPrimary }}>
+                {mem.displayName || mem.name}
+              </span>
+              <span style={{ fontSize: 10.5, color: S.textTertiary }}>{totalMs} MS · {totalT} 할일</span>
+              {totalT > 10 && (
+                <span style={{ fontSize: 9.5, color: '#ef4444', fontWeight: 600 }}>⚠ 과부하</span>
+              )}
+            </div>
+
+            {/* Card body */}
+            <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {myMs.length === 0 ? (
+                <span style={{ fontSize: 10.5, color: S.textTertiary, fontStyle: 'italic', padding: 4 }}>
+                  배정된 마일스톤 없음
+                </span>
+              ) : myMs.map(g => (
+                <div key={g.project.id} style={{ minWidth: 200, flex: '1 1 220px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px', marginBottom: 2 }}>
+                    <Dot color={g.color.dot} size={6} />
+                    <span style={{ fontSize: 10.5, fontWeight: 600, color: g.color.dot }}>{g.project.name}</span>
+                    <span style={{ fontSize: 9, color: S.textTertiary }}>{g.ms.length}개</span>
+                  </div>
+                  {g.ms.map(ms => (
+                    <CompactMsRow
+                      key={ms.id}
+                      milestone={ms}
+                      milestones={milestones}
+                      color={g.color.dot}
+                      taskCount={getMsTaskCount(ms.id, tasks)}
+                      assignee={mem}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Unassigned card */}
+      {(() => {
+        const unassignedGroups = []
+        projects.forEach(p => {
+          const c = getColor(p.color)
+          const visibleMs = filterByDepth(milestones, p.id, depthFilter).filter(m => !m.owner_id)
+          if (visibleMs.length) unassignedGroups.push({ project: p, color: c, ms: visibleMs })
+        })
+        if (unassignedGroups.length === 0) return null
+        const totalUn = unassignedGroups.reduce((a, g) => a + g.ms.length, 0)
+
+        return (
+          <div style={{
+            marginTop: 8, background: '#fff', borderRadius: 8,
+            border: `0.5px solid ${S.border}`, overflow: 'hidden',
+          }}>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                background: '#fafaf8', borderBottom: `0.5px solid ${S.border}`, cursor: 'pointer',
+              }}
+              onClick={() => setShowUnassignedCard(!showUnassignedCard)}
+            >
+              <span style={{ fontSize: 9, color: S.textTertiary }}>{showUnassignedCard ? '▾' : '▸'}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: S.textTertiary }}>미배정</span>
+              <span style={{ fontSize: 10.5, color: S.textTertiary }}>{totalUn}개</span>
+            </div>
+            {showUnassignedCard && (
+              <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {unassignedGroups.map(g => (
+                  <div key={g.project.id} style={{ minWidth: 200, flex: '1 1 220px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px', marginBottom: 2 }}>
+                      <Dot color={g.color.dot} size={6} />
+                      <span style={{ fontSize: 10.5, fontWeight: 600, color: g.color.dot }}>{g.project.name}</span>
+                      <span style={{ fontSize: 9, color: S.textTertiary }}>{g.ms.length}개</span>
+                    </div>
+                    {g.ms.map(ms => (
+                      <CompactMsRow
+                        key={ms.id}
+                        milestone={ms}
+                        milestones={milestones}
+                        color={g.color.dot}
+                        taskCount={getMsTaskCount(ms.id, tasks)}
+                        assignee={null}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
