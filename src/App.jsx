@@ -83,11 +83,10 @@ function AppShell({ mobile }) {
     return () => document.removeEventListener('keydown', handler)
   }, [currentView])
 
-  // Loop-39: 3-section sidebar view routing
-  const teamId = useStore(s => s.currentTeamId)
+  // Loop-39: 3-section sidebar view routing — team views always use team components
   const views = {
     today: TodayView, allTasks: AllTasksView, memory: MemoryView,
-    'team-matrix': teamId ? TeamMatrixView : MatrixView,
+    'team-matrix': TeamMatrixView,
     'team-timeline': TimelineView,
     'team-weekly': WeeklyPlannerView,
     'personal-matrix': PersonalMatrixView,
