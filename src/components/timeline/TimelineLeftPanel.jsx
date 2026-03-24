@@ -71,7 +71,7 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
         display: 'flex', alignItems: 'center', gap: 5,
         padding: `0 4px 0 ${4 + indent}px`,
         cursor: hasChildren ? 'pointer' : 'default',
-        height: rowH, boxSizing: 'border-box',
+        height: rowH, boxSizing: 'border-box', overflow: 'hidden',
         borderBottom: '1px solid #f0f0f0',
         background: isProject ? 'transparent' : '#fafafa',
       }}
@@ -143,7 +143,7 @@ function SortableTaskRow({ node, onOpenDetail, isDragging }) {
         transition,
         paddingLeft: 4 + indent + 16,
         height: rowH, display: 'flex', alignItems: 'center',
-        boxSizing: 'border-box',
+        boxSizing: 'border-box', overflow: 'hidden',
       }}
       {...attributes}
       {...listeners}
