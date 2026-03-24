@@ -100,6 +100,29 @@ USING (team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()))
 - Personal project tasks cannot be assigned to other team members
   (frontend shows toast: "개인 프로젝트 할일은 본인에게만 배정 가능합니다")
 
+### B9: Scope-Based Interaction Constraints (Loop-39)
+
+Data filtering by scope:
+- team scope: projects where team_id IS NOT NULL → all team members' tasks/MS visible
+- personal scope: ALL projects (team + personal) → only items where
+  assignee_id = currentUser OR owner_id = currentUser
+
+Interaction constraints by scope:
+| Action | Team Scope | Personal Scope |
+|--------|-----------|----------------|
+| View tasks | All team members | My tasks only |
+| Add task | Any project × any member cell | Any project (assigned to me) |
+| DnD change category | ✅ | ✅ |
+| DnD change assignee | ✅ | ❌ BLOCKED |
+| DnD change dueDate | ✅ | ✅ |
+| Edit task | ✅ (permission rules apply) | ✅ (my tasks only) |
+| MS reassignment | ✅ (owner_id change) | ❌ BLOCKED |
+
+Personal scope blocks assignee/owner changes because:
+- Personal view purpose is "manage MY work", not "redistribute team work"
+- Reassignment requires team context (seeing all members' load)
+- Use team views for reassignment
+
 ---
 
 ## Known Divergences
@@ -115,6 +138,7 @@ USING (team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()))
 | KD-2.7 | INFO | `companies` table: RLS enabled + zero policies = full deny (currently unused) |
 | KD-2.8 | LOW | Weekly Planner cross-member DnD (Loop-36B) allows reassigning tasks to other team members by changing assigneeId. Intentional for team collaboration but follows same over-permissive pattern as KD-2.1 |
 | KD-2.9 | LOW | Hierarchical milestone deletion (Loop-37) cascades to all descendants. No separate permission check for deleting child milestones — if user can delete parent, all children are deleted. Matches ON DELETE CASCADE behavior |
+| KD-2.10 | INFO | Personal scope DnD intentionally blocks assigneeId and ownerId changes. If user attempts cross-member DnD in personal view, show toast: "담당자 변경은 팀 뷰에서 가능합니다". This is a UX guardrail, not a permission issue. |
 
 ---
 

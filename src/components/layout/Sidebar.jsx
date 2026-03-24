@@ -30,12 +30,15 @@ const S = {
 }
 
 const GLOBAL_VIEWS = [
-  { key: 'today',    label: '오늘 할일',  icon: '📋' },
+  { key: 'today',    label: '지금 할일',  icon: '📋' },
   { key: 'allTasks', label: '전체 할일',  icon: '📑' },
+  { key: 'memory',   label: '노트',       icon: '✎' },
+]
+
+const TASK_VIEWS = [
   { key: 'matrix',   label: '매트릭스',   icon: '⊞' },
   { key: 'timeline', label: '타임라인',   icon: '▤' },
   { key: 'weekly',   label: '주간 플래너', icon: '📅' },
-  { key: 'memory',   label: '노트',       icon: '✎' },
 ]
 
 export default function Sidebar() {
@@ -52,6 +55,16 @@ export default function Sidebar() {
   const [showTeamSwitcher, setShowTeamSwitcher] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
   const [addProjectScope, setAddProjectScope] = useState('team') // 'team' or 'personal'
+  const [sectionCollapsed, setSectionCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sidebarSections') || '{}') } catch { return {} }
+  })
+  const toggleSection = (key) => {
+    setSectionCollapsed(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      localStorage.setItem('sidebarSections', JSON.stringify(next))
+      return next
+    })
+  }
   const currentTeam = myTeams?.find(t => t.id === currentTeamId)
   const teamName = currentTeam?.name || '개인 모드'
 
@@ -182,7 +195,7 @@ export default function Sidebar() {
 
       {/* ── Scrollable content ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: `${S.dividerMy}px 0` }}>
-        {/* Global Views */}
+        {/* ─── Section 1: 글로벌 뷰 ─── */}
         {!collapsed && <SectionLabel label="글로벌 뷰" />}
         {GLOBAL_VIEWS.map(v => (
           <NavItem key={v.key} icon={v.icon} label={v.label} isActive={currentView === v.key} onClick={() => setView(v.key)} collapsed={collapsed} />
@@ -190,21 +203,54 @@ export default function Sidebar() {
 
         <Divider />
 
-        {/* Team Projects */}
+        {/* ─── Section 2: 할일 ─── */}
+        {!collapsed && <SectionLabel label="할일" />}
+
+        {/* 팀 subsection */}
+        {currentTeamId && !collapsed && (
+          <SubSectionHeader label="팀" collapsed={sectionCollapsed.taskTeam} onClick={() => toggleSection('taskTeam')} />
+        )}
+        {currentTeamId && !sectionCollapsed.taskTeam && TASK_VIEWS.map(v => (
+          <NavItem key={`team-${v.key}`} icon={v.icon} label={v.label}
+            isActive={currentView === `team-${v.key}`}
+            onClick={() => setView(`team-${v.key}`)}
+            collapsed={collapsed}
+            indent={collapsed ? 0 : 1}
+          />
+        ))}
+
+        {/* 개인 subsection */}
+        {!collapsed && (
+          <SubSectionHeader label="개인" collapsed={sectionCollapsed.taskPersonal} onClick={() => toggleSection('taskPersonal')} />
+        )}
+        {!sectionCollapsed.taskPersonal && TASK_VIEWS.map(v => (
+          <NavItem key={`personal-${v.key}`} icon={v.icon} label={v.label}
+            isActive={currentView === `personal-${v.key}`}
+            onClick={() => setView(`personal-${v.key}`)}
+            collapsed={collapsed}
+            indent={collapsed ? 0 : 1}
+          />
+        ))}
+
+        <Divider />
+
+        {/* ─── Section 3: 프로젝트 ─── */}
+        {!collapsed && <SectionLabel label="프로젝트" />}
+
+        {/* 팀 프로젝트 */}
         {currentTeamId && (
           <>
-            {!collapsed && <SectionLabel label="팀 프로젝트" onAdd={() => { setAddProjectScope('team'); setShowAddProject(true) }} />}
-            {teamProjects.map(p => (
-              <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} />
+            {!collapsed && <SubSectionHeader label="팀 프로젝트" collapsed={sectionCollapsed.projTeam} onClick={() => toggleSection('projTeam')} onAdd={() => { setAddProjectScope('team'); setShowAddProject(true) }} />}
+            {!sectionCollapsed.projTeam && teamProjects.map(p => (
+              <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} />
             ))}
-            <Divider />
           </>
         )}
 
-        {/* Personal Projects */}
-        {!collapsed && <SectionLabel label="개인 프로젝트" onAdd={() => { setAddProjectScope('personal'); setShowAddProject(true) }} />}
-        {personalProjects.map(p => (
-          <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} />
+        {/* 개인 프로젝트 */}
+        {!collapsed && <SubSectionHeader label="개인 프로젝트" collapsed={sectionCollapsed.projPersonal} onClick={() => toggleSection('projPersonal')} onAdd={() => { setAddProjectScope('personal'); setShowAddProject(true) }} />}
+        {!sectionCollapsed.projPersonal && personalProjects.map(p => (
+          <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} />
         ))}
       </div>
 
@@ -295,7 +341,33 @@ function SectionLabel({ label, onAdd }) {
   )
 }
 
-function NavItem({ icon, label, isActive, onClick, collapsed }) {
+function SubSectionHeader({ label, collapsed, onClick, onAdd }) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: `6px ${S.itemMx + S.itemPx}px 2px ${S.itemMx + S.itemPx + 4}px`,
+        fontSize: 11, fontWeight: 500, color: '#a09f99',
+        cursor: 'pointer', userSelect: 'none',
+      }}
+    >
+      <span onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+        <span style={{ fontSize: 9, width: 12 }}>{collapsed ? '▸' : '▾'}</span>
+        <span>{label}</span>
+      </span>
+      {onAdd && (
+        <span
+          onClick={e => { e.stopPropagation(); onAdd() }}
+          style={{ fontSize: 14, color: '#b4b2a9', cursor: 'pointer', fontWeight: 400, lineHeight: 1 }}
+          onMouseEnter={e => e.currentTarget.style.color = '#6b6a66'}
+          onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+        >+</span>
+      )}
+    </div>
+  )
+}
+
+function NavItem({ icon, label, isActive, onClick, collapsed, indent = 0 }) {
   const [hovered, setHovered] = useState(false)
   return (
     <div
@@ -305,7 +377,7 @@ function NavItem({ icon, label, isActive, onClick, collapsed }) {
       title={collapsed ? label : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: S.gap,
-        padding: collapsed ? `${S.itemPy}px 0` : `${S.itemPy}px ${S.itemPx}px`,
+        padding: collapsed ? `${S.itemPy}px 0` : `${S.itemPy}px ${S.itemPx}px ${S.itemPy}px ${S.itemPx + indent * 12}px`,
         margin: `1px ${S.itemMx}px`,
         borderRadius: S.radius,
         cursor: 'pointer',
@@ -328,7 +400,7 @@ function NavItem({ icon, label, isActive, onClick, collapsed }) {
   )
 }
 
-function ProjectItem({ project, isActive, onClick, collapsed }) {
+function ProjectItem({ project, isActive, onClick, collapsed, indent = 0 }) {
   const [hovered, setHovered] = useState(false)
   const openModal = useStore(s => s.openModal)
   const color = getColor(project.color)
@@ -340,7 +412,7 @@ function ProjectItem({ project, isActive, onClick, collapsed }) {
       title={collapsed ? project.name : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: S.gap,
-        padding: collapsed ? `${S.itemPy}px 0` : `${S.itemPy}px ${S.itemPx}px`,
+        padding: collapsed ? `${S.itemPy}px 0` : `${S.itemPy}px ${S.itemPx}px ${S.itemPy}px ${S.itemPx + indent * 12}px`,
         margin: `1px ${S.itemMx}px`,
         borderRadius: S.radius,
         cursor: 'pointer',

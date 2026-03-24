@@ -5,7 +5,7 @@ import { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import { getColor } from '../../utils/colors'
-import ProjectFilter from '../shared/ProjectFilter'
+// ProjectFilter removed — scope determined by sidebar (Loop-39)
 import ProgressBar from '../common/ProgressBar'
 
 /* ═══════════════════════════════════════════════════════
@@ -233,7 +233,6 @@ export default function WeeklyPlannerView() {
               <span style={{ fontSize: 13, color: '#6b6a66' }}>{weekLabel}</span>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <ProjectFilter />
             </div>
           </div>
 

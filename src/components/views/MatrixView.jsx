@@ -99,13 +99,14 @@ export default function MatrixView() {
       <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
         <div>
           <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <ModePill active={matrixMode} onChange={setMatrixMode} />
+              <button onClick={() => setShowProjectMgr(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500 }}>
+                <SettingsIcon /> 프로젝트 관리
+              </button>
             </div>
-            <button onClick={() => setShowProjectMgr(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500 }}>
-              <SettingsIcon /> 프로젝트 관리
-            </button>
           </div>
           <Suspense fallback={<div style={{ textAlign: 'center', color: '#999', padding: 40 }}>로딩...</div>}>
             <MilestoneMatrixView projects={projects} milestones={milestones} tasks={tasks} />
@@ -120,18 +121,20 @@ export default function MatrixView() {
       <div>
         <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <ModePill active={matrixMode} onChange={setMatrixMode} />
             <div>
               <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>매트릭스 뷰</h1>
               <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
             </div>
           </div>
-          <button onClick={() => setShowProjectMgr(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#999'; e.currentTarget.style.color = '#37352f' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e0e0'; e.currentTarget.style.color = '#888' }}>
-            <SettingsIcon /> 프로젝트 관리
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <ModePill active={matrixMode} onChange={setMatrixMode} />
+            <button onClick={() => setShowProjectMgr(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#999'; e.currentTarget.style.color = '#37352f' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e0e0'; e.currentTarget.style.color = '#888' }}>
+              <SettingsIcon /> 프로젝트 관리
+            </button>
+          </div>
         </div>
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>

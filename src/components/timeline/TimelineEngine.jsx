@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
+import { getCachedUserId } from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import {
@@ -25,7 +26,7 @@ const LEFT_PANEL_MOBILE = 130
  * @param {string} initialScale - 'month' | 'quarter' | 'year'
  * @param {string} initialDepth - 'project' | 'milestone' | 'task'
  */
-export default function TimelineEngine({ rootLevel, projectId, initialScale = 'month', initialDepth = 'task' }) {
+export default function TimelineEngine({ rootLevel, projectId, initialScale = 'month', initialDepth = 'task', scope }) {
   const isProjectMode = !!projectId
   const {
     projects, tasks, openDetail, updateTask, reorderTasks, moveTaskTo,
@@ -70,6 +71,7 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
 
   // ── Milestones (store에서 loadAll 시 함께 로딩됨) ──
   const allMilestones = useStore(s => s.milestones)
+  const personalUserId = scope === 'personal' ? getCachedUserId() : null
 
   // ── Column computation ──
   const colW = COL_WIDTHS[scale]
@@ -115,31 +117,45 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
 
   // ── Build tree + apply filters ──
   const displayProjects = useMemo(() => {
+    // scope="personal": show ALL projects (both team + personal) — filter by tasks later
+    let base = scope === 'personal' ? projects : filteredProjects
     let result = isProjectMode
-      ? filteredProjects.filter(p => p.id === projectId)
-      : filteredProjects
+      ? base.filter(p => p.id === projectId)
+      : base
 
     if (!isProjectMode && selectedProjects) {
       result = result.filter(p => selectedProjects.includes(p.id))
     }
 
-    // Scope filter
-    if (scopeFilter === 'team') result = result.filter(p => p.teamId)
-    else if (scopeFilter === 'personal') result = result.filter(p => !p.teamId)
+    // Scope filter (internal toggle, not used when scope prop is set)
+    if (!scope) {
+      if (scopeFilter === 'team') result = result.filter(p => p.teamId)
+      else if (scopeFilter === 'personal') result = result.filter(p => !p.teamId)
+    }
 
     return result
-  }, [filteredProjects, selectedProjects, isProjectMode, projectId, scopeFilter])
+  }, [filteredProjects, projects, selectedProjects, isProjectMode, projectId, scopeFilter, scope])
 
   const displayTasks = useMemo(() => {
-    let result = filteredTasks.filter(t => !t.deletedAt)
+    // scope="personal": use all tasks, filter to my tasks only
+    let base = scope === 'personal' ? tasks : filteredTasks
+    let result = base.filter(t => !t.deletedAt)
+
+    // Personal scope: only my tasks
+    if (scope === 'personal' && personalUserId) {
+      result = result.filter(t => t.assigneeId === personalUserId || t.createdBy === personalUserId)
+    }
+
     if (isProjectMode) {
       result = result.filter(t => t.projectId === projectId)
     } else if (selectedProjects) {
       result = result.filter(t => selectedProjects.includes(t.projectId))
     }
-    // Scope filter
-    if (scopeFilter === 'team') result = result.filter(t => t.teamId)
-    else if (scopeFilter === 'personal') result = result.filter(t => t.scope === 'private')
+    // Scope filter (internal toggle, not used when scope prop is set)
+    if (!scope) {
+      if (scopeFilter === 'team') result = result.filter(t => t.teamId)
+      else if (scopeFilter === 'personal') result = result.filter(t => t.scope === 'private')
+    }
 
     // Assignee filter
     if (selectedMembers) {
@@ -152,7 +168,7 @@ export default function TimelineEngine({ rootLevel, projectId, initialScale = 'm
     }
 
     return result
-  }, [filteredTasks, selectedProjects, selectedMembers, showUnassigned, isProjectMode, projectId, scopeFilter])
+  }, [filteredTasks, tasks, selectedProjects, selectedMembers, showUnassigned, isProjectMode, projectId, scopeFilter, scope, personalUserId])
 
   const tree = useMemo(() => {
     return buildTimelineTree({

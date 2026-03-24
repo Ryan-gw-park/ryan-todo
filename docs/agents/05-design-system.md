@@ -106,6 +106,74 @@ New views MUST specify their width in the work instruction.
 - No table borders in tree — tree-style rendering with column alignment
 - Gantt bars: semi-transparent MS bar (top) + solid task bar (below), same row
 
+### B11: Sidebar 3-Section Structure (Loop-39)
+
+Section header:
+- fontSize: 11px, fontWeight: 600, color: textTertiary
+- letterSpacing: 0.02em
+- padding: 16px 14px 4px
+
+Sub-section header (팀/개인):
+- fontSize: 11px, fontWeight: 500, color: textTertiary
+- ▸▾ toggle: fontSize 9px, width 12px
+- padding: 6px 14px 2px 18px
+- Collapsible — default expanded
+
+Nav item:
+- icon: 14px width 20px centered, opacity 0.7
+- label: fontSize 13px, color textPrimary
+- padding: 6px 12px (+ indent per level: 12px)
+- Active state: background #f0efeb, fontWeight 600
+- Hover state: background #f5f4f0
+- Border radius: 6px
+- Margin: 1px 6px
+
+Project item:
+- Dot (8px) + name (fontSize 13px)
+- Same active/hover as nav items
+
+Badge (notifications):
+- fontSize 10px, color #fff, background #ef4444
+- borderRadius 8px, padding 0 5px, minWidth 16px
+
+### B12: Team vs Personal Layout Variants (Loop-39)
+
+Same component name, different layout by scope:
+
+| Aspect | Team | Personal |
+|--------|------|----------|
+| Matrix rows | Team members (avatar + name) | Projects (dot + name) |
+| Matrix cols | Projects (dot + name) | Categories: 오늘/다음/나중 |
+| Matrix cell | Tasks for (member, project) | Tasks for (project, category) |
+| Matrix + 추가 | Creates task for specific member+project | Creates task for specific project+category (assigned to me) |
+| Weekly rows | Team members | Projects |
+| Weekly cell | Tasks for (member, day) | Tasks for (project, day) |
+| Timeline | All members' gantt, avatar badges | My gantt only, no avatar needed |
+
+View header must indicate scope:
+- Team views: "팀 매트릭스", "팀 타임라인", "팀 주간 플래너"
+- Personal views: "개인 매트릭스", "개인 타임라인", "개인 주간 플래너"
+
+When modifying shared components, test BOTH scope variants.
+
+### B13: View Content Width — Scope-Aware Update (Loop-39)
+
+| View | maxWidth |
+|------|----------|
+| TodayView | 800 |
+| AllTasksView | 800 |
+| MemoryView | 960 (list) / 720 (fullscreen) |
+| MatrixView | full width |
+| WeeklyPlannerView | full width |
+| TimelineView | full width |
+| ProjectLayer | 1100 (tasks) / 1400 (timeline) |
+| TeamMatrixView | full width |
+| TeamTimelineView | full width |
+| TeamWeeklyPlannerView | full width |
+| PersonalMatrixView | full width |
+| PersonalTimelineView | full width |
+| PersonalWeeklyPlannerView | full width |
+
 ---
 
 ## Known Divergences

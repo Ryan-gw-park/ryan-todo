@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
-import ProjectFilter from '../shared/ProjectFilter'
+// ProjectFilter removed — scope determined by sidebar (Loop-39)
 import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { CategorySection } from '../project/tasks'
@@ -110,10 +110,9 @@ export default function ProjectView() {
             <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>프로젝트</h1>
             <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>↑↓ 이동 · Enter 새 항목 · Tab 레벨 · Ctrl+←/→ 프로젝트 이동</p>
           </div>
-          <ProjectFilter />
         </div>
         <div style={{ padding: 60, textAlign: 'center', color: '#bbb', fontSize: 13 }}>
-          {projects.length === 0 ? '프로젝트를 추가하세요' : '해당 필터에 맞는 프로젝트가 없습니다'}
+          {projects.length === 0 ? '프로젝트를 추가하세요' : '프로젝트가 없습니다'}
         </div>
       </div>
     </div>
@@ -149,7 +148,6 @@ export default function ProjectView() {
             <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>↑↓ 이동 · Enter 새 항목 · Tab 레벨 · Ctrl+←/→ 프로젝트 이동</p>
           </div>
           <div className="today-toolbar">
-            <ProjectFilter />
           </div>
         </div>
 

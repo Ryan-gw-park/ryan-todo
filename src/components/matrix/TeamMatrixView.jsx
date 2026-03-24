@@ -12,7 +12,6 @@ import { parseDateFromText } from '../../utils/dateParser'
 import InlineAdd from '../shared/InlineAdd'
 import ColorPicker from '../shared/ColorPicker'
 import RowConfigSettings from '../shared/RowConfigSettings'
-import ProjectFilter from '../shared/ProjectFilter'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
 import MSBadge from '../common/MSBadge'
@@ -340,17 +339,44 @@ export default function TeamMatrixView() {
   const N = allColumns.length
   const rowCategoryMap = { me_today: 'today', me_next: 'next' }
 
+  // 마일스톤 모드 → 별도 컴포넌트
+  if (matrixMode === 'milestone') {
+    return (
+      <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+          <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <TeamModePill active={matrixMode} onChange={setMatrixMode} />
+              <button onClick={() => setShowRowConfig(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500 }}>
+                <SettingsIcon /> 뷰 관리
+              </button>
+            </div>
+          </div>
+          <Suspense fallback={<div style={{ textAlign: 'center', color: '#999', padding: 40 }}>로딩...</div>}>
+            <MilestoneMatrixView projects={filteredProjects} milestones={milestones} tasks={tasks} />
+          </Suspense>
+        </div>
+        {showRowConfig && <RowConfigSettings teamId={currentTeamId} userId={userId} onClose={() => setShowRowConfig(false)} onSave={cfg => { setConfig(cfg); setShowRowConfig(false) }} />}
+      </div>
+    )
+  }
+
   return (
     <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        {/* Header row 1: title + project filter + settings */}
-        <div style={{ marginBottom: 12, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>매트릭스 뷰</h1>
-            <p style={{ fontSize: 13, color: '#999', marginTop: 2 }}>{dateStr}</p>
+        {/* Header */}
+        <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>팀 매트릭스</h1>
+              <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <ProjectFilter />
+            <TeamModePill active={matrixMode} onChange={setMatrixMode} />
             <button onClick={() => setShowRowConfig(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#999'; e.currentTarget.style.color = '#37352f' }}

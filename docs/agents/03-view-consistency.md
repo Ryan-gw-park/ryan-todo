@@ -7,7 +7,48 @@
 
 ## BLOCK Rules
 
-### B1. Identify all affected views when changing data
+### B1: Complete View Inventory (Loop-39 — Sidebar Restructure)
+
+Sidebar Section 1: 글로벌 뷰
+1. TodayView → renamed "지금 할일" (viewId: "now")
+2. AllTasksView → "전체 할일" (viewId: "allTasks")
+3. MemoryView → "노트" (viewId: "notes")
+
+Sidebar Section 2: 할일
+  ▾ 팀 (scope="team")
+4. MatrixView(scope="team") — 팀 매트릭스
+   Sub-tabs: [할일] [마일스톤] [담당자별]
+   할일 tab: rows=members, cols=projects, DnD reassignment
+   마일스톤 tab: rows=members, cols=projects, CompactMsRow, depth toggle
+   담당자별 tab: member portfolio cards
+5. TimelineView(scope="team") — 팀 타임라인
+   All team members' MS/tasks gantt, avatar badges
+6. WeeklyPlannerView(scope="team") — 팀 주간 플래너
+   rows=members, cols=weekdays, cross-member DnD
+
+  ▾ 개인 (scope="personal")
+7. MatrixView(scope="personal") — 개인 매트릭스
+   rows=projects, cols=categories(오늘/다음/나중), my tasks only
+8. TimelineView(scope="personal") — 개인 타임라인
+   My MS/tasks gantt only (from ALL projects including team)
+9. WeeklyPlannerView(scope="personal") — 개인 주간 플래너
+   rows=projects, cols=weekdays, my tasks only
+
+Sidebar Section 3: 프로젝트
+  ▾ 팀 프로젝트
+10. UnifiedProjectView — per team project (tree + tasks/timeline)
+  ▾ 개인 프로젝트
+11. UnifiedProjectView — per personal project
+
+Modals/Panels:
+12. DetailPanel
+13. ProjectSettingsModal
+14. MilestoneDetailModal
+15. DeleteConfirmDialog
+
+Retired (files preserved, imports removed):
+- [전체|팀|개인] toggle in MatrixView, TimelineView, WeeklyPlannerView
+- Standalone MilestoneMatrixView → absorbed into MatrixView 마일스톤 tab
 
 When a Loop modifies store data fields (tasks, projects, memos, milestones, etc.), the work instruction MUST include a checklist verifying correct behavior in **every view** that references that field.
 
@@ -39,7 +80,22 @@ Detail/Modal:
 
 **Example**: Adding a new field to the `tasks` array requires verification in at least TodayView, MatrixView, and UnifiedProjectView.
 
-### B2. Sync all 3 navigation surfaces
+### B2: Navigation Surfaces (Loop-39)
+
+| Surface | Location | Content |
+|---------|----------|---------|
+| Sidebar | Sidebar.jsx | 3 sections: 글로벌(3) + 할일(팀3+개인3) + 프로젝트(팀N+개인N) |
+| BottomNav | BottomNav.jsx | Mobile subset: 지금할일, 전체할일, 팀매트릭스, 노트 |
+| Keyboard | VIEW_ORDER | now, allTasks, team-matrix, team-timeline, team-weekly, personal-matrix, personal-timeline, personal-weekly, notes |
+
+Sidebar sub-sections (팀/개인) are collapsible with ▸▾ toggle.
+
+When adding a new view:
+1. Decide scope (global / team / personal)
+2. Add to appropriate sidebar section
+3. Add to VIEW_ORDER for keyboard cycling
+4. Update BottomNav if mobile-relevant
+5. Add React.lazy import in App.jsx with viewId routing
 
 When adding or removing a view, ALL three surfaces must be updated:
 
@@ -55,7 +111,7 @@ When adding a new global view:
 3. Add to VIEW_ORDER for Ctrl+Shift+←/→ cycling
 4. Add React.lazy import in App.jsx
 
-Missing any one = BLOCK.
+Missing any surface = BLOCK.
 
 ### B3. Store reads MUST use useStore selectors
 
@@ -90,6 +146,41 @@ function MatrixView() {
 ```
 
 **Exception**: The 4 large view files (TodayView, ProjectView, TimelineView, DetailPanel) may use conditional additions (complex DnD/keyboard logic makes full duplication impractical).
+
+### KD-3.9: Legacy URL Redirects (Loop-39)
+
+```
+/matrix → /tasks/team/matrix
+/timeline → /tasks/team/timeline
+/weekly → /tasks/team/weekly
+/today → /now
+```
+
+Implement as simple viewId mapping in App.jsx or useStore.
+
+### KD-3.10: Shared Components with Scope Prop (Loop-39)
+
+MatrixView, TimelineView, WeeklyPlannerView accept scope prop.
+- scope="team": team projects, all team members
+- scope="personal": all projects, my items only
+
+Layout differs by scope:
+| Component | Team Layout | Personal Layout |
+|-----------|------------|-----------------|
+| MatrixView rows | Team members | Projects |
+| MatrixView cols | Projects | Categories (오늘/다음/나중) |
+| WeeklyPlanner rows | Team members | Projects |
+
+When modifying any of these components, verify BOTH scope variants.
+
+### KD-3.11: [전체|팀|개인] Toggle Removal (Loop-39)
+
+Previously: each view had internal toggle to switch scope
+Now: scope is determined by sidebar navigation position
+
+DO NOT re-add scope toggles inside views.
+If a view needs to show "team" data from "personal" context,
+the user navigates to the team section in sidebar.
 
 ---
 

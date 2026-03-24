@@ -129,6 +129,44 @@ Never force. Only propose.
 
 ---
 
+## View ID Registry
+
+Global views:
+- "now" — 지금 할일 (renamed from "today")
+- "allTasks" — 전체 할일
+- "notes" — 노트
+
+Team views (scope="team"):
+- "team-matrix" — 팀 매트릭스 [할일|마일스톤|담당자별]
+- "team-timeline" — 팀 타임라인
+- "team-weekly" — 팀 주간 플래너
+
+Personal views (scope="personal"):
+- "personal-matrix" — 개인 매트릭스 (프로젝트 × 카테고리)
+- "personal-timeline" — 개인 타임라인 (내 담당만)
+- "personal-weekly" — 개인 주간 플래너
+
+Project views:
+- "project-{id}" — UnifiedProjectView
+
+Retired IDs (redirect to team equivalents):
+- "matrix" → "team-matrix"
+- "timeline" → "team-timeline"
+- "weekly" → "team-weekly"
+- "today" → "now"
+
+---
+
+## Scope Change Dispatch Rule
+
+When a work instruction involves scope filtering (team↔personal) or
+sidebar structure changes, dispatch ALL of:
+- 03-view-consistency (navigation surfaces, view inventory)
+- 05-design-system (layout variants)
+- 07-ux-guardian (discoverability, navigation clarity)
+
+---
+
 ## Agent File Maintenance
 
 1. Agent files are part of the codebase. Version-controlled in Git.

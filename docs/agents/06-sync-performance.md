@@ -99,6 +99,49 @@ No additional Supabase queries for timeline data.
 All date calculations (toX, computeGroupSpan) are pure frontend functions in
 src/utils/ganttHelpers.js — no network calls.
 
+### B11: Scope Filtering Performance (Loop-39)
+
+Scope filtering runs on every render — use useMemo.
+
+Team scope filter:
+```js
+const teamProjects = useMemo(() =>
+  projects.filter(p => p.teamId), [projects]);
+const teamTasks = useMemo(() =>
+  tasks.filter(t => teamProjects.some(p => p.pkmId === t.projectId)),
+  [tasks, teamProjects]);
+```
+
+Personal scope filter:
+```js
+const myTasks = useMemo(() =>
+  tasks.filter(t => t.assigneeId === me || t.createdBy === me),
+  [tasks, me]);
+const myMs = useMemo(() =>
+  milestones.filter(m => m.ownerId === me),
+  [milestones, me]);
+```
+
+Performance thresholds:
+- tasks < 200: useMemo optional
+- tasks 200–500: useMemo recommended
+- tasks > 500: useMemo required, consider virtualization
+
+### B12: No Additional Queries on Scope Switch (Loop-39)
+
+Switching between team and personal views MUST NOT trigger loadAll()
+or any Supabase query. store.tasks and store.milestones already
+contain all data for both scopes.
+
+Scope switch = frontend filter change only.
+Navigation: sidebar click → viewId change → component re-render with
+different scope prop → useMemo recalculates filtered data.
+
+Anti-pattern to BLOCK:
+```js
+useEffect(() => { loadAll(); }, [scope]); // WRONG — no re-fetch
+```
+
 ---
 
 ## Known Divergences

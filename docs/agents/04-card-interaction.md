@@ -74,6 +74,20 @@ This is NOT a DndContext — bars are positioned with CSS absolute positioning.
 Bar drag/resize uses manual mousedown/mousemove/mouseup events (same pattern as TimelineGrid).
 Do NOT wrap these in a DndContext — mouse events will conflict.
 
+### B8: Personal Scope DnD Constraints (Loop-39)
+
+In personal scope views, DnD MUST NOT change:
+- assigneeId (blocked — show toast "담당자 변경은 팀 뷰에서 가능합니다")
+- ownerId (blocked)
+
+Allowed changes in personal scope DnD:
+- category (오늘/다음/나중 between columns in personal matrix)
+- dueDate (between days in personal weekly planner)
+
+Implementation:
+- In onDragEnd, check scope prop before applying assignee changes
+- If scope="personal" and target implies assignee change → reject + toast
+
 ---
 
 ## Known Divergences
@@ -111,6 +125,19 @@ UnifiedProjectView DnD (Loop-37):
 - Drag sources: milestone nodes in tree
 - Drop targets: other positions in same parent, other parent nodes
 - onDragEnd: reorderMilestones or moveMilestone
+
+**DndContext Inventory (Loop-39 — scope-aware update):**
+
+| View | Scope | DndContext | Drag Sources | Drop Targets | onDragEnd |
+|------|-------|-----------|-------------|-------------|-----------|
+| TodayView | — | SortableContext | task cards | sort positions | reorder |
+| MatrixView | team | DndContext | task cards | member×project cells | category+assignee |
+| MatrixView | personal | DndContext | task cards | project×category cells | category only |
+| WeeklyPlanner | team | DndContext | task cards, backlog | member×day cells | dueDate+assignee |
+| WeeklyPlanner | personal | DndContext | task cards | project×day cells | dueDate only |
+| UnifiedProjectView | — | DndContext | MS nodes | tree positions | sortOrder+parentId |
+
+Standard sensors for all: PointerSensor distance:3, TouchSensor delay:200/tolerance:5
 
 ---
 

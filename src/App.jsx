@@ -25,6 +25,9 @@ const TimelineView = lazy(() => import('./components/views/TimelineView'))
 const MemoryView = lazy(() => import('./components/views/MemoryView'))
 const TeamMatrixView = lazy(() => import('./components/matrix/TeamMatrixView'))
 const WeeklyPlannerView = lazy(() => import('./components/views/WeeklyPlannerView'))
+const PersonalMatrixView = lazy(() => import('./components/views/PersonalMatrixView'))
+const PersonalWeeklyView = lazy(() => import('./components/views/PersonalWeeklyView'))
+const PersonalTimelineView = lazy(() => import('./components/views/PersonalTimelineView'))
 const ProjectLayer = lazy(() => import('./components/project/ProjectLayer'))
 const TeamSettings = lazy(() => import('./components/team/TeamSettings'))
 const Onboarding = lazy(() => import('./components/team/Onboarding'))
@@ -46,7 +49,7 @@ function AppShell({ mobile }) {
 
   // 뷰 초기화만 — loadAll은 App에서 이미 실행됨
   useEffect(() => {
-    setView(mobile ? 'today' : 'matrix')
+    setView(mobile ? 'today' : 'team-matrix')
   }, [])
 
   // Idle 프리로드 — 첫 화면 후 유휴 시간에 다른 뷰 미리 로드
@@ -61,7 +64,7 @@ function AppShell({ mobile }) {
   }, [])
 
   // Keyboard shortcuts
-  const VIEW_ORDER = ['today', 'matrix', 'project', 'timeline', 'weekly', 'memory']
+  const VIEW_ORDER = ['today', 'allTasks', 'team-matrix', 'team-timeline', 'team-weekly', 'personal-matrix', 'personal-timeline', 'personal-weekly', 'memory']
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') { closeDetail() }
@@ -80,14 +83,33 @@ function AppShell({ mobile }) {
     return () => document.removeEventListener('keydown', handler)
   }, [currentView])
 
-  // Loop-20: 팀 모드에서 매트릭스 뷰 분기
+  // Loop-39: 3-section sidebar view routing
   const teamId = useStore(s => s.currentTeamId)
-  const views = { today: TodayView, allTasks: AllTasksView, matrix: teamId ? TeamMatrixView : MatrixView, project: ProjectView, timeline: TimelineView, weekly: WeeklyPlannerView, memory: MemoryView, projectLayer: ProjectLayer }
+  const views = {
+    today: TodayView, allTasks: AllTasksView, memory: MemoryView,
+    'team-matrix': teamId ? TeamMatrixView : MatrixView,
+    'team-timeline': TimelineView,
+    'team-weekly': WeeklyPlannerView,
+    'personal-matrix': PersonalMatrixView,
+    'personal-timeline': PersonalTimelineView,
+    'personal-weekly': PersonalWeeklyView,
+    project: ProjectView, projectLayer: ProjectLayer,
+    // Legacy compat
+    matrix: teamId ? TeamMatrixView : MatrixView,
+    timeline: TimelineView,
+    weekly: WeeklyPlannerView,
+  }
   const ViewComponent = views[currentView] || TodayView
 
-  // 모바일에서 matrix/timeline 접근 시 today로 리다이렉트
+  // Legacy viewId redirect
   useEffect(() => {
-    if (mobile && (currentView === 'matrix' || currentView === 'timeline' || currentView === 'weekly')) {
+    const LEGACY_MAP = { matrix: 'team-matrix', timeline: 'team-timeline', weekly: 'team-weekly' }
+    if (LEGACY_MAP[currentView]) setView(LEGACY_MAP[currentView])
+  }, [currentView])
+
+  // 모바일에서 team/personal 뷰 접근 시 today로 리다이렉트
+  useEffect(() => {
+    if (mobile && (currentView.includes('matrix') || currentView.includes('timeline') || currentView.includes('weekly'))) {
       setView('today')
     }
   }, [currentView, mobile])

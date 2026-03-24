@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import useStore from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
-import ProjectFilter from '../shared/ProjectFilter'
+// ProjectFilter removed — scope determined by sidebar (Loop-39)
 import { getColor } from '../../utils/colors'
 import ProgressBar from '../common/ProgressBar'
 import MsDropdown from '../common/MsDropdown'
@@ -55,7 +55,6 @@ export default function AllTasksView() {
             <span style={{ fontSize: 12, color: '#a09f99' }}>총 {totalActive}건</span>
           </div>
           <div className="today-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ProjectFilter />
             <button
               onClick={toggleAll}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#999', fontFamily: 'inherit', padding: '4px 0', whiteSpace: 'nowrap' }}

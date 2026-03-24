@@ -11,7 +11,7 @@ import { getColor } from '../../utils/colors'
 import { CheckIcon } from '../shared/Icons'
 import { parseDateFromText } from '../../utils/dateParser'
 import { getNextAlarmTime } from '../../utils/alarm'
-import ProjectFilter from '../shared/ProjectFilter'
+// ProjectFilter removed — scope determined by sidebar (Loop-39)
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
 import MSBadge from '../common/MSBadge'
@@ -149,7 +149,6 @@ export default function TodayView() {
             <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
           </div>
           <div className="today-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ProjectFilter />
             <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#a09f99', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
               <input type="checkbox" checked={showMs} onChange={e => setShowMs(e.target.checked)} style={{ margin: 0 }} />
               MS
