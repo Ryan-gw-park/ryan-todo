@@ -47,9 +47,9 @@ function AppShell({ mobile }) {
   const { currentView, setView, closeDetail, detailTask, showProjectMgr } = useStore()
   const showNotificationPanel = useStore(s => s.showNotificationPanel)
 
-  // 뷰 초기화만 — loadAll은 App에서 이미 실행됨
+  // 뷰 초기화 — 'today'는 데이터 로딩 전에도 안전하게 렌더 가능
   useEffect(() => {
-    setView(mobile ? 'today' : 'team-matrix')
+    setView('today')
   }, [])
 
   // Idle 프리로드 — 첫 화면 후 유휴 시간에 다른 뷰 미리 로드
@@ -94,22 +94,12 @@ function AppShell({ mobile }) {
     'personal-timeline': PersonalTimelineView,
     'personal-weekly': PersonalWeeklyView,
     project: ProjectView, projectLayer: ProjectLayer,
-    // Legacy compat
-    matrix: teamId ? TeamMatrixView : MatrixView,
-    timeline: TimelineView,
-    weekly: WeeklyPlannerView,
   }
   const ViewComponent = views[currentView] || TodayView
 
-  // Legacy viewId redirect
+  // 모바일에서 team/personal scope 뷰 접근 시 today로 리다이렉트
   useEffect(() => {
-    const LEGACY_MAP = { matrix: 'team-matrix', timeline: 'team-timeline', weekly: 'team-weekly' }
-    if (LEGACY_MAP[currentView]) setView(LEGACY_MAP[currentView])
-  }, [currentView])
-
-  // 모바일에서 team/personal 뷰 접근 시 today로 리다이렉트
-  useEffect(() => {
-    if (mobile && (currentView.includes('matrix') || currentView.includes('timeline') || currentView.includes('weekly'))) {
+    if (mobile && (currentView.startsWith('team-') || currentView.startsWith('personal-'))) {
       setView('today')
     }
   }, [currentView, mobile])

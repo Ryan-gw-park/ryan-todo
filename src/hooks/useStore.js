@@ -282,7 +282,10 @@ const useStore = create((set, get) => ({
     _saveCollapseState(cs)
   },
 
-  setView: (v) => set({ currentView: v }),
+  setView: (v) => {
+    const LEGACY_MAP = { matrix: 'team-matrix', timeline: 'team-timeline', weekly: 'team-weekly', now: 'today' }
+    set({ currentView: LEGACY_MAP[v] || v })
+  },
 
   // ─── Sidebar collapse state ───
   sidebarCollapsed: JSON.parse(localStorage.getItem('sidebarCollapsed') || 'false'),
