@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -17,6 +17,8 @@ import UniversalCard from '../common/UniversalCard'
 import MSBadge from '../common/MSBadge'
 import CompactMsRow from '../common/CompactMsRow'
 import { getMsPath, getVisibleMs } from '../../utils/milestoneTree'
+
+const MilestoneMatrixView = lazy(() => import('./MilestoneMatrixView'))
 
 // Custom collision: pointerWithin → prefer task cards for reorder, fall back to category zone for cross-cell
 function matrixCollision(args) {
@@ -49,6 +51,8 @@ export default function TeamMatrixView() {
   const LW = isMobile ? 80 : 110
   const COL_GAP = 10
   const COL_MIN = isMobile ? 200 : 0
+
+  const [matrixMode, setMatrixMode] = useState('task') // 'task' | 'milestone'
 
   // Loop-38: sub-view tabs + depth toggle
   const [subView, setSubView] = useState('matrix') // 'matrix' | 'project' | 'member'

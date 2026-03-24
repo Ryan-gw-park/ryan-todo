@@ -2,7 +2,9 @@ import useStore from './useStore'
 
 export default function useProjectFilter(projects, tasks) {
   const teamId = useStore(s => s.currentTeamId)
-  const filter = useStore(s => s.projectFilter)
+  // Loop-39: projectFilter UI removed — scope is now determined by sidebar navigation.
+  // Always use 'all' to prevent stale localStorage values from filtering out projects.
+  const filter = 'all'
   const localProjectOrder = useStore(s => s.localProjectOrder)
 
   // 로컬 순서 적용 정렬 함수
