@@ -48,15 +48,6 @@ export default function TeamMatrixView() {
   const myRole = useStore(s => s.myRole)
   const isOwner = myRole === 'owner'
   const isMobile = window.innerWidth < 768
-
-  // teamId 로딩 전 guard — initTeamState 완료 후 자동 리렌더
-  if (!currentTeamId) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#a09f99', fontSize: 13 }}>
-        팀 데이터 로딩 중...
-      </div>
-    )
-  }
   const LW = isMobile ? 80 : 110
   const COL_GAP = 10
   const COL_MIN = isMobile ? 200 : 0
@@ -351,6 +342,15 @@ export default function TeamMatrixView() {
   const allColumns = filteredProjects
   const N = allColumns.length
   const rowCategoryMap = { me_today: 'today', me_next: 'next' }
+
+  // teamId 로딩 전 guard — 모든 hooks 이후에 위치 (Rules of Hooks 준수)
+  if (!currentTeamId) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#a09f99', fontSize: 13 }}>
+        팀을 선택하세요. 사이드바에서 팀을 전환할 수 있습니다.
+      </div>
+    )
+  }
 
   // 마일스톤 모드 → 별도 컴포넌트
   if (matrixMode === 'milestone') {
