@@ -55,13 +55,7 @@ export default function TimelineToolbar({
 
         <Separator />
 
-        {/* Scope filter (team mode only) */}
-        {hasTeam && (
-          <>
-            <ScopeFilter value={scopeFilter} onChange={onScopeChange} />
-            <Separator />
-          </>
-        )}
+        {/* Loop-39: Scope filter removed — scope determined by sidebar navigation */}
 
         {/* Assignee dropdown */}
         {members.length > 0 && (

@@ -12,7 +12,7 @@ const S = {
   border: '#e8e6df',
 }
 
-const ROW_H = 34
+const ROW_H = 30
 const COL_W_DEFAULT = [155, 140, 140, 140, 140]
 const WEEK_W = 50 // Width per week in timeline mode
 const WEEK_COUNT = 24 // Show 24 weeks (6 months)
@@ -81,7 +81,7 @@ function InlineAddTask({ msId, projectId, onDone }) {
   }, [text, addTask, projectId, msId, onDone])
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 12px', minHeight: ROW_H }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 10px', minHeight: ROW_H }}>
       <div style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid #e8e6df', flexShrink: 0 }} />
       <input
         ref={inputRef}
@@ -369,7 +369,7 @@ export default function UnifiedProjectView({ projectId }) {
           {/* Left: tree column headers */}
           <div style={{ width: totalTreeWidth, flexShrink: 0, display: 'flex', position: 'sticky', left: 0, zIndex: 4, background: '#fafaf8' }}>
             {colWidths.slice(0, maxDepth).map((w, ci) => (
-              <div key={ci} style={{ width: w, flexShrink: 0, padding: '7px 8px', fontSize: 10.5, fontWeight: 600, color: S.textTertiary, position: 'relative', userSelect: 'none' }}>
+              <div key={ci} style={{ width: w, flexShrink: 0, padding: '5px 8px', fontSize: 10.5, fontWeight: 600, color: S.textTertiary, position: 'relative', userSelect: 'none' }}>
                 {ci === 0 ? '마일스톤' : `하위 ${ci}`}
                 {/* Resize handle */}
                 <div
@@ -394,7 +394,7 @@ export default function UnifiedProjectView({ projectId }) {
 
           {/* Right header */}
           {rightMode === '전체 할일' ? (
-            <div style={{ flex: 1, padding: '7px 12px', fontSize: 10.5, fontWeight: 600, color: S.textTertiary, minWidth: 280 }}>
+            <div style={{ flex: 1, padding: '5px 12px', fontSize: 10.5, fontWeight: 600, color: S.textTertiary, minWidth: 280 }}>
               연결된 할일
             </div>
           ) : (
@@ -447,7 +447,7 @@ export default function UnifiedProjectView({ projectId }) {
                         <div
                           key={ci}
                           style={{
-                            width: w, flexShrink: 0, padding: '5px 8px',
+                            width: w, flexShrink: 0, padding: '4px 8px',
                             display: 'flex', alignItems: 'flex-start', gap: 4, position: 'relative',
                           }}
                           onMouseEnter={e => { if (!isEditing) e.currentTarget.querySelector('.hover-actions')?.style.setProperty('opacity', '1') }}
@@ -474,17 +474,17 @@ export default function UnifiedProjectView({ projectId }) {
                             ) : (
                               <div
                                 onDoubleClick={(e) => { e.stopPropagation(); setEditingMsId(cell.id) }}
-                                style={{ fontSize: isD0 ? 12 : 11.5, fontWeight: isD0 ? 700 : ci === 1 ? 600 : 400, color: S.textPrimary, lineHeight: 1.3, wordBreak: 'break-word' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: isD0 ? 12 : 11.5, fontWeight: isD0 ? 700 : ci === 1 ? 600 : 400, color: S.textPrimary, lineHeight: 1.3 }}
                               >
-                                {cell.title || '제목 없음'}
-                              </div>
-                            )}
-                            {nodeCount.total > 0 && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                                <div style={{ width: 22, height: 2.5, borderRadius: 2, background: '#e8e6df' }}>
-                                  <div style={{ width: `${nodeCount.done / nodeCount.total * 100}%`, height: 2.5, borderRadius: 2, background: cell.color }} />
-                                </div>
-                                <span style={{ fontSize: 9, color: S.textTertiary }}>{nodeCount.done}/{nodeCount.total}</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cell.title || '제목 없음'}</span>
+                                {nodeCount.total > 0 && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                                    <span style={{ width: 22, height: 2.5, borderRadius: 2, background: '#e8e6df', display: 'inline-block', position: 'relative' }}>
+                                      <span style={{ width: `${nodeCount.done / nodeCount.total * 100}%`, height: 2.5, borderRadius: 2, background: cell.color, display: 'block' }} />
+                                    </span>
+                                    <span style={{ fontSize: 9, color: S.textTertiary }}>{nodeCount.done}/{nodeCount.total}</span>
+                                  </span>
+                                )}
                               </div>
                             )}
                             {/* Hover actions */}
@@ -520,7 +520,7 @@ export default function UnifiedProjectView({ projectId }) {
 
                   {/* RIGHT: task row */}
                   {rightMode === '전체 할일' ? (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '3px 12px', minWidth: 280 }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '2px 10px', minWidth: 280 }}>
                       {isAdding ? (
                         <InlineAddTask msId={row.leafId} projectId={projectId} onDone={() => setAddingTaskLeafId(null)} />
                       ) : row.task ? (
