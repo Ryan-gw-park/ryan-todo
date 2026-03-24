@@ -309,13 +309,16 @@ const useStore = create((set, get) => ({
       const snapshot = JSON.parse(cached)
       // 24시간 이내만 사용 (teamId 검증은 Auth 완료 후 지연 검증)
       if (Date.now() - snapshot.timestamp > SNAPSHOT_MAX_AGE) return false
-      set({
+      const patch = {
         tasks: snapshot.tasks || [],
         projects: snapshot.projects || [],
         memos: snapshot.memos || [],
         snapshotTeamId: snapshot.teamId || null,
         snapshotRestored: true,
-      })
+      }
+      if (snapshot.collapseState) patch.collapseState = snapshot.collapseState
+      if (snapshot.userTaskSettings) patch.userTaskSettings = snapshot.userTaskSettings
+      set(patch)
       return true
     } catch (e) {
       return false
@@ -428,12 +431,20 @@ const useStore = create((set, get) => ({
       }
       if (tr.error) throw tr.error
 
-      // Merge loaded collapse state with defaults
-      const loaded = uiR?.data?.collapse_state || {}
-      const cs = { ..._defaultCollapseState }
-      for (const key of Object.keys(cs)) {
-        if (loaded[key] && typeof loaded[key] === 'object') {
-          cs[key] = loaded[key]
+      // Merge loaded collapse state with defaults — preserve snapshot values if already restored
+      const currentCs = get().collapseState
+      const hasSnapshotCs = currentCs && Object.values(currentCs).some(v => v && Object.keys(v).length > 0)
+      let cs
+      if (hasSnapshotCs) {
+        // 스냅샷에서 이미 복원된 값이 있으면 유지 (DB 값은 다음 loadAll에서 적용)
+        cs = currentCs
+      } else {
+        const loaded = uiR?.data?.collapse_state || {}
+        cs = { ..._defaultCollapseState }
+        for (const key of Object.keys(cs)) {
+          if (loaded[key] && typeof loaded[key] === 'object') {
+            cs[key] = loaded[key]
+          }
         }
       }
 
@@ -458,7 +469,10 @@ const useStore = create((set, get) => ({
 
       // 스냅샷 → 서버 전환 시 변경분만 set하여 불필요한 리렌더 방지
       const current = get()
-      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: taskSettings, milestones }
+      // userTaskSettings: 스냅샷에서 이미 복원된 값이 있으면 유지
+      const currentUts = current.userTaskSettings
+      const mergedUts = (currentUts && currentUts.length > 0) ? currentUts : taskSettings
+      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: mergedUts, milestones }
       if (!isArrayEqual(current.tasks, tasks)) patch.tasks = tasks
       if (!isArrayEqual(current.projects, projects)) patch.projects = projects
       if (!isArrayEqual(current.memos, memos)) patch.memos = memos
@@ -466,7 +480,7 @@ const useStore = create((set, get) => ({
 
       // 스냅샷 저장 (PWA 로딩 속도 개선)
       try {
-        const snapshot = { tasks, projects, memos, teamId, timestamp: Date.now() }
+        const snapshot = { tasks, projects, memos, teamId, timestamp: Date.now(), collapseState: get().collapseState, userTaskSettings: get().userTaskSettings }
         localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
       } catch (e) {
         // localStorage 용량 초과 시 무시
@@ -998,7 +1012,7 @@ const useStore = create((set, get) => ({
   })),
 
   // ─── Team State (Loop-19) ───
-  currentTeamId: null,
+  currentTeamId: localStorage.getItem('currentTeamId') || null,
   myTeams: [],
   myRole: null, // 'owner' | 'member' | null
   teamLoading: true,
