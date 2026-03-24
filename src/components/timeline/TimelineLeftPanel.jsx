@@ -2,7 +2,6 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ROW_HEIGHTS, INDENTS, getBarStyles } from '../../utils/timelineUtils'
 import { getColor } from '../../utils/colors'
-import UniversalCard from '../common/UniversalCard'
 
 const ASSIGNEE_W = 50
 const PROGRESS_W = 32
@@ -129,7 +128,7 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
   )
 }
 
-/* ── Task row (sortable for DnD) using UniversalCard compact ── */
+/* ── Task row (sortable for DnD) — 1-line inline text, no UniversalCard ── */
 function SortableTaskRow({ node, onOpenDetail, isDragging }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: node.id })
   const rowH = ROW_HEIGHTS.task
@@ -144,19 +143,39 @@ function SortableTaskRow({ node, onOpenDetail, isDragging }) {
         paddingLeft: 4 + indent + 16,
         height: rowH, display: 'flex', alignItems: 'center',
         boxSizing: 'border-box', overflow: 'hidden',
+        opacity: isDragging ? 0.3 : 1,
+        borderBottom: '1px solid #f0f0f0',
       }}
       {...attributes}
       {...listeners}
     >
-      <UniversalCard
-        type="task"
-        data={{ id: node.id, name: node.name, done: node.done }}
-        compact
-        onDetailOpen={() => onOpenDetail(node.raw)}
-        isDragging={isDragging}
-        style={{ flex: 1, minWidth: 0, cursor: 'grab' }}
-      />
+      {/* Checkbox */}
+      <div
+        onClick={(e) => { e.stopPropagation(); onOpenDetail?.(node.raw) }}
+        style={{
+          width: 14, height: 14, borderRadius: 3, flexShrink: 0, cursor: 'pointer',
+          border: node.done ? 'none' : '1.5px solid #ccc',
+          background: node.done ? '#2383e2' : '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {node.done && <svg width={8} height={8} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+      </div>
 
+      {/* Task name — 1 line, ellipsis */}
+      <span
+        onClick={() => onOpenDetail?.(node.raw)}
+        style={{
+          flex: 1, minWidth: 0, fontSize: 12, marginLeft: 6, cursor: 'pointer',
+          color: node.done ? '#a09f99' : '#37352f',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          textDecoration: node.done ? 'line-through' : 'none',
+        }}
+      >
+        {node.name}
+      </span>
+
+      {/* Assignee */}
       <span style={{
         fontSize: 10, color: '#aaa', fontWeight: 500,
         width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0,

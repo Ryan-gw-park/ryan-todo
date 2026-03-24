@@ -146,38 +146,47 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
         />
       ))}
 
-      {/* MS bar (first sub-row only) — thin, semi-transparent, at top */}
+      {/* MS bar (first sub-row only) — semi-transparent with label */}
       {isFirstSubRow && msStartX !== null && msWidth > 0 && (
         <div
           title={`${leafNode?.title || ''}: ${leafNode?.start_date} ~ ${leafNode?.end_date}`}
           style={{
             position: 'absolute',
             left: Math.max(msStartX, 0),
-            top: 4,
-            height: 5,
+            top: 3,
+            height: 16,
             width: msWidth,
-            borderRadius: 2,
-            background: barColor,
-            opacity: 0.35,
+            borderRadius: 4,
+            background: `${barColor}30`,
+            border: `1px solid ${barColor}45`,
+            fontSize: 9, color: barColor, paddingLeft: 4,
+            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: '16px',
           }}
-        />
+        >
+          {msWidth > 40 ? (leafNode?.title?.length > 20 ? leafNode.title.slice(0, 20) + '…' : leafNode?.title || '') : ''}
+        </div>
       )}
 
-      {/* Task bar — thicker, solid */}
+      {/* Task bar — solid with label */}
       {task && taskStartX !== null && (
         <div
           title={`${task.text}: ${task.startDate || task.dueDate} ~ ${task.dueDate || task.startDate}`}
           style={{
             position: 'absolute',
             left: Math.max(taskStartX, 0),
-            top: isFirstSubRow ? 12 : 8,
-            height: task.done ? 6 : 10,
+            top: isFirstSubRow ? 20 : 8,
+            height: task.done ? 8 : 14,
             width: taskWidth,
-            borderRadius: 3,
-            background: task.done ? S.textTertiary : barColor,
-            opacity: task.done ? 0.4 : 0.85,
+            borderRadius: 4,
+            background: task.done ? S.textTertiary : `${barColor}cc`,
+            opacity: task.done ? 0.4 : 1,
+            fontSize: 8.5, color: '#fff', paddingLeft: 4,
+            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: '14px',
+            cursor: 'grab',
           }}
-        />
+        >
+          {!task.done && taskWidth > 40 ? (task.text?.length > 18 ? task.text.slice(0, 18) + '…' : task.text || '') : ''}
+        </div>
       )}
 
       {/* Today red line */}
@@ -254,9 +263,33 @@ export default function UnifiedProjectView({ projectId }) {
     return projectTasks.filter(t => !t.keyMilestoneId)
   }, [projectTasks])
 
-  // Timeline mode state
-  const timelineStart = useMemo(() => getTimelineStart(), [])
-  const weekDates = useMemo(() => getWeekDates(timelineStart, WEEK_COUNT), [timelineStart])
+  // Timeline mode state — auto-calculate range from project data
+  const { timelineStart, weekCount } = useMemo(() => {
+    const projectMs = milestones.filter(m => m.project_id === projectId)
+    const allDates = [
+      ...projectMs.flatMap(m => [m.start_date, m.end_date || m.due_date]),
+      ...projectTasks.flatMap(t => [t.startDate, t.dueDate]),
+    ].filter(Boolean).map(d => new Date(d)).filter(d => !isNaN(d))
+
+    if (allDates.length === 0) return { timelineStart: getTimelineStart(), weekCount: WEEK_COUNT }
+
+    const minDate = new Date(Math.min(...allDates))
+    const maxDate = new Date(Math.max(...allDates))
+
+    // 2주 여백 추가 (앞뒤)
+    const start = new Date(minDate)
+    start.setDate(start.getDate() - 14)
+    // 월요일로 정렬
+    const dow = start.getDay()
+    start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1))
+
+    const end = new Date(maxDate)
+    end.setDate(end.getDate() + 14)
+    const diffWeeks = Math.ceil((end - start) / (7 * 864e5))
+    return { timelineStart: start, weekCount: Math.max(diffWeeks, 12) }
+  }, [milestones, projectTasks, projectId])
+
+  const weekDates = useMemo(() => getWeekDates(timelineStart, weekCount), [timelineStart, weekCount])
   const todayX = useMemo(() => getTodayX(timelineStart, WEEK_W), [timelineStart])
 
   // Column resize handler
@@ -398,7 +431,7 @@ export default function UnifiedProjectView({ projectId }) {
               연결된 할일
             </div>
           ) : (
-            <div style={{ display: 'flex', minWidth: WEEK_COUNT * WEEK_W }}>
+            <div style={{ display: 'flex', minWidth: weekCount * WEEK_W }}>
               {weekDates.map((d, i) => (
                 <div
                   key={i}
@@ -557,7 +590,7 @@ export default function UnifiedProjectView({ projectId }) {
                       row={row}
                       timelineStart={timelineStart}
                       todayX={todayX}
-                      weekCount={WEEK_COUNT}
+                      weekCount={weekCount}
                       weekW={WEEK_W}
                       rowH={ROW_H}
                     />
