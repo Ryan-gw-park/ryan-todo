@@ -1016,6 +1016,24 @@ function MemberAvatar({ name, size = 22 }) {
   )
 }
 
+/* ═══ Mode Pill — [할일 모드][마일스톤 모드] ═══ */
+function TeamModePill({ active, onChange }) {
+  const items = [{ key: 'task', label: '할일 모드' }, { key: 'milestone', label: '마일스톤 모드' }]
+  return (
+    <div style={{ display: 'flex', gap: 2, background: '#fafaf8', borderRadius: 8, padding: 2 }}>
+      {items.map(it => (
+        <button key={it.key} onClick={() => onChange(it.key)} style={{
+          border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+          fontWeight: active === it.key ? 600 : 400,
+          background: active === it.key ? '#fff' : 'transparent',
+          color: active === it.key ? '#37352f' : '#a09f99',
+          boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+        }}>{it.label}</button>
+      ))}
+    </div>
+  )
+}
+
 /* ═══ Sub-view Pill — [매트릭스][프로젝트별][담당자별] (Loop-38) ═══ */
 function SubViewPill({ active, onChange }) {
   const items = [
