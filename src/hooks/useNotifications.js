@@ -41,23 +41,32 @@ const useNotifications = {
 
   /** 읽지 않은 알림 수 — localStorage lastSeenAt 기준 */
   async getUnreadCount(teamId) {
-    const d = db()
-    if (!d || !teamId) return 0
+    try {
+      const d = db()
+      if (!d || !teamId) return 0
 
-    const lastSeenAt = localStorage.getItem(LAST_SEEN_KEY) || '1970-01-01T00:00:00Z'
+      const lastSeenAt = localStorage.getItem(LAST_SEEN_KEY) || '1970-01-01T00:00:00Z'
 
-    const { count, error } = await d
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('team_id', teamId)
-      .gt('created_at', lastSeenAt)
-      .gte('expires_at', new Date().toISOString())
+      const { count, error } = await d
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_id', teamId)
+        .gt('created_at', lastSeenAt)
+        .gte('expires_at', new Date().toISOString())
 
-    if (error) {
-      console.error('[Ryan Todo] getUnreadCount:', error)
+      if (error) {
+        console.error('[Ryan Todo] getUnreadCount:', error)
+        return 0
+      }
+      return count || 0
+    } catch (e) {
+      if (e?.name === 'AbortError') {
+        console.warn('[Ryan Todo] getUnreadCount AbortError — returning 0')
+      } else {
+        console.error('[Ryan Todo] getUnreadCount unexpected:', e)
+      }
       return 0
     }
-    return count || 0
   },
 
   /** 모두 읽음 처리 — lastSeenAt 갱신 */
