@@ -220,6 +220,9 @@ export default function App() {
         }
         // 최신 데이터 로딩
         useStore.getState().loadAll()
+      }).catch(err => {
+        console.warn('[App] initTeamState/loadAll 실패:', err?.message || err)
+        // AbortError 등으로 실패해도 앱은 진행 — 스냅샷 데이터로 표시
       })
     }
   }, [connected, isAuthenticated])

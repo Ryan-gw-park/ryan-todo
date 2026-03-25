@@ -486,8 +486,14 @@ const useStore = create((set, get) => ({
         // localStorage 용량 초과 시 무시
       }
     } catch (e) {
-      console.error('[Ryan Todo] loadAll:', e)
-      set({ syncStatus: 'error' })
+      // AbortError (lock stolen by another tab/request) — non-fatal, retry on next cycle
+      if (e?.name === 'AbortError') {
+        console.warn('[Ryan Todo] loadAll AbortError — 다음 주기에 재시도')
+        set({ syncStatus: 'ok' })
+      } else {
+        console.error('[Ryan Todo] loadAll:', e)
+        set({ syncStatus: 'error' })
+      }
     } finally {
       _loadAllRunning = false
     }
@@ -1078,7 +1084,11 @@ const useStore = create((set, get) => ({
         teamLoading: false,
       })
     } catch (e) {
-      console.error('[Ryan Todo] initTeamState:', e)
+      if (e?.name === 'AbortError') {
+        console.warn('[Ryan Todo] initTeamState AbortError — 기본값으로 진행')
+      } else {
+        console.error('[Ryan Todo] initTeamState:', e)
+      }
       set({ teamLoading: false })
     }
   },
