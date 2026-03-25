@@ -1,16 +1,12 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
+import { COLOR, FONT, SPACE, GANTT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
 import { buildTree, flattenTreeWithTasks, countTasksRecursive } from '../../utils/milestoneTree'
 import { toX, getWeekDates, getTimelineStart, formatWeekLabel, getTodayX, getBarWidth } from '../../utils/ganttHelpers'
 
-const S = {
-  textPrimary: '#37352f',
-  textSecondary: '#6b6a66',
-  textTertiary: '#a09f99',
-  border: '#e8e6df',
-}
+const S = COLOR
 
 const ROW_H = 30
 const COL_W_DEFAULT = [155, 140, 140, 140, 140]
@@ -23,9 +19,9 @@ function Check({ done, onClick }) {
     <div
       onClick={(e) => { e.stopPropagation(); onClick?.() }}
       style={{
-        width: 14, height: 14, borderRadius: 3, flexShrink: 0, cursor: 'pointer',
-        border: done ? 'none' : '1.5px solid #ccc',
-        background: done ? '#2383e2' : '#fff',
+        width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, flexShrink: 0, cursor: 'pointer',
+        border: done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
+        background: done ? CHECKBOX.checkedBg : '#fff',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
@@ -47,7 +43,7 @@ function Pill({ items, active, onChange }) {
           key={it.key}
           onClick={() => onChange(it.key)}
           style={{
-            border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: 11.5, fontFamily: 'inherit', cursor: 'pointer',
+            border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
             fontWeight: active === it.key ? 600 : 400,
             background: active === it.key ? '#fff' : 'transparent',
             color: active === it.key ? S.textPrimary : S.textTertiary,
@@ -96,7 +92,7 @@ function InlineAddTask({ msId, projectId, onDone }) {
         onMouseDown={e => e.stopPropagation()}
         placeholder="할일 입력..."
         style={{
-          flex: 1, fontSize: 12, border: 'none', outline: 'none',
+          flex: 1, fontSize: FONT.body, border: 'none', outline: 'none',
           background: 'transparent', color: S.textPrimary, fontFamily: 'inherit', padding: 0,
         }}
       />
@@ -157,14 +153,14 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
           style={{
             position: 'absolute',
             left: Math.max(msStartX, 0),
-            top: 3,
-            height: 16,
+            top: (rowH - GANTT.msBarHeight) / 2,
+            height: GANTT.msBarHeight,
             width: msWidth,
-            borderRadius: 4,
+            borderRadius: GANTT.barRadius,
             background: `${barColor}30`,
             border: `1px solid ${barColor}45`,
-            fontSize: 9, color: barColor, paddingLeft: 4,
-            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: '16px',
+            fontSize: FONT.ganttMs, color: barColor, paddingLeft: 4,
+            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: `${GANTT.msBarHeight}px`,
           }}
         >
           {msWidth > 20 ? (leafNode?.title?.length > 20 ? leafNode.title.slice(0, 20) + '…' : leafNode?.title || '') : ''}
@@ -178,14 +174,14 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
           style={{
             position: 'absolute',
             left: Math.max(taskStartX, 0),
-            top: isFirstSubRow ? 20 : 8,
-            height: task.done ? 8 : 14,
+            top: (rowH - GANTT.taskBarHeight) / 2,
+            height: task.done ? GANTT.taskBarDoneHeight : GANTT.taskBarHeight,
             width: taskWidth,
-            borderRadius: 4,
+            borderRadius: GANTT.barRadius,
             background: task.done ? S.textTertiary : `${barColor}cc`,
             opacity: task.done ? 0.4 : 1,
-            fontSize: 8.5, color: '#fff', paddingLeft: 4,
-            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: '14px',
+            fontSize: FONT.ganttTask, color: '#fff', paddingLeft: 4,
+            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: `${GANTT.taskBarHeight}px`,
             cursor: 'grab',
           }}
         >
@@ -202,8 +198,8 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
             top: 0,
             bottom: 0,
             width: 1.5,
-            background: '#e53935',
-            opacity: 0.4,
+            background: COLOR.todayLine,
+            opacity: GANTT.todayLineOpacity,
             zIndex: 1,
           }}
         />
@@ -364,7 +360,7 @@ export default function UnifiedProjectView({ projectId }) {
 
   if (pkmLoading) {
     return (
-      <div style={{ padding: 40, color: S.textTertiary, textAlign: 'center', fontSize: 13 }}>
+      <div style={{ padding: 40, color: S.textTertiary, textAlign: 'center', fontSize: FONT.body }}>
         로딩 중...
       </div>
     )
@@ -389,7 +385,7 @@ export default function UnifiedProjectView({ projectId }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 12px', borderBottom: `0.5px solid ${S.border}`, flexShrink: 0 }}>
         <div style={{ width: 11, height: 11, borderRadius: '50%', background: color?.dot, flexShrink: 0 }} />
-        <span style={{ fontSize: 17, fontWeight: 700 }}>{project.name}</span>
+        <span style={{ fontSize: FONT.projectTitle, fontWeight: 700 }}>{project.name}</span>
         <div style={{ marginLeft: 'auto' }}>
           <Pill
             items={[{ key: '전체 할일', label: '전체 할일' }, { key: '타임라인', label: '타임라인' }]}
@@ -406,7 +402,7 @@ export default function UnifiedProjectView({ projectId }) {
           {/* Left: tree column headers */}
           <div style={{ width: totalTreeWidth, flexShrink: 0, display: 'flex', position: 'sticky', left: 0, zIndex: 4, background: '#fafaf8' }}>
             {colWidths.slice(0, maxDepth).map((w, ci) => (
-              <div key={ci} style={{ width: w, flexShrink: 0, padding: '5px 8px', fontSize: 10.5, fontWeight: 600, color: S.textTertiary, position: 'relative', userSelect: 'none' }}>
+              <div key={ci} style={{ width: w, flexShrink: 0, padding: '5px 8px', fontSize: FONT.caption, fontWeight: 600, color: S.textTertiary, position: 'relative', userSelect: 'none' }}>
                 {ci === 0 ? '마일스톤' : `하위 ${ci}`}
                 {/* Resize handle */}
                 <div
@@ -431,7 +427,7 @@ export default function UnifiedProjectView({ projectId }) {
 
           {/* Right header */}
           {rightMode === '전체 할일' ? (
-            <div style={{ flex: 1, padding: '5px 12px', fontSize: 10.5, fontWeight: 600, color: S.textTertiary, minWidth: 280 }}>
+            <div style={{ flex: 1, padding: '5px 12px', fontSize: FONT.caption, fontWeight: 600, color: S.textTertiary, minWidth: 280 }}>
               연결된 할일
             </div>
           ) : (
@@ -441,7 +437,7 @@ export default function UnifiedProjectView({ projectId }) {
                   key={i}
                   style={{
                     width: WEEK_W, flexShrink: 0, textAlign: 'center',
-                    fontSize: 9.5, fontWeight: 500, color: S.textTertiary,
+                    fontSize: FONT.tiny, fontWeight: 500, color: S.textTertiary,
                     padding: '6px 0', borderLeft: i > 0 ? `0.5px solid ${S.border}` : 'none',
                   }}
                 >
@@ -455,7 +451,7 @@ export default function UnifiedProjectView({ projectId }) {
         {/* Scrollable body */}
         <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
           {rows.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: S.textTertiary, fontSize: 12 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: S.textTertiary, fontSize: FONT.body }}>
               마일스톤이 없습니다
             </div>
           ) : (
@@ -566,14 +562,14 @@ export default function UnifiedProjectView({ projectId }) {
                           <span
                             onClick={() => openDetail(row.task.id)}
                             style={{
-                              flex: 1, fontSize: 12, color: row.task.done ? S.textTertiary : S.textPrimary,
+                              flex: 1, fontSize: FONT.body, color: row.task.done ? S.textTertiary : S.textPrimary,
                               lineHeight: 1.3, cursor: 'pointer',
                               textDecoration: row.task.done ? 'line-through' : 'none',
                             }}
                           >
                             {row.task.text}
                           </span>
-                          {row.task.dueDate && <span style={{ fontSize: 10, color: S.textTertiary, flexShrink: 0 }}>{row.task.dueDate}</span>}
+                          {row.task.dueDate && <span style={{ fontSize: FONT.tiny, color: S.textTertiary, flexShrink: 0 }}>{row.task.dueDate}</span>}
                           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.2, flexShrink: 0, cursor: 'pointer' }} onClick={() => openDetail(row.task.id)}>
                             <path d="M6 3l5 5-5 5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
@@ -581,7 +577,7 @@ export default function UnifiedProjectView({ projectId }) {
                       ) : row.isFirstSubRow ? (
                         <span
                           onClick={() => setAddingTaskLeafId(row.leafId)}
-                          style={{ fontSize: 11, color: S.textTertiary, cursor: 'pointer' }}
+                          style={{ fontSize: FONT.caption, color: S.textTertiary, cursor: 'pointer' }}
                           onMouseEnter={e => e.currentTarget.style.color = S.textPrimary}
                           onMouseLeave={e => e.currentTarget.style.color = S.textTertiary}
                         >
@@ -609,7 +605,7 @@ export default function UnifiedProjectView({ projectId }) {
             <div style={{ width: totalTreeWidth, flexShrink: 0, padding: '8px 10px', position: 'sticky', left: 0, background: '#fff' }}>
               <span
                 onClick={() => handleAddChildMs(null)}
-                style={{ fontSize: 11, color: S.textTertiary, cursor: 'pointer' }}
+                style={{ fontSize: FONT.caption, color: S.textTertiary, cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.color = S.textPrimary}
                 onMouseLeave={e => e.currentTarget.style.color = S.textTertiary}
               >
@@ -638,9 +634,9 @@ function BacklogSection({ tasks, onToggle, onOpen }) {
         onClick={() => setOpen(!open)}
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer' }}
       >
-        <span style={{ fontSize: 12, color: S.textTertiary }}>⊙</span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: S.textTertiary }}>백로그</span>
-        <span style={{ fontSize: 11, color: S.textTertiary }}>{tasks.length}건</span>
+        <span style={{ fontSize: FONT.label, color: S.textTertiary }}>⊙</span>
+        <span style={{ fontSize: FONT.label, fontWeight: 500, color: S.textTertiary }}>백로그</span>
+        <span style={{ fontSize: FONT.caption, color: S.textTertiary }}>{tasks.length}건</span>
         <span style={{ fontSize: 9, color: S.textTertiary, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
       </div>
       {open && tasks.map(t => (
@@ -650,7 +646,7 @@ function BacklogSection({ tasks, onToggle, onOpen }) {
           onClick={() => onOpen(t.id)}
         >
           <Check done={t.done} onClick={() => onToggle(t.id)} />
-          <span style={{ flex: 1, fontSize: 12, color: t.done ? S.textTertiary : S.textPrimary, textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
+          <span style={{ flex: 1, fontSize: FONT.body, color: t.done ? S.textTertiary : S.textPrimary, textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
         </div>
       ))}
     </div>
