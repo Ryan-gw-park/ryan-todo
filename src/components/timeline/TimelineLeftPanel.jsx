@@ -1,4 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable'
+import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import { CSS } from '@dnd-kit/utilities'
 import { ROW_HEIGHTS, INDENTS, getBarStyles } from '../../utils/timelineUtils'
 import { getColor } from '../../utils/colors'
@@ -23,9 +24,9 @@ export default function TimelineLeftPanel({
     <div style={{ width: panelW, flexShrink: 0, borderRight: '1px solid #f0f0f0', background: 'white', zIndex: 5 }}>
       {/* Header spacer for date headers */}
       <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-        <span style={{ fontSize: 12, color: '#999', fontWeight: 500, flex: 1, minWidth: 0 }}>프로젝트 / 할일</span>
-        <span style={{ fontSize: 10, color: '#999', fontWeight: 500, width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0, borderLeft: '1px solid #f0f0f0', paddingLeft: 8 }}>담당자</span>
-        <span style={{ fontSize: 10, color: '#999', fontWeight: 500, width: PROGRESS_W, textAlign: 'center', flexShrink: 0, borderLeft: '1px solid #f0f0f0' }}>%</span>
+        <span style={{ fontSize: FONT.label, color: COLOR.textTertiary, fontWeight: 500, flex: 1, minWidth: 0 }}>프로젝트 / 할일</span>
+        <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, fontWeight: 500, width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0, borderLeft: '1px solid #f0f0f0', paddingLeft: 8 }}>담당자</span>
+        <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, fontWeight: 500, width: PROGRESS_W, textAlign: 'center', flexShrink: 0, borderLeft: '1px solid #f0f0f0' }}>%</span>
       </div>
 
       {/* Rows */}
@@ -78,7 +79,7 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
       {/* Toggle arrow */}
       {hasChildren ? (
         <span style={{
-          fontSize: isProject ? 11 : 9, color: '#bbb',
+          fontSize: isProject ? FONT.caption : FONT.ganttMs, color: COLOR.textTertiary,
           transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
           transition: 'transform 0.15s', flexShrink: 0, width: 16, textAlign: 'center',
         }}>▾</span>
@@ -97,9 +98,9 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
 
       {/* Name */}
       <span style={{
-        fontSize: isProject ? 13 : 12,
+        fontSize: isProject ? FONT.body : FONT.label,
         fontWeight: isProject ? 600 : 500,
-        color: isProject ? c.text : '#555',
+        color: isProject ? c.text : COLOR.textSecondary,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         flex: 1, minWidth: 0,
       }}>
@@ -108,7 +109,7 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
 
       {/* Assignee */}
       <span style={{
-        fontSize: 10, color: '#aaa', fontWeight: 500,
+        fontSize: FONT.tiny, color: COLOR.textTertiary, fontWeight: 500,
         width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         borderLeft: '1px solid #f0f0f0', paddingLeft: 8,
@@ -118,7 +119,7 @@ function GroupRow({ node, expandedIds, onToggleExpand }) {
 
       {/* Progress */}
       <span style={{
-        fontSize: 10, color: '#aaa', fontWeight: 600,
+        fontSize: FONT.tiny, color: COLOR.textTertiary, fontWeight: 600,
         width: PROGRESS_W, textAlign: 'center', flexShrink: 0,
         borderLeft: '1px solid #f0f0f0',
       }}>
@@ -153,9 +154,9 @@ function SortableTaskRow({ node, onOpenDetail, isDragging }) {
       <div
         onClick={(e) => { e.stopPropagation(); onOpenDetail?.(node.raw) }}
         style={{
-          width: 14, height: 14, borderRadius: 3, flexShrink: 0, cursor: 'pointer',
-          border: node.done ? 'none' : '1.5px solid #ccc',
-          background: node.done ? '#2383e2' : '#fff',
+          width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, flexShrink: 0, cursor: 'pointer',
+          border: node.done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
+          background: node.done ? CHECKBOX.checkedBg : '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -166,8 +167,8 @@ function SortableTaskRow({ node, onOpenDetail, isDragging }) {
       <span
         onClick={() => onOpenDetail?.(node.raw)}
         style={{
-          flex: 1, minWidth: 0, fontSize: 12, marginLeft: 6, cursor: 'pointer',
-          color: node.done ? '#a09f99' : '#37352f',
+          flex: 1, minWidth: 0, fontSize: FONT.body, marginLeft: 6, cursor: 'pointer',
+          color: node.done ? COLOR.textTertiary : COLOR.textPrimary,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           textDecoration: node.done ? 'line-through' : 'none',
         }}
@@ -177,7 +178,7 @@ function SortableTaskRow({ node, onOpenDetail, isDragging }) {
 
       {/* Assignee */}
       <span style={{
-        fontSize: 10, color: '#aaa', fontWeight: 500,
+        fontSize: FONT.tiny, color: COLOR.textTertiary, fontWeight: 500,
         width: ASSIGNEE_W, textAlign: 'left', flexShrink: 0,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         borderLeft: '1px solid #f0f0f0', paddingLeft: 8,
