@@ -339,8 +339,10 @@ export default function TeamMatrixView() {
   // Loop-20.2: 전역 필터 적용
   const { filteredProjects, filteredTasks: _ft } = useProjectFilter(projects, tasks)
 
-  // 프로젝트 열 — localProjectOrder 기준 단일 리스트 (섹션 분리 없음)
-  const allColumns = filteredProjects
+  // 프로젝트 열 — 팀 모드에서는 팀 프로젝트만 표시 (개인 프로젝트 제외)
+  const allColumns = currentTeamId
+    ? filteredProjects.filter(p => p.teamId === currentTeamId)
+    : filteredProjects
   const N = allColumns.length
   const rowCategoryMap = { me_today: 'today', me_next: 'next' }
 
@@ -409,17 +411,7 @@ export default function TeamMatrixView() {
         </div>
 
         {/* Loop-38: conditional sub-view rendering */}
-        {subView === 'matrix' && (
-          <SubviewMatrix
-            projects={filteredProjects}
-            milestones={milestones}
-            tasks={tasks}
-            members={members}
-            depthFilter={depthFilter}
-            showUnassigned={showUnassigned}
-            setShowUnassigned={setShowUnassigned}
-          />
-        )}
+        {/* subView === 'matrix' → rendered below via original DnD task grid */}
         {subView === 'project' && (
           <SubviewProject
             projects={filteredProjects}
@@ -440,8 +432,8 @@ export default function TeamMatrixView() {
           />
         )}
 
-        {/* Original task-mode grid (hidden when sub-view is active) */}
-        {false && <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {/* Original task-mode grid — shown when subView is 'matrix' */}
+        {subView === 'matrix' && <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
 
