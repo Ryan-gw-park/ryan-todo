@@ -114,14 +114,18 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
   // MS bar (first sub-row only) — thin, semi-transparent, at top of row
   const msStartX = toX(leafNode?.start_date, timelineStart, weekW)
   const msEndX = toX(leafNode?.end_date, timelineStart, weekW)
-  const msWidth = msStartX !== null && msEndX !== null ? msEndX - msStartX : 0
+  const msWidthRaw = msStartX !== null && msEndX !== null ? msEndX - msStartX : 0
+  const msWidth = msWidthRaw > 0 ? Math.max(msWidthRaw, weekW * 0.6) : 0
 
   // Task bar — thicker, solid color
   const taskStartX = toX(task?.startDate || task?.dueDate, timelineStart, weekW)
   const taskEndX = toX(task?.dueDate || task?.startDate, timelineStart, weekW)
-  const taskWidth = taskStartX !== null && taskEndX !== null
-    ? Math.max(taskEndX - taskStartX, 8) // minimum 8px for single-day tasks
-    : (task?.dueDate ? 8 : 0)
+  const taskWidthRaw = taskStartX !== null && taskEndX !== null
+    ? taskEndX - taskStartX
+    : 0
+  const taskWidth = taskWidthRaw > 0 || (task?.dueDate)
+    ? Math.max(taskWidthRaw, weekW * 0.5) // minimum half-week width
+    : 0
 
   return (
     <div style={{
@@ -163,7 +167,7 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
             overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: '16px',
           }}
         >
-          {msWidth > 40 ? (leafNode?.title?.length > 20 ? leafNode.title.slice(0, 20) + '…' : leafNode?.title || '') : ''}
+          {msWidth > 20 ? (leafNode?.title?.length > 20 ? leafNode.title.slice(0, 20) + '…' : leafNode?.title || '') : ''}
         </div>
       )}
 
@@ -185,7 +189,7 @@ function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
             cursor: 'grab',
           }}
         >
-          {!task.done && taskWidth > 40 ? (task.text?.length > 18 ? task.text.slice(0, 18) + '…' : task.text || '') : ''}
+          {!task.done && taskWidth > 20 ? (task.text?.length > 18 ? task.text.slice(0, 18) + '…' : task.text || '') : ''}
         </div>
       )}
 
