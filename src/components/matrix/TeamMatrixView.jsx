@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react'
+import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
@@ -346,7 +347,7 @@ export default function TeamMatrixView() {
   // teamId 로딩 전 guard — 모든 hooks 이후에 위치 (Rules of Hooks 준수)
   if (!currentTeamId) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#a09f99', fontSize: 13 }}>
+      <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>
         팀을 선택하세요. 사이드바에서 팀을 전환할 수 있습니다.
       </div>
     )
@@ -355,20 +356,20 @@ export default function TeamMatrixView() {
   // 마일스톤 모드 → 별도 컴포넌트
   if (matrixMode === 'milestone') {
     return (
-      <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <div data-view="matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding }}>
+        <div style={{ maxWidth: VIEW_WIDTH.wide, margin: '0 auto' }}>
           <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <TeamModePill active={matrixMode} onChange={setMatrixMode} />
               <button onClick={() => setShowRowConfig(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px solid ${COLOR.border}`, background: 'white', cursor: 'pointer', color: COLOR.textSecondary, fontSize: FONT.label, fontFamily: 'inherit', fontWeight: 500 }}>
                 <SettingsIcon /> 뷰 관리
               </button>
             </div>
           </div>
-          <Suspense fallback={<div style={{ textAlign: 'center', color: '#999', padding: 40 }}>로딩...</div>}>
+          <Suspense fallback={<div style={{ textAlign: 'center', color: COLOR.textTertiary, padding: 40 }}>로딩...</div>}>
             <MilestoneMatrixView projects={filteredProjects} milestones={milestones} tasks={tasks} />
           </Suspense>
         </div>
@@ -378,22 +379,22 @@ export default function TeamMatrixView() {
   }
 
   return (
-    <div data-view="matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div data-view="matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding }}>
+      <div style={{ maxWidth: VIEW_WIDTH.wide, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div>
-              <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>팀 매트릭스</h1>
-              <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
+              <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>팀 매트릭스</h1>
+              <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{dateStr}</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <TeamModePill active={matrixMode} onChange={setMatrixMode} />
             <button onClick={() => setShowRowConfig(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: '1px solid #e0e0e0', background: 'white', cursor: 'pointer', color: '#888', fontSize: 12, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#999'; e.currentTarget.style.color = '#37352f' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e0e0'; e.currentTarget.style.color = '#888' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px solid ${COLOR.border}`, background: 'white', cursor: 'pointer', color: COLOR.textSecondary, fontSize: FONT.label, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = COLOR.textTertiary; e.currentTarget.style.color = COLOR.textPrimary }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = COLOR.border; e.currentTarget.style.color = COLOR.textSecondary }}
             >
               <SettingsIcon /> 뷰 관리
             </button>
@@ -531,9 +532,9 @@ export default function TeamMatrixView() {
                           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer' }}
                         >
                           <MemberAvatar name={row.label} size={22} />
-                          <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>{row.label}</span>
-                          <span style={{ fontSize: 10, color: '#aaa' }}>▾</span>
-                          <span style={{ fontSize: 11, color: '#bbb', marginLeft: 4 }}>{mTasks.length}건</span>
+                          <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textSecondary }}>{row.label}</span>
+                          <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>▾</span>
+                          <span style={{ fontSize: FONT.caption, color: COLOR.textTertiary, marginLeft: 4 }}>{mTasks.length}건</span>
                         </div>
                         <ReadOnlyRow
                           columns={allColumns}
@@ -997,7 +998,7 @@ function TaskOverlay({ task }) {
         <CheckIcon checked={false} size={14} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, lineHeight: '19px', color: hlColor ? '#fff' : '#37352f' }}>{task.text}</div>
+        <div style={{ fontSize: FONT.body, lineHeight: '19px', color: hlColor ? '#fff' : COLOR.textPrimary }}>{task.text}</div>
       </div>
     </div>
   )
@@ -1026,7 +1027,7 @@ function TeamModePill({ active, onChange }) {
           border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
           fontWeight: active === it.key ? 600 : 400,
           background: active === it.key ? '#fff' : 'transparent',
-          color: active === it.key ? '#37352f' : '#a09f99',
+          color: active === it.key ? COLOR.textPrimary : COLOR.textTertiary,
           boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
         }}>{it.label}</button>
       ))}
