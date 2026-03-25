@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
@@ -223,14 +224,14 @@ export default function WeeklyPlannerView() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div data-view="weekly" style={{ padding: '40px 48px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div data-view="weekly" style={{ padding: SPACE.viewPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
           {/* ─── Header ─── */}
           <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <WeekNav onPrev={goPrev} onThis={goThisWeek} onNext={goNext} />
-              <span style={{ fontSize: 13, color: '#6b6a66' }}>{weekLabel}</span>
+              <span style={{ fontSize: FONT.body, color: COLOR.textSecondary }}>{weekLabel}</span>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             </div>
@@ -255,11 +256,11 @@ export default function WeeklyPlannerView() {
                   return (
                     <div key={i} style={{
                       padding: '8px 10px', textAlign: 'center',
-                      background: isToday ? '#fef9ec' : '#fafaf8',
+                      background: isToday ? '#fef9ec' : COLOR.bgSurface,
                       borderRadius: '8px 8px 0 0',
-                      borderBottom: '1px solid #e8e6df',
+                      borderBottom: `1px solid ${COLOR.border}`,
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: isToday ? '#92400e' : '#37352f' }}>
+                      <div style={{ fontSize: FONT.label, fontWeight: 600, color: isToday ? '#92400e' : COLOR.textPrimary }}>
                         {DAY_LABELS[i]} {d.getMonth() + 1}/{d.getDate()}
                       </div>
                     </div>
@@ -270,10 +271,10 @@ export default function WeeklyPlannerView() {
                 {memberRows.map(mem => [
                   <div key={`label-${mem.id}`} style={{
                     display: 'flex', alignItems: 'center', gap: 6, padding: 8,
-                    borderBottom: '0.5px solid #e8e6df',
+                    borderBottom: `0.5px solid ${COLOR.border}`,
                   }}>
                     <MemberAvatar name={mem.name} />
-                    <span style={{ fontSize: 12, fontWeight: 500, color: '#37352f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: FONT.label, fontWeight: 500, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {mem.name.split(' ')[0]}
                     </span>
                   </div>,
@@ -330,8 +331,8 @@ export default function WeeklyPlannerView() {
 /* ═══ Week Navigation ═══ */
 function WeekNav({ onPrev, onThis, onNext }) {
   const btnStyle = {
-    border: 'none', background: '#fafaf8', borderRadius: 4,
-    padding: '4px 8px', cursor: 'pointer', fontSize: 12, color: '#37352f',
+    border: 'none', background: COLOR.bgSurface, borderRadius: 4,
+    padding: '4px 8px', cursor: 'pointer', fontSize: FONT.label, color: COLOR.textPrimary,
     fontFamily: 'inherit',
   }
   return (
@@ -354,11 +355,11 @@ function DayCell({ cellId, memberId, date, isToday, tasks, projectMap, onOpenDet
     <div ref={setNodeRef} style={{
       padding: 6, minHeight: 80,
       background: isOver ? 'rgba(35, 131, 226, 0.06)' : isToday ? '#fefcf5' : '#fff',
-      borderBottom: '0.5px solid #e8e6df',
+      borderBottom: `0.5px solid ${COLOR.border}`,
       transition: 'background 0.15s',
     }}>
       {tasks.length === 0 && !isOver && (
-        <span style={{ fontSize: 11, color: '#a09f99' }}>—</span>
+        <span style={{ fontSize: FONT.caption, color: COLOR.textTertiary }}>—</span>
       )}
       {tasks.map(t => (
         <DraggableTaskCard key={t.id} task={t} project={projectMap[t.projectId]} onOpenDetail={onOpenDetail} />
@@ -384,8 +385,8 @@ function DraggableTaskCard({ task, project, onOpenDetail }) {
       style={{
         background: c ? c.card : '#fff',
         borderRadius: 6, padding: '5px 7px', marginBottom: 4,
-        border: `0.5px solid ${c ? c.header : '#e8e6df'}`,
-        cursor: 'grab', fontSize: 12, color: '#37352f',
+        border: `0.5px solid ${c ? c.header : COLOR.border}`,
+        cursor: 'grab', fontSize: FONT.body, color: COLOR.textPrimary,
         opacity: isDragging ? 0.3 : 1,
         lineHeight: '17px',
       }}
@@ -396,7 +397,7 @@ function DraggableTaskCard({ task, project, onOpenDetail }) {
       {project && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: c?.dot || '#bbb', flexShrink: 0 }} />
-          <span style={{ fontSize: 10, color: c?.text || '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: FONT.tiny, color: c?.text || COLOR.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {project.name}
           </span>
         </div>
@@ -414,13 +415,13 @@ function TaskOverlayCard({ task, project }) {
       border: `0.5px solid ${c ? c.header : '#e8e6df'}`,
       boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
       transform: 'rotate(2deg)', cursor: 'grabbing', maxWidth: 200,
-      fontSize: 12, color: '#37352f',
+      fontSize: FONT.body, color: COLOR.textPrimary,
     }}>
       <div style={{ fontWeight: 500 }}>{task.text}</div>
       {project && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: c?.dot || '#bbb' }} />
-          <span style={{ fontSize: 10, color: c?.text || '#888' }}>{project.name}</span>
+          <span style={{ fontSize: FONT.tiny, color: c?.text || COLOR.textSecondary }}>{project.name}</span>
         </div>
       )}
     </div>
@@ -439,23 +440,23 @@ function BacklogSidebar({
   })
 
   const pillStyle = (active) => ({
-    border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11,
+    border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: FONT.caption,
     fontFamily: 'inherit', cursor: 'pointer', fontWeight: active ? 600 : 400,
     background: active ? '#fff' : 'transparent',
-    color: active ? '#37352f' : '#a09f99',
+    color: active ? COLOR.textPrimary : COLOR.textTertiary,
     boxShadow: active ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
   })
 
   return (
     <div ref={setNodeRef} style={{
-      width: 260, flexShrink: 0, borderLeft: '1px solid #e8e6df',
+      width: 260, flexShrink: 0, borderLeft: `1px solid ${COLOR.border}`,
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
       background: isOver ? 'rgba(35,131,226,0.04)' : '#fafaf8',
       transition: 'background 0.15s',
     }}>
       {/* Header */}
-      <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e8e6df' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#37352f', marginBottom: 8 }}>백로그</div>
+      <div style={{ padding: '12px 12px 8px', borderBottom: `1px solid ${COLOR.border}` }}>
+        <div style={{ fontSize: FONT.subtitle, fontWeight: 700, color: COLOR.textPrimary, marginBottom: 8 }}>백로그</div>
 
         {/* Project dropdown */}
         <select
@@ -463,8 +464,8 @@ function BacklogSidebar({
           onChange={e => setBacklogProject(e.target.value)}
           style={{
             width: '100%', padding: '5px 8px', borderRadius: 6,
-            border: '1px solid #e8e6df', fontSize: 12, fontFamily: 'inherit',
-            color: '#37352f', background: '#fff', marginBottom: 6, cursor: 'pointer',
+            border: `1px solid ${COLOR.border}`, fontSize: FONT.label, fontFamily: 'inherit',
+            color: COLOR.textPrimary, background: '#fff', marginBottom: 6, cursor: 'pointer',
           }}
         >
           <option value="all">전체 프로젝트</option>
@@ -524,7 +525,7 @@ function BacklogSidebar({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: ms.color || '#22c55e', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#37352f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {ms.title || '(제목 없음)'}
                   </span>
                 </div>
@@ -535,20 +536,20 @@ function BacklogSidebar({
         )}
 
         {backlogTab === 'tasks' && backlogTasks.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#a09f99', fontSize: 12, padding: 20 }}>
+          <div style={{ textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.label, padding: 20 }}>
             백로그에 할일이 없습니다
           </div>
         )}
         {backlogTab === 'milestones' && backlogMilestones.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#a09f99', fontSize: 12, padding: 20 }}>
+          <div style={{ textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.label, padding: 20 }}>
             마일스톤이 없습니다
           </div>
         )}
       </div>
 
       {/* Hint */}
-      <div style={{ padding: '8px 12px', borderTop: '1px solid #e8e6df', textAlign: 'center' }}>
-        <span style={{ fontSize: 11, color: '#a09f99' }}>← 요일 셀로 드래그</span>
+      <div style={{ padding: '8px 12px', borderTop: `1px solid ${COLOR.border}`, textAlign: 'center' }}>
+        <span style={{ fontSize: FONT.caption, color: COLOR.textTertiary }}>← 요일 셀로 드래그</span>
       </div>
     </div>
   )
@@ -569,11 +570,11 @@ function BacklogTaskRow({ task, onOpenDetail }) {
       onClick={() => onOpenDetail(task)}
       style={{
         padding: '4px 6px', borderRadius: 4, marginBottom: 2,
-        cursor: 'grab', fontSize: 12, color: '#37352f',
+        cursor: 'grab', fontSize: FONT.body, color: COLOR.textPrimary,
         opacity: isDragging ? 0.3 : 1,
         background: isDragging ? 'rgba(35,131,226,0.06)' : 'transparent',
       }}
-      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = '#f5f4f0' }}
+      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = COLOR.bgHover }}
       onMouseLeave={e => { if (!isDragging) e.currentTarget.style.background = 'transparent' }}
     >
       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
