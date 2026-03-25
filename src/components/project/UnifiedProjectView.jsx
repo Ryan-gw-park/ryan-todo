@@ -404,13 +404,15 @@ export default function UnifiedProjectView({ projectId }) {
             {colWidths.slice(0, maxDepth).map((w, ci) => (
               <div key={ci} style={{ width: w, flexShrink: 0, padding: '5px 8px', fontSize: FONT.caption, fontWeight: 600, color: S.textTertiary, position: 'relative', userSelect: 'none' }}>
                 {ci === 0 ? '마일스톤' : `하위 ${ci}`}
-                {/* Resize handle */}
-                <div
-                  onMouseDown={(e) => handleColResizeStart(ci, e)}
-                  style={{ position: 'absolute', right: -2, top: 0, bottom: 0, width: 5, cursor: 'col-resize', zIndex: 2 }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                />
+                {/* Resize handle — only between columns, not after the last one */}
+                {ci < maxDepth - 1 && (
+                  <div
+                    onMouseDown={(e) => handleColResizeStart(ci, e)}
+                    style={{ position: 'absolute', right: -2, top: 0, bottom: 0, width: 5, cursor: 'col-resize', zIndex: 2 }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  />
+                )}
               </div>
             ))}
           </div>
