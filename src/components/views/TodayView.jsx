@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import {
   DndContext, DragOverlay, useDroppable,
   PointerSensor, TouchSensor, useSensors, useSensor, closestCenter,
@@ -141,23 +142,23 @@ export default function TodayView() {
   }
 
   return (
-    <div data-view="today" style={{ padding: isMobile ? '20px 16px 100px' : '40px 48px' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div data-view="today" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding }}>
+      <div style={{ maxWidth: VIEW_WIDTH.narrow, margin: '0 auto' }}>
         <div className="today-header" style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="today-greeting">
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
-            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
+            <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0 }}>{greetingEmoji()} 좋은 하루 되세요, Ryan</h1>
+            <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{dateStr}</p>
           </div>
           <div className="today-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#a09f99', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: FONT.label, color: COLOR.textTertiary, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
               <input type="checkbox" checked={showMs} onChange={e => setShowMs(e.target.checked)} style={{ margin: 0 }} />
               MS
             </label>
             <button
             onClick={toggleAll}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#999', fontFamily: 'inherit', padding: '4px 0', whiteSpace: 'nowrap' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#37352f'}
-            onMouseLeave={e => e.currentTarget.style.color = '#999'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: FONT.label, color: COLOR.textTertiary, fontFamily: 'inherit', padding: '4px 0', whiteSpace: 'nowrap' }}
+            onMouseEnter={e => e.currentTarget.style.color = COLOR.textPrimary}
+            onMouseLeave={e => e.currentTarget.style.color = COLOR.textTertiary}
           >
             {allCollapsed ? '전체 펼치기' : '전체 접기'}
           </button>
@@ -165,7 +166,7 @@ export default function TodayView() {
         </div>
         {todayAlarms.length > 0 && (
           <div style={{ marginBottom: 20, padding: '14px 16px', background: '#fffdf5', borderRadius: 10, border: '1px solid rgba(0,0,0,0.06)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#37352f', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: FONT.body, fontWeight: 600, color: COLOR.textPrimary, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>🔔</span> 오늘 예정된 알람
             </div>
             {todayAlarms.map((task) => {
@@ -229,10 +230,10 @@ function ProjectCard({ project, color, todayTasks, activeId, isCollapsed, onTogg
     }}>
       <div style={{ background: color.header, padding: isEmpty ? '10px 16px' : '12px 16px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={onToggleCollapse}>
         <div style={{ width: 10, height: 10, borderRadius: 3, background: color.dot }} />
-        <span style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: color.text }}>{project.name}</span>
-        <span style={{ fontSize: 11, color: color.text, background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '2px 8px', fontWeight: 600, marginLeft: 'auto' }}>{todayTasks.length}</span>
+        <span style={{ fontSize: isMobile ? FONT.subtitle : FONT.sectionTitle, fontWeight: 600, color: color.text }}>{project.name}</span>
+        <span style={{ fontSize: FONT.caption, color: color.text, background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '2px 8px', fontWeight: 600, marginLeft: 'auto' }}>{todayTasks.length}</span>
         {isEmpty && <InlineAddSimple projectId={project.id} color={color} compact />}
-        {!isEmpty && <span style={{ color: color.text, opacity: 0.5, fontSize: 12, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>}
+        {!isEmpty && <span style={{ color: color.text, opacity: 0.5, fontSize: FONT.label, transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>}
       </div>
       {!isCollapsed && !isEmpty && (
         <div style={{ padding: '10px 16px' }}>
@@ -298,7 +299,7 @@ function SortableTaskItem({ task, expanded, onToggleExpand, showMs, msMap }) {
       }}
       renderMeta={showMs && task.keyMilestoneId && msMap[task.keyMilestoneId] ? () => <MSBadge milestone={msMap[task.keyMilestoneId]} /> : undefined}
       renderExpanded={task.notes ? () => (
-        <div style={{ fontSize: 12, color: '#888', lineHeight: 1.4 }}>
+        <div style={{ fontSize: FONT.label, color: COLOR.textSecondary, lineHeight: 1.4 }}>
           {task.notes.length > 100 ? task.notes.slice(0, 100) + '…' : task.notes}
         </div>
       ) : undefined}
@@ -327,8 +328,8 @@ function InlineAddSimple({ projectId, color, compact }) {
       <button
         onClick={(e) => { e.stopPropagation(); setActive(true); setText('') }}
         style={compact
-          ? { background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'inherit', padding: '2px 6px', whiteSpace: 'nowrap', borderRadius: 4, transition: 'color 0.15s' }
-          : { display: 'flex', alignItems: 'center', gap: 5, padding: '4px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#c8c8c8', fontSize: 12, width: '100%', borderRadius: 4, transition: 'all 0.15s', fontFamily: 'inherit' }
+          ? { background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: FONT.label, fontFamily: 'inherit', padding: '2px 6px', whiteSpace: 'nowrap', borderRadius: 4, transition: 'color 0.15s' }
+          : { display: 'flex', alignItems: 'center', gap: 5, padding: '4px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#c8c8c8', fontSize: FONT.label, width: '100%', borderRadius: 4, transition: 'all 0.15s', fontFamily: 'inherit' }
         }
         onMouseEnter={e => { e.currentTarget.style.color = compact ? '#fff' : color.text; if (!compact) e.currentTarget.style.background = 'rgba(0,0,0,0.03)' }}
         onMouseLeave={e => { e.currentTarget.style.color = compact ? 'rgba(255,255,255,0.6)' : '#c8c8c8'; if (!compact) e.currentTarget.style.background = 'none' }}
@@ -345,7 +346,7 @@ function InlineAddSimple({ projectId, color, compact }) {
         onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setActive(false) }}
         onBlur={() => { if (!text.trim()) setActive(false) }}
         placeholder="할일을 입력하세요..."
-        style={{ width: compact ? 140 : '100%', padding: '6px 8px', fontSize: 13, border: `1.5px solid ${color.dot}`, borderRadius: 6, outline: 'none', background: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        style={{ width: compact ? 140 : '100%', padding: '6px 8px', fontSize: FONT.body, border: `1.5px solid ${color.dot}`, borderRadius: 6, outline: 'none', background: 'white', fontFamily: 'inherit', boxSizing: 'border-box' }}
       />
     </div>
   )
