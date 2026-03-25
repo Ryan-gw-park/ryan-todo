@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import { DndContext, useDroppable, useDraggable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
@@ -93,27 +94,27 @@ export default function PersonalMatrixView() {
   }, [])
 
   return (
-    <div data-view="personal-matrix" style={{ padding: isMobile ? '20px 0 100px' : '40px 48px' }}>
-      <div>
+    <div data-view="personal-matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding }}>
+      <div style={{ maxWidth: VIEW_WIDTH.wide, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: 24, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#37352f', margin: 0, letterSpacing: '-0.02em' }}>개인 매트릭스</h1>
-            <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>{dateStr}</p>
+            <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>개인 매트릭스</h1>
+            <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{dateStr}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: '#999' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: FONT.caption, color: COLOR.textTertiary }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={showMs} onChange={e => setShowMs(e.target.checked)} style={{ accentColor: '#37352f' }} />
+              <input type="checkbox" checked={showMs} onChange={e => setShowMs(e.target.checked)} style={{ accentColor: COLOR.textPrimary }} />
               MS 뱃지
             </label>
           </div>
         </div>
 
         {/* 요약 */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 16, padding: isMobile ? '0 16px' : 0, fontSize: 12, color: '#999' }}>
-          <span>전체: <b style={{ color: '#37352f' }}>{myTasks.filter(t => !t.done).length}</b>건</span>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 16, padding: isMobile ? '0 16px' : 0, fontSize: FONT.label, color: COLOR.textTertiary }}>
+          <span>전체: <b style={{ color: COLOR.textPrimary }}>{myTasks.filter(t => !t.done).length}</b>건</span>
           {CAT_COLS.map(cat => (
-            <span key={cat.key}>{cat.label}: <b style={{ color: '#37352f' }}>{catCounts[cat.key]}</b></span>
+            <span key={cat.key}>{cat.label}: <b style={{ color: COLOR.textPrimary }}>{catCounts[cat.key]}</b></span>
           ))}
           <span style={{ color: '#bbb' }}>완료: {catCounts.done}</span>
         </div>
@@ -122,17 +123,17 @@ export default function PersonalMatrixView() {
           <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             {/* Grid header */}
             <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)`, gap: 0, border: '0.5px solid #e8e6df', borderRadius: '10px 10px 0 0', overflow: 'hidden' }}>
-              <div style={{ padding: '8px 10px', background: '#fafaf8', borderBottom: '1px solid #e8e6df', borderRight: '0.5px solid #e8e6df', fontSize: 11, fontWeight: 600, color: '#a09f99' }}>
+              <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
                 프로젝트
               </div>
               {CAT_COLS.map(cat => (
                 <div key={cat.key} style={{
-                  padding: '8px 10px', background: '#fafaf8', borderBottom: '1px solid #e8e6df', borderRight: '0.5px solid #e8e6df',
-                  fontSize: 11, fontWeight: 600,
-                  color: cat.key === 'today' ? '#ef4444' : cat.key === 'next' ? '#37352f' : '#a09f99',
+                  padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                  fontSize: FONT.caption, fontWeight: 600,
+                  color: cat.key === 'today' ? COLOR.danger : cat.key === 'next' ? COLOR.textPrimary : COLOR.textTertiary,
                 }}>
                   {cat.emoji} {cat.label}
-                  <span style={{ fontSize: 10, color: '#a09f99', marginLeft: 6 }}>{catCounts[cat.key]}</span>
+                  <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, marginLeft: 6 }}>{catCounts[cat.key]}</span>
                 </div>
               ))}
             </div>
@@ -151,8 +152,8 @@ export default function PersonalMatrixView() {
                     }}>
                       <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: 3 }} />
                       <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#37352f' }}>{proj.name}</div>
-                        <div style={{ fontSize: 10, color: '#a09f99' }}>{projTasks.length}건</div>
+                        <div style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary }}>{proj.name}</div>
+                        <div style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{projTasks.length}건</div>
                       </div>
                     </div>
 
@@ -181,7 +182,7 @@ export default function PersonalMatrixView() {
 
               {/* Empty state */}
               {projectsWithTasks.length === 0 && (
-                <div style={{ padding: 40, textAlign: 'center', color: '#999', fontSize: 13, gridColumn: '1 / -1' }}>
+                <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body, gridColumn: '1 / -1' }}>
                   배정된 할일이 없습니다. 팀 매트릭스에서 할일을 배정받거나, + 추가로 직접 생성하세요.
                 </div>
               )}
@@ -191,7 +192,7 @@ export default function PersonalMatrixView() {
           {/* Drag overlay */}
           <DragOverlay>
             {activeTask && (
-              <div style={{ background: '#fff', borderRadius: 5, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: '4px 8px', fontSize: 11, color: '#37352f', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ background: '#fff', borderRadius: 5, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', padding: '4px 8px', fontSize: FONT.body, color: COLOR.textPrimary, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeTask.text}
               </div>
             )}
@@ -205,7 +206,7 @@ export default function PersonalMatrixView() {
 function CellDrop({ id, children }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
-    <div ref={setNodeRef} style={{ background: isOver ? '#f0efeb' : 'transparent', transition: 'background 0.1s' }}>
+    <div ref={setNodeRef} style={{ background: isOver ? COLOR.bgActive : 'transparent', transition: 'background 0.1s' }}>
       {children}
     </div>
   )
@@ -225,11 +226,11 @@ function DraggableTask({ task, showMs, msMap }) {
         borderRadius: 4, cursor: 'grab', transition: 'background 0.1s',
         opacity: isDragging ? 0.3 : 1,
       }}
-      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = '#f5f4f0' }}
+      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = COLOR.bgHover }}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
       <span style={{
-        flex: 1, fontSize: 11, color: task.done ? '#a09f99' : '#37352f', lineHeight: 1.3,
+        flex: 1, fontSize: FONT.body, color: task.done ? COLOR.textTertiary : COLOR.textPrimary, lineHeight: 1.3,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         textDecoration: task.done ? 'line-through' : 'none',
       }}>
@@ -238,7 +239,7 @@ function DraggableTask({ task, showMs, msMap }) {
       {showMs && task.milestoneId && msMap[task.milestoneId] && (
         <MSBadge ms={msMap[task.milestoneId]} size="xs" />
       )}
-      {task.dueDate && <span style={{ fontSize: 9, color: '#a09f99', flexShrink: 0 }}>{task.dueDate.slice(5)}</span>}
+      {task.dueDate && <span style={{ fontSize: FONT.ganttMs, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate.slice(5)}</span>}
     </div>
   )
 }
