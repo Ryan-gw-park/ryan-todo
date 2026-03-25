@@ -53,14 +53,24 @@ export default function PersonalWeeklyView() {
 
   // 이번 주에 dueDate가 있는 할일
   const weekTasks = useMemo(() =>
-    myTasks.filter(t => !t.done && t.dueDate && weekDateStrs.includes(t.dueDate)),
-    [myTasks, weekDateStrs]
+    myTasks.filter(t => {
+      if (t.done) return false
+      if (t.dueDate && weekDateStrs.includes(t.dueDate)) return true
+      if (!t.dueDate && t.category === 'today' && weekDateStrs.includes(todayStr)) return true
+      return false
+    }),
+    [myTasks, weekDateStrs, todayStr]
   )
 
   // 백로그: dueDate 없는 할일
   const backlogTasks = useMemo(() =>
-    myTasks.filter(t => !t.done && !t.dueDate),
-    [myTasks]
+    myTasks.filter(t => {
+      if (t.done) return false
+      if (t.dueDate) return false
+      if (t.category === 'today' && weekDateStrs.includes(todayStr)) return false
+      return true
+    }),
+    [myTasks, weekDateStrs, todayStr]
   )
 
   // 내 할일이 있는 프로젝트
@@ -165,7 +175,12 @@ export default function PersonalWeeklyView() {
                   ...weekDays.map((d, di) => {
                     const ds = fmtDate(d)
                     const isToday = ds === todayStr
-                    const dayTasks = weekTasks.filter(t => t.projectId === proj.id && t.dueDate === ds)
+                    const dayTasks = weekTasks.filter(t => {
+                      if (t.projectId !== proj.id) return false
+                      if (t.dueDate === ds) return true
+                      if (!t.dueDate && t.category === 'today' && ds === todayStr) return true
+                      return false
+                    })
                     return (
                       <DayCellDrop key={`${proj.id}-${di}`} id={`day:${ds}`}>
                         <div style={{

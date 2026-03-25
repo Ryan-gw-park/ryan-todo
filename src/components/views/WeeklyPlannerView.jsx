@@ -91,7 +91,14 @@ export default function WeeklyPlannerView() {
     const map = {} // key: `${memberId}__${dateStr}`
     filteredTasks.forEach(t => {
       if (t.done) return
-      if (!t.dueDate || !weekDateStrs.includes(t.dueDate)) return
+      // Effective date: explicit dueDate or category='today' → today's column
+      let effectiveDate = null
+      if (t.dueDate && weekDateStrs.includes(t.dueDate)) {
+        effectiveDate = t.dueDate
+      } else if (!t.dueDate && t.category === 'today' && weekDateStrs.includes(todayStr)) {
+        effectiveDate = todayStr
+      }
+      if (!effectiveDate) return
       // Determine member
       let memId = '_me'
       if (currentTeamId) {
@@ -102,12 +109,12 @@ export default function WeeklyPlannerView() {
           memId = '_unassigned'
         }
       }
-      const key = `${memId}__${t.dueDate}`
+      const key = `${memId}__${effectiveDate}`
       if (!map[key]) map[key] = []
       map[key].push(t)
     })
     return map
-  }, [filteredTasks, weekDateStrs, currentTeamId, memberRows])
+  }, [filteredTasks, weekDateStrs, todayStr, currentTeamId, memberRows])
 
   // ─── Backlog state ───
   const [backlogProject, setBacklogProject] = useState('all')
@@ -118,12 +125,14 @@ export default function WeeklyPlannerView() {
     return filteredTasks.filter(t => {
       if (t.done) return false
       if (t.dueDate && weekDateStrs.includes(t.dueDate)) return false
+      // category='today' tasks go to today's cell, not backlog
+      if (!t.dueDate && t.category === 'today' && weekDateStrs.includes(todayStr)) return false
       if (backlogProject !== 'all' && t.projectId !== backlogProject) return false
       if (backlogCat === 'backlog') return t.category === 'backlog'
       if (backlogCat === 'next') return t.category === 'next'
       return true
     })
-  }, [filteredTasks, weekDateStrs, backlogProject, backlogCat])
+  }, [filteredTasks, weekDateStrs, todayStr, backlogProject, backlogCat])
 
   const backlogByProject = useMemo(() => {
     const map = {}
