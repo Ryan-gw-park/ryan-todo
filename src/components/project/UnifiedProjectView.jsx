@@ -6,7 +6,7 @@ import { getColor } from '../../utils/colors'
 import { buildTree, flattenTreeWithTasks, countTasksRecursive } from '../../utils/milestoneTree'
 import { toX, getWeekDates, getTimelineStart, formatWeekLabel, getTodayX, getBarWidth } from '../../utils/ganttHelpers'
 import InlineTimelineView from '../views/InlineTimelineView'
-import MsTaskListMode from './MsTaskListMode'
+import MsTaskTreeMode from './MsTaskTreeMode'
 
 const S = COLOR
 
@@ -406,7 +406,7 @@ export default function UnifiedProjectView({ projectId }) {
 
         {/* Task list mode → MS-grouped single list */}
         {rightMode === '전체 할일' && (
-          <MsTaskListMode
+          <MsTaskTreeMode
             tree={tree}
             projectTasks={projectTasks}
             backlogTasks={backlogTasks}
