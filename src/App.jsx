@@ -22,12 +22,13 @@ const AllTasksView = lazy(() => import('./components/views/AllTasksView'))
 const MatrixView = lazy(() => import('./components/views/MatrixView'))
 const ProjectView = lazy(() => import('./components/views/ProjectView'))
 const TimelineView = lazy(() => import('./components/views/TimelineView'))
+const InlineTimelineView = lazy(() => import('./components/views/InlineTimelineView'))
 const MemoryView = lazy(() => import('./components/views/MemoryView'))
 const TeamMatrixView = lazy(() => import('./components/matrix/TeamMatrixView'))
 const WeeklyPlannerView = lazy(() => import('./components/views/WeeklyPlannerView'))
 const PersonalMatrixView = lazy(() => import('./components/views/PersonalMatrixView'))
 const PersonalWeeklyView = lazy(() => import('./components/views/PersonalWeeklyView'))
-const PersonalTimelineView = lazy(() => import('./components/views/PersonalTimelineView'))
+// PersonalTimelineView replaced by InlineTimelineView with scope="personal"
 const ProjectLayer = lazy(() => import('./components/project/ProjectLayer'))
 const TeamSettings = lazy(() => import('./components/team/TeamSettings'))
 const Onboarding = lazy(() => import('./components/team/Onboarding'))
@@ -87,10 +88,10 @@ function AppShell({ mobile }) {
   const views = {
     today: TodayView, allTasks: AllTasksView, memory: MemoryView,
     'team-matrix': TeamMatrixView,
-    'team-timeline': TimelineView,
+    'team-timeline': InlineTimelineView,
     'team-weekly': WeeklyPlannerView,
     'personal-matrix': PersonalMatrixView,
-    'personal-timeline': PersonalTimelineView,
+    'personal-timeline': () => <InlineTimelineView scope="personal" />,
     'personal-weekly': PersonalWeeklyView,
     project: ProjectView, projectLayer: ProjectLayer,
   }
