@@ -6,6 +6,7 @@ import { getColor } from '../../utils/colors'
 import { buildTree, flattenTreeWithTasks, countTasksRecursive } from '../../utils/milestoneTree'
 import { toX, getWeekDates, getTimelineStart, formatWeekLabel, getTodayX, getBarWidth } from '../../utils/ganttHelpers'
 import InlineTimelineView from '../views/InlineTimelineView'
+import MsTaskListMode from './MsTaskListMode'
 
 const S = COLOR
 
@@ -403,263 +404,24 @@ export default function UnifiedProjectView({ projectId }) {
           <InlineTimelineView projectId={projectId} />
         )}
 
-        {/* Task list mode → existing tree + task rows */}
-        {rightMode === '전체 할일' && <>
-        {/* Column headers */}
-        <div style={{ display: 'flex', borderBottom: `0.5px solid ${S.border}`, background: '#fafaf8', flexShrink: 0 }}>
-          {/* Left: tree column headers */}
-          <div style={{ width: totalTreeWidth, flexShrink: 0, display: 'flex', position: 'sticky', left: 0, zIndex: 4, background: '#fafaf8' }}>
-            {colWidths.slice(0, maxDepth).map((w, ci) => (
-              <div key={ci} style={{ width: w, flexShrink: 0, padding: '5px 8px', fontSize: FONT.caption, fontWeight: 600, color: S.textTertiary, position: 'relative', userSelect: 'none' }}>
-                {ci === 0 ? '마일스톤' : `하위 ${ci}`}
-                {/* Resize handle — only between columns, not after the last one */}
-                {ci < maxDepth - 1 && (
-                  <div
-                    onMouseDown={(e) => handleColResizeStart(ci, e)}
-                    style={{ position: 'absolute', right: -2, top: 0, bottom: 0, width: 5, cursor: 'col-resize', zIndex: 2 }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Divider */}
-          <div
-            onMouseDown={handleDividerStart}
-            style={{ width: 5, flexShrink: 0, cursor: 'col-resize', position: 'relative', background: 'transparent', zIndex: 3 }}
-            onMouseEnter={e => e.currentTarget.style.background = '#e0e0e0'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <div style={{ position: 'absolute', top: '50%', left: 1, width: 3, height: 24, marginTop: -12, borderRadius: 2, background: '#ccc', opacity: 0.4 }} />
-          </div>
-
-          {/* Right header */}
-          {rightMode === '전체 할일' ? (
-            <div style={{ flex: 1, padding: '5px 12px', fontSize: FONT.caption, fontWeight: 600, color: S.textTertiary, minWidth: 280 }}>
-              연결된 할일
-            </div>
-          ) : (
-            <div style={{ display: 'flex', minWidth: weekCount * WEEK_W }}>
-              {weekDates.map((d, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: WEEK_W, flexShrink: 0, textAlign: 'center',
-                    fontSize: FONT.tiny, fontWeight: 500, color: S.textTertiary,
-                    padding: '6px 0', borderLeft: i > 0 ? `0.5px solid ${S.border}` : 'none',
-                  }}
-                >
-                  {formatWeekLabel(d)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Scrollable body */}
-        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
-          {rows.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: S.textTertiary, fontSize: FONT.body }}>
-              마일스톤이 없습니다
-            </div>
-          ) : (
-            rows.map((row, ri) => {
-              const cells = row.cells.slice(0, maxDepth)
-              const isAdding = addingTaskLeafId === row.leafId && !row.task && row.isFirstSubRow
-
-              return (
-                <div key={row.leafId + '-' + row.taskIndex} style={{ display: 'flex', minHeight: ROW_H, borderBottom: `0.5px solid ${S.border}` }}>
-                  {/* LEFT: sticky tree */}
-                  <div style={{
-                    width: totalTreeWidth, flexShrink: 0, display: 'flex', alignItems: 'stretch',
-                    position: 'sticky', left: 0, zIndex: 2, background: '#fff',
-                  }}>
-                    {cells.map((cell, ci) => {
-                      const w = colWidths[ci] || 140
-                      if (!cell) return <div key={ci} style={{ width: w, flexShrink: 0 }} />
-                      if (rendered.current[cell.id] && !cell.isLeaf) return <div key={ci} style={{ width: w, flexShrink: 0 }} />
-                      if (!cell.isLeaf) rendered.current[cell.id] = true
-
-                      const isD0 = ci === 0
-                      const nodeCount = countTasksRecursive(cell._node || { children: [] }, projectTasks)
-                      const isEditing = editingMsId === cell.id
-
-                      return (
-                        <div
-                          key={ci}
-                          style={{
-                            width: w, flexShrink: 0, padding: '4px 8px',
-                            display: 'flex', alignItems: 'flex-start', gap: 4, position: 'relative',
-                          }}
-                          onMouseEnter={e => { if (!isEditing) e.currentTarget.querySelector('.hover-actions')?.style.setProperty('opacity', '1') }}
-                          onMouseLeave={e => { e.currentTarget.querySelector('.hover-actions')?.style.setProperty('opacity', '0') }}
-                        >
-                          {ci > 0 && <span style={{ color: `${cell.color}40`, fontSize: 10, flexShrink: 0, marginTop: 2 }}>─</span>}
-                          <div style={{ width: isD0 ? 8 : 6, height: isD0 ? 8 : 6, borderRadius: '50%', background: cell.color, flexShrink: 0, marginTop: 3 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            {isEditing ? (
-                              <input
-                                autoFocus
-                                defaultValue={cell.title}
-                                onBlur={(e) => handleMsEditFinish(cell.id, e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') { e.preventDefault(); handleMsEditFinish(cell.id, e.target.value) }
-                                  if (e.key === 'Escape') { e.preventDefault(); handleMsEditFinish(cell.id, null) }
-                                }}
-                                onMouseDown={e => e.stopPropagation()}
-                                style={{
-                                  width: '100%', fontSize: isD0 ? 12 : 11.5, fontWeight: isD0 ? 700 : ci === 1 ? 600 : 400,
-                                  border: 'none', outline: 'none', background: 'transparent', color: S.textPrimary, fontFamily: 'inherit', padding: 0,
-                                }}
-                              />
-                            ) : (
-                              <div
-                                onDoubleClick={(e) => { e.stopPropagation(); setEditingMsId(cell.id) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: isD0 ? 12 : 11.5, fontWeight: isD0 ? 700 : ci === 1 ? 600 : 400, color: S.textPrimary, lineHeight: 1.3 }}
-                              >
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cell.title || '제목 없음'}</span>
-                                {nodeCount.total > 0 && (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                                    <span style={{ width: 22, height: 2.5, borderRadius: 2, background: '#e8e6df', display: 'inline-block', position: 'relative' }}>
-                                      <span style={{ width: `${nodeCount.done / nodeCount.total * 100}%`, height: 2.5, borderRadius: 2, background: cell.color, display: 'block' }} />
-                                    </span>
-                                    <span style={{ fontSize: 9, color: S.textTertiary }}>{nodeCount.done}/{nodeCount.total}</span>
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            {/* Hover actions */}
-                            <div
-                              className="hover-actions"
-                              style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, opacity: 0, transition: 'opacity 0.15s' }}
-                            >
-                              <span
-                                onClick={(e) => { e.stopPropagation(); handleAddChildMs(cell.id) }}
-                                style={{ fontSize: 10, color: cell.color, cursor: 'pointer', fontWeight: 500 }}
-                              >
-                                + 하위 추가
-                              </span>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); handleDeleteMs(cell.id, cell.title) }}
-                                style={{ fontSize: 10, color: '#ccc', cursor: 'pointer' }}
-                                onMouseEnter={e => e.currentTarget.style.color = '#c53030'}
-                                onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
-                              >
-                                삭제
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {/* Sticky shadow */}
-                    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, background: S.border }} />
-                  </div>
-
-                  {/* Divider space */}
-                  <div style={{ width: 5, flexShrink: 0 }} />
-
-                  {/* RIGHT: task row */}
-                  {rightMode === '전체 할일' ? (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '2px 10px', minWidth: 280 }}>
-                      {isAdding ? (
-                        <InlineAddTask msId={row.leafId} projectId={projectId} onDone={() => setAddingTaskLeafId(null)} />
-                      ) : row.task ? (
-                        <>
-                          <Check done={row.task.done} onClick={() => toggleDone(row.task.id)} />
-                          <span
-                            onClick={() => openDetail(row.task.id)}
-                            style={{
-                              flex: 1, fontSize: FONT.body, color: row.task.done ? S.textTertiary : S.textPrimary,
-                              lineHeight: 1.3, cursor: 'pointer',
-                              textDecoration: row.task.done ? 'line-through' : 'none',
-                            }}
-                          >
-                            {row.task.text}
-                          </span>
-                          {row.task.dueDate && <span style={{ fontSize: FONT.tiny, color: S.textTertiary, flexShrink: 0 }}>{row.task.dueDate}</span>}
-                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.2, flexShrink: 0, cursor: 'pointer' }} onClick={() => openDetail(row.task.id)}>
-                            <path d="M6 3l5 5-5 5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </>
-                      ) : row.isFirstSubRow ? (
-                        <span
-                          onClick={() => setAddingTaskLeafId(row.leafId)}
-                          style={{ fontSize: FONT.caption, color: S.textTertiary, cursor: 'pointer' }}
-                          onMouseEnter={e => e.currentTarget.style.color = S.textPrimary}
-                          onMouseLeave={e => e.currentTarget.style.color = S.textTertiary}
-                        >
-                          + 추가
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <GanttRow
-                      row={row}
-                      timelineStart={timelineStart}
-                      todayX={todayX}
-                      weekCount={weekCount}
-                      weekW={WEEK_W}
-                      rowH={ROW_H}
-                    />
-                  )}
-                </div>
-              )
-            })
-          )}
-
-          {/* + 마일스톤 추가 */}
-          <div style={{ display: 'flex', minHeight: 32 }}>
-            <div style={{ width: totalTreeWidth, flexShrink: 0, padding: '8px 10px', position: 'sticky', left: 0, background: '#fff' }}>
-              <span
-                onClick={() => handleAddChildMs(null)}
-                style={{ fontSize: FONT.caption, color: S.textTertiary, cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.color = S.textPrimary}
-                onMouseLeave={e => e.currentTarget.style.color = S.textTertiary}
-              >
-                + 마일스톤 추가
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Backlog */}
-        {backlogTasks.length > 0 && (
-          <BacklogSection tasks={backlogTasks} onToggle={toggleDone} onOpen={openDetail} />
+        {/* Task list mode → MS-grouped single list */}
+        {rightMode === '전체 할일' && (
+          <MsTaskListMode
+            tree={tree}
+            projectTasks={projectTasks}
+            backlogTasks={backlogTasks}
+            projectId={projectId}
+            pkmId={pkmId}
+            color={color}
+            toggleDone={toggleDone}
+            openDetail={openDetail}
+            addMilestone={addMilestone}
+            updateMilestone={updateMilestone}
+            deleteMilestone={deleteMilestone}
+            openConfirmDialog={openConfirmDialog}
+          />
         )}
-        </>}
       </div>
-    </div>
-  )
-}
-
-/* ═══ Backlog section ═══ */
-function BacklogSection({ tasks, onToggle, onOpen }) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div style={{ borderTop: `1.5px dashed ${S.border}`, flexShrink: 0 }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer' }}
-      >
-        <span style={{ fontSize: FONT.label, color: S.textTertiary }}>⊙</span>
-        <span style={{ fontSize: FONT.label, fontWeight: 500, color: S.textTertiary }}>백로그</span>
-        <span style={{ fontSize: FONT.caption, color: S.textTertiary }}>{tasks.length}건</span>
-        <span style={{ fontSize: 9, color: S.textTertiary, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
-      </div>
-      {open && tasks.map(t => (
-        <div
-          key={t.id}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px 6px 28px', borderBottom: `0.5px solid ${S.border}`, cursor: 'pointer' }}
-          onClick={() => onOpen(t.id)}
-        >
-          <Check done={t.done} onClick={() => onToggle(t.id)} />
-          <span style={{ flex: 1, fontSize: FONT.body, color: t.done ? S.textTertiary : S.textPrimary, textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
-        </div>
-      ))}
     </div>
   )
 }
