@@ -57,7 +57,8 @@ const MS_DEPTH = {
   2: { indent: 40, barH: 18, barOp: 0.65, fontSize: 10.5, fontWeight: 500, bg: false },
 }
 
-export default function InlineTimelineView({ scope }) {
+export default function InlineTimelineView({ scope, projectId }) {
+  const isProjectMode = !!projectId
   const { projects, tasks, openDetail, updateTask } = useStore()
   const currentTeamId = useStore(s => s.currentTeamId)
   const milestones = useStore(s => s.milestones)
@@ -95,12 +96,11 @@ export default function InlineTimelineView({ scope }) {
   // ─── Build display data ───
   const displayProjects = useMemo(() => {
     let base = scope === 'personal' ? projects : filteredProjects
-    if (scope === 'personal') {
-      // personal: show all projects where user has tasks or MS
-      return base
+    if (isProjectMode) {
+      return base.filter(p => p.id === projectId)
     }
     return base
-  }, [projects, filteredProjects, scope])
+  }, [projects, filteredProjects, scope, isProjectMode, projectId])
 
   // ─── Build hierarchical tree: project → MS tree → tasks ───
   const visibleRows = useMemo(() => {
@@ -146,16 +146,18 @@ export default function InlineTimelineView({ scope }) {
       const projStart = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : null
       const projEnd = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : null
 
-      // Project row
-      rows.push({
-        rowType: 'project', id: p.id, name: p.name, color: getColor(p.color).dot,
-        projectColor: getColor(p.color).dot,
-        startDate: projStart, endDate: projEnd,
-        hasChildren: projMs.length > 0 || projTasks.length > 0,
-      })
+      // Project row — skip in project mode (already shown in project header)
+      if (!isProjectMode) {
+        rows.push({
+          rowType: 'project', id: p.id, name: p.name, color: getColor(p.color).dot,
+          projectColor: getColor(p.color).dot,
+          startDate: projStart, endDate: projEnd,
+          hasChildren: projMs.length > 0 || projTasks.length > 0,
+        })
 
-      if (collapsed.has(p.id)) return
-      if (depth === 'project') return
+        if (collapsed.has(p.id)) return
+        if (depth === 'project') return
+      }
 
       // Build MS tree
       const rootMs = projMs.filter(m => !m.parent_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
@@ -274,27 +276,29 @@ export default function InlineTimelineView({ scope }) {
   const today = new Date()
   const monthLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월`
 
-  const LEFT_W = 260
+  const LEFT_W = isProjectMode ? 300 : 260
 
   return (
-    <div data-view="timeline" style={{ padding: SPACE.viewPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div data-view="timeline" style={{ padding: isProjectMode ? 0 : SPACE.viewPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ maxWidth: isProjectMode ? undefined : 1400, margin: isProjectMode ? 0 : '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
-        {/* ─── Header ─── */}
-        <div style={{ marginBottom: 16, flexShrink: 0 }}>
-          <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0 }}>
-            {scope === 'personal' ? '개인 타임라인' : '타임라인'}
-          </h1>
-          <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{monthLabel}</p>
-        </div>
+        {/* ─── Header (global mode only) ─── */}
+        {!isProjectMode && (
+          <div style={{ marginBottom: 16, flexShrink: 0 }}>
+            <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0 }}>
+              {scope === 'personal' ? '개인 타임라인' : '타임라인'}
+            </h1>
+            <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{monthLabel}</p>
+          </div>
+        )}
 
         {/* ─── Toolbar ─── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: COLOR.textTertiary }}>깊이:</span>
           {[
-            { k: 'project', l: '프로젝트' },
-            { k: 'ms', l: '+마일스톤' },
-            { k: 'ms+task', l: '+마일스톤+할일' },
+            ...(!isProjectMode ? [{ k: 'project', l: '프로젝트' }] : []),
+            { k: 'ms', l: '마일스톤' },
+            { k: 'ms+task', l: '마일스톤+할일' },
           ].map(d => (
             <button key={d.k} onClick={() => setDepth(d.k)} style={{
               fontSize: 11, padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
@@ -317,7 +321,9 @@ export default function InlineTimelineView({ scope }) {
             {/* Date header */}
             <div style={{ display: 'flex', height: 32, borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, background: '#fff', zIndex: 4 }}>
               <div style={{ width: LEFT_W, flexShrink: 0, padding: '0 12px', display: 'flex', alignItems: 'center', position: 'sticky', left: 0, background: '#fff', zIndex: 5 }}>
-                <span style={{ fontSize: FONT.label, color: COLOR.textTertiary, fontWeight: 500 }}>프로젝트 / MS / 할일</span>
+                <span style={{ fontSize: FONT.label, color: COLOR.textTertiary, fontWeight: 500 }}>
+                  {isProjectMode ? '마일스톤 / 할일' : '프로젝트 / MS / 할일'}
+                </span>
               </div>
               {weekCols.map((d, i) => (
                 <div key={i} style={{

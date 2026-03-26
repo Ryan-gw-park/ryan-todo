@@ -5,6 +5,7 @@ import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
 import { buildTree, flattenTreeWithTasks, countTasksRecursive } from '../../utils/milestoneTree'
 import { toX, getWeekDates, getTimelineStart, formatWeekLabel, getTodayX, getBarWidth } from '../../utils/ganttHelpers'
+import InlineTimelineView from '../views/InlineTimelineView'
 
 const S = COLOR
 
@@ -397,6 +398,13 @@ export default function UnifiedProjectView({ projectId }) {
 
       {/* Main container */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Timeline mode → full InlineTimelineView */}
+        {rightMode === '타임라인' && (
+          <InlineTimelineView projectId={projectId} />
+        )}
+
+        {/* Task list mode → existing tree + task rows */}
+        {rightMode === '전체 할일' && <>
         {/* Column headers */}
         <div style={{ display: 'flex', borderBottom: `0.5px solid ${S.border}`, background: '#fafaf8', flexShrink: 0 }}>
           {/* Left: tree column headers */}
@@ -621,6 +629,7 @@ export default function UnifiedProjectView({ projectId }) {
         {backlogTasks.length > 0 && (
           <BacklogSection tasks={backlogTasks} onToggle={toggleDone} onOpen={openDetail} />
         )}
+        </>}
       </div>
     </div>
   )
