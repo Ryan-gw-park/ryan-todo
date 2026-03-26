@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react'
+import { DndContext, DragOverlay, useDroppable, useDraggable, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
@@ -17,6 +18,7 @@ export default function MsTaskTreeMode({
 }) {
   const addTask = useStore(s => s.addTask)
   const updateTask = useStore(s => s.updateTask)
+  const reorderTasks = useStore(s => s.reorderTasks)
 
   const [collapsed, setCollapsed] = useState(new Set())
   const [expandedDone, setExpandedDone] = useState(new Set())
@@ -38,6 +40,80 @@ export default function MsTaskTreeMode({
   }, [tree])
 
   const expandAll = useCallback(() => { setCollapsed(new Set()) }, [])
+
+  // ─── DnD ───
+  const [activeId, setActiveId] = useState(null)
+  const [activeType, setActiveType] = useState(null) // 'task' | 'ms'
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const sensors = useSensors(pointerSensor, touchSensor)
+
+  const activeTask = activeId && activeType === 'task' ? projectTasks.find(t => t.id === activeId) : null
+
+  const handleDragStart = useCallback((event) => {
+    const { active } = event
+    const data = active.data?.current
+    if (data?.type === 'task') {
+      setActiveId(active.id)
+      setActiveType('task')
+    } else if (data?.type === 'ms') {
+      setActiveId(active.id)
+      setActiveType('ms')
+    }
+  }, [])
+
+  const handleDragEnd = useCallback((event) => {
+    const { active, over } = event
+    setActiveId(null)
+    setActiveType(null)
+    if (!over || !active) return
+
+    const activeData = active.data?.current
+    const overData = over.data?.current
+
+    // ── Task dropped on MS drop zone → move to that MS ──
+    if (activeData?.type === 'task' && overData?.type === 'ms-drop') {
+      const taskId = active.id
+      const targetMsId = overData.msId
+      const task = projectTasks.find(t => t.id === taskId)
+      if (!task) return
+      if (task.keyMilestoneId === targetMsId) return
+      updateTask(taskId, { keyMilestoneId: targetMsId })
+      return
+    }
+
+    // ── Task dropped on another task → reorder within same MS or move to target's MS ──
+    if (activeData?.type === 'task' && overData?.type === 'task') {
+      const dragTask = projectTasks.find(t => t.id === active.id)
+      const overTask = projectTasks.find(t => t.id === over.id)
+      if (!dragTask || !overTask) return
+
+      if (dragTask.keyMilestoneId === overTask.keyMilestoneId) {
+        // Same MS: reorder
+        const msTasks = projectTasks
+          .filter(t => t.keyMilestoneId === dragTask.keyMilestoneId && !t.done && !t.deletedAt)
+          .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+        const oldIdx = msTasks.findIndex(t => t.id === active.id)
+        const newIdx = msTasks.findIndex(t => t.id === over.id)
+        if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
+          const reordered = [...msTasks]
+          const [moved] = reordered.splice(oldIdx, 1)
+          reordered.splice(newIdx, 0, moved)
+          reorderTasks(reordered)
+        }
+      } else {
+        // Different MS: move to target's MS
+        updateTask(active.id, { keyMilestoneId: overTask.keyMilestoneId })
+      }
+      return
+    }
+
+    // ── Task dropped on backlog → remove MS link ──
+    if (activeData?.type === 'task' && overData?.type === 'backlog-drop') {
+      updateTask(active.id, { keyMilestoneId: null })
+      return
+    }
+  }, [projectTasks, updateTask, reorderTasks])
 
   // ─── MS CRUD ───
   const handleAddChildMs = useCallback(async (parentId) => {
@@ -125,6 +201,7 @@ export default function MsTaskTreeMode({
   }, [tree, projectTasks, collapsed, expandedDone])
 
   return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div style={{ flex: 1, overflow: 'auto' }}>
       <div style={{ minWidth: maxDepth * COL_W + TASK_MIN_W, padding: '0 24px' }}>
 
@@ -212,7 +289,8 @@ export default function MsTaskTreeMode({
             const isHover = hoverMsId === row.node.id
             const isEditing = editingMsId === row.node.id
             return (
-              <div key={`l-${row.node.id}`}
+              <MsDropZone key={`l-${row.node.id}`} msId={row.node.id} activeId={activeId}>
+              <div
                 onMouseEnter={() => setHoverMsId(row.node.id)}
                 onMouseLeave={() => setHoverMsId(null)}
                 style={{ display: 'flex', borderBottom: `0.5px solid ${S.border}`, minHeight: 32 }}
@@ -248,8 +326,9 @@ export default function MsTaskTreeMode({
                 {Array.from({ length: maxDepth - row.depth - 1 }, (_, i) => (
                   <div key={`e${i}`} style={{ width: COL_W, flexShrink: 0, borderRight: '0.5px solid #f0f0f0' }} />
                 ))}
-                <TaskCell task={row.task} editingTaskId={editingTaskId} onStartEdit={setEditingTaskId} onFinishEdit={handleTaskEditFinish} onToggle={toggleDone} onDetail={openDetail} minW={TASK_MIN_W} />
+                <TaskCell task={row.task} editingTaskId={editingTaskId} onStartEdit={setEditingTaskId} onFinishEdit={handleTaskEditFinish} onToggle={toggleDone} onDetail={openDetail} minW={TASK_MIN_W} activeId={activeId} />
               </div>
+              </MsDropZone>
             )
           }
 
@@ -260,7 +339,7 @@ export default function MsTaskTreeMode({
                 {Array.from({ length: maxDepth }, (_, i) => (
                   <div key={i} style={{ width: COL_W, flexShrink: 0, borderRight: '0.5px solid #f0f0f0' }} />
                 ))}
-                <TaskCell task={row.task} editingTaskId={editingTaskId} onStartEdit={setEditingTaskId} onFinishEdit={handleTaskEditFinish} onToggle={toggleDone} onDetail={openDetail} minW={TASK_MIN_W} />
+                <TaskCell task={row.task} editingTaskId={editingTaskId} onStartEdit={setEditingTaskId} onFinishEdit={handleTaskEditFinish} onToggle={toggleDone} onDetail={openDetail} minW={TASK_MIN_W} activeId={activeId} />
               </div>
             )
           }
@@ -367,28 +446,67 @@ export default function MsTaskTreeMode({
         )}
       </div>
     </div>
+
+    {/* Drag overlay */}
+    <DragOverlay dropAnimation={null}>
+      {activeTask ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 12px', background: '#fff', borderRadius: 6,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', border: '1px solid #e0e0e0',
+          transform: 'rotate(2deg)', cursor: 'grabbing', maxWidth: 300,
+        }}>
+          <div style={{ width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, border: `1.5px solid ${CHECKBOX.borderColor}`, flexShrink: 0 }} />
+          <span style={{ fontSize: FONT.body, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeTask.text}</span>
+        </div>
+      ) : null}
+    </DragOverlay>
+    </DndContext>
   )
 }
 
-/* ═══ Task Cell ═══ */
-function TaskCell({ task, editingTaskId, onStartEdit, onFinishEdit, onToggle, onDetail, minW }) {
+/* ═══ MsDropZone — droppable area for each leaf MS ═══ */
+function MsDropZone({ msId, activeId, children }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `ms-drop:${msId}`,
+    data: { type: 'ms-drop', msId },
+  })
+  return (
+    <div ref={setNodeRef} style={{
+      transition: 'background 0.1s',
+      ...(isOver && activeId ? { background: 'rgba(49,130,206,0.06)', borderRadius: 4 } : {}),
+    }}>
+      {children}
+    </div>
+  )
+}
+
+/* ═══ Task Cell — draggable, title=edit zone, rest=drag zone ═══ */
+function TaskCell({ task, editingTaskId, onStartEdit, onFinishEdit, onToggle, onDetail, minW, activeId }) {
   const [hover, setHover] = useState(false)
   if (!task) return <div style={{ flex: 1, minWidth: minW }} />
 
   const isEditing = editingTaskId === task.id
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    data: { type: 'task', taskId: task.id },
+  })
 
   return (
     <div
+      ref={setNodeRef}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         flex: 1, display: 'flex', alignItems: 'center', gap: 8,
         padding: '4px 12px', minWidth: minW,
         background: hover ? '#fafaf8' : 'transparent', transition: 'background 0.1s',
+        opacity: isDragging ? 0.3 : 1,
+        position: 'relative',
       }}
     >
-      {/* Drag handle (visual only for now — DnD in Sub-Loop 5-B) */}
-      <div style={{ width: 12, opacity: hover ? 0.35 : 0, transition: 'opacity 0.15s', cursor: 'grab', flexShrink: 0 }}>
+      {/* Drag handle — this is the drag trigger (title is excluded) */}
+      <div {...listeners} {...attributes} style={{ width: 12, opacity: hover ? 0.35 : 0, transition: 'opacity 0.15s', cursor: 'grab', flexShrink: 0 }}>
         <svg width="8" height="12" viewBox="0 0 8 12" fill="#999">
           <circle cx="2" cy="2" r="1.2" /><circle cx="6" cy="2" r="1.2" />
           <circle cx="2" cy="6" r="1.2" /><circle cx="6" cy="6" r="1.2" />
@@ -440,7 +558,28 @@ function TaskCell({ task, editingTaskId, onStartEdit, onFinishEdit, onToggle, on
           <path d="M6 3l5 5-5 5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
+
+      {/* Invisible drop target for task-on-task reorder */}
+      <TaskDropTarget taskId={task.id} activeId={activeId} />
     </div>
+  )
+}
+
+/* ═══ Task Drop Target — invisible droppable for reorder ═══ */
+function TaskDropTarget({ taskId, activeId }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: taskId,
+    data: { type: 'task', taskId },
+  })
+  if (!activeId) return null
+  return (
+    <div ref={setNodeRef} style={{
+      position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+      background: isOver ? 'rgba(49,130,206,0.08)' : 'transparent',
+      pointerEvents: 'all', zIndex: isOver ? 1 : -1,
+      borderTop: isOver ? '2px solid #3182CE' : 'none',
+      transition: 'background 0.1s',
+    }} />
   )
 }
 
