@@ -6,6 +6,7 @@ import { getCachedUserId } from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import InlineAdd from '../shared/InlineAdd'
 import MSBadge from '../common/MSBadge'
+import MsBacklogSidebar from '../common/MsBacklogSidebar'
 
 /* ═══════════════════════════════════════════════════════
    PersonalMatrixView — 개인 매트릭스
@@ -102,11 +103,19 @@ export default function PersonalMatrixView() {
             <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>개인 매트릭스</h1>
             <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{dateStr}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: FONT.caption, color: COLOR.textTertiary }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={showMs} onChange={e => setShowMs(e.target.checked)} style={{ accentColor: COLOR.textPrimary }} />
-              MS 뱃지
-            </label>
+          <div style={{ display: 'flex', gap: 2, background: '#f5f4f0', borderRadius: 7, padding: 2 }}>
+            <button onClick={() => setShowMs(false)} style={{
+              border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
+              fontWeight: !showMs ? 600 : 400, background: !showMs ? '#fff' : 'transparent',
+              color: !showMs ? COLOR.textPrimary : COLOR.textTertiary,
+              boxShadow: !showMs ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+            }}>할일 모드</button>
+            <button onClick={() => setShowMs(true)} style={{
+              border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
+              fontWeight: showMs ? 600 : 400, background: showMs ? '#fff' : 'transparent',
+              color: showMs ? COLOR.textPrimary : COLOR.textTertiary,
+              boxShadow: showMs ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+            }}>MS 배정</button>
           </div>
         </div>
 
@@ -119,8 +128,9 @@ export default function PersonalMatrixView() {
           <span style={{ color: '#bbb' }}>완료: {catCounts.done}</span>
         </div>
 
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
+          <div style={{ flex: 1, overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             {/* Grid header */}
             <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)`, gap: 0, border: '0.5px solid #e8e6df', borderRadius: '10px 10px 0 0', overflow: 'hidden' }}>
               <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
@@ -198,6 +208,8 @@ export default function PersonalMatrixView() {
             )}
           </DragOverlay>
         </DndContext>
+        {showMs && <MsBacklogSidebar projects={projects} milestones={milestones} tasks={tasks} />}
+        </div>
       </div>
     </div>
   )

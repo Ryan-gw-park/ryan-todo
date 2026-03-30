@@ -17,6 +17,7 @@ import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
 import MSBadge from '../common/MSBadge'
 import CompactMsRow from '../common/CompactMsRow'
+import MsBacklogSidebar from '../common/MsBacklogSidebar'
 import { getMsPath, getVisibleMs } from '../../utils/milestoneTree'
 
 const MilestoneMatrixView = lazy(() => import('./MilestoneMatrixView'))
@@ -358,10 +359,11 @@ export default function TeamMatrixView() {
   // 마일스톤 모드 → 별도 컴포넌트
   if (matrixMode === 'milestone') {
     return (
-      <div data-view="matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding }}>
-        <div style={{ maxWidth: VIEW_WIDTH.wide, margin: '0 auto' }}>
-          <div style={{ marginBottom: 32, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div data-view="matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ maxWidth: VIEW_WIDTH.wide, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ marginBottom: 20, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>팀 매트릭스</h1>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <TeamModePill active={matrixMode} onChange={setMatrixMode} />
@@ -371,9 +373,14 @@ export default function TeamMatrixView() {
               </button>
             </div>
           </div>
-          <Suspense fallback={<div style={{ textAlign: 'center', color: COLOR.textTertiary, padding: 40 }}>로딩...</div>}>
-            <MilestoneMatrixView projects={filteredProjects} milestones={milestones} tasks={tasks} />
-          </Suspense>
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <Suspense fallback={<div style={{ textAlign: 'center', color: COLOR.textTertiary, padding: 40 }}>로딩...</div>}>
+                <MilestoneMatrixView projects={filteredProjects} milestones={milestones} tasks={tasks} />
+              </Suspense>
+            </div>
+            <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
+          </div>
         </div>
         {showRowConfig && <RowConfigSettings teamId={currentTeamId} userId={userId} onClose={() => setShowRowConfig(false)} onSave={cfg => { setConfig(cfg); setShowRowConfig(false) }} />}
       </div>
@@ -1049,13 +1056,13 @@ function SubViewPill({ active, onChange }) {
   )
 }
 
-/* ═══ Depth Toggle — [전체][대분류][중분류][소분류] (Loop-38) ═══ */
+/* ═══ Depth Toggle — [전체][L1][L2][L3] (Loop-38) ═══ */
 function DepthToggle({ value, onChange }) {
   const items = [
     { key: 'all', label: '전체' },
-    { key: '0', label: '대분류' },
-    { key: '1', label: '중분류' },
-    { key: '2', label: '소분류' },
+    { key: '0', label: 'L1' },
+    { key: '1', label: 'L2' },
+    { key: '2', label: 'L3' },
   ]
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
