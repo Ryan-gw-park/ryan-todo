@@ -11,6 +11,7 @@ import { getColor } from '../../utils/colors'
 export default function MsBacklogSidebar({ projects, milestones, tasks }) {
   const [blProject, setBlProject] = useState('all')
   const [blAssign, setBlAssign] = useState('unassigned')
+  const [contentType, setContentType] = useState('ms') // 'ms' | 'task'
 
   // Per-project depth map: { projectId: depthLevel }
   const [depthMap, setDepthMap] = useState(() => {
@@ -55,7 +56,7 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
     return result
   }, [milestones, blProject, blAssign, depthMap])
 
-  // Group by project
+  // Group MS by project
   const backlogByProject = useMemo(() => {
     const map = {}
     backlogMs.forEach(m => {
@@ -64,6 +65,32 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
     })
     return map
   }, [backlogMs])
+
+  // Filter tasks for backlog
+  const backlogTasks = useMemo(() => {
+    let result = tasks.filter(t => !t.done && !t.deletedAt)
+
+    // Project filter
+    if (blProject !== 'all') {
+      result = result.filter(t => t.projectId === blProject)
+    }
+
+    // Assignment filter
+    if (blAssign === 'unassigned') result = result.filter(t => !t.assigneeId)
+    else if (blAssign === 'assigned') result = result.filter(t => !!t.assigneeId)
+
+    return result.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+  }, [tasks, blProject, blAssign])
+
+  // Group tasks by project
+  const tasksByProject = useMemo(() => {
+    const map = {}
+    backlogTasks.forEach(t => {
+      if (!map[t.projectId]) map[t.projectId] = []
+      map[t.projectId].push(t)
+    })
+    return map
+  }, [backlogTasks])
 
   // Get parent MS name for breadcrumb
   const msMap = useMemo(() => {
@@ -124,6 +151,12 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
 
+        {/* Content type toggle */}
+        <div style={{ display: 'flex', gap: 2, background: '#f0efeb', borderRadius: 6, padding: 2, marginBottom: 6 }}>
+          {pill(contentType === 'ms', 'MS', () => setContentType('ms'))}
+          {pill(contentType === 'task', '할일', () => setContentType('task'))}
+        </div>
+
         {/* Assignment filter */}
         <div style={{ display: 'flex', gap: 2, background: '#f0efeb', borderRadius: 6, padding: 2, marginBottom: 8 }}>
           {pill(blAssign === 'all', '전체', () => setBlAssign('all'))}
@@ -131,8 +164,8 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
           {pill(blAssign === 'assigned', '배정됨', () => setBlAssign('assigned'))}
         </div>
 
-        {/* Per-project depth selector — L1/L2/L3 */}
-        {multiDepthProjects.length > 0 && (
+        {/* Per-project depth selector — L1/L2/L3 (MS only) */}
+        {contentType === 'ms' && multiDepthProjects.length > 0 && (
           <div style={{ marginTop: 4 }}>
             <div style={{ fontSize: 10, color: COLOR.textTertiary, marginBottom: 6, fontWeight: 500 }}>프로젝트별 배정 단위</div>
             {multiDepthProjects.map(p => {
@@ -159,59 +192,109 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-        {Object.entries(backlogByProject).map(([pid, msList]) => {
-          const p = projects.find(pr => pr.id === pid)
-          if (!p) return null
-          const c = getColor(p.color)
-          return (
-            <div key={pid} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 0', marginBottom: 4 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot }} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: c.dot }}>{p.name}</span>
-                <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{msList.length}개</span>
-              </div>
-              {msList.map(ms => {
-                const parentPath = getParentPath(ms)
-                const tc = getTaskCount(ms.id)
-                return (
-                  <div key={ms.id} draggable style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '4px 8px', marginBottom: 3, borderRadius: 5,
-                    background: `${c.dot}08`, border: `0.5px solid ${c.dot}18`,
-                    cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.background = `${c.dot}15`; e.currentTarget.style.borderColor = `${c.dot}40` }}
-                    onMouseLeave={e => { e.currentTarget.style.background = `${c.dot}08`; e.currentTarget.style.borderColor = `${c.dot}18` }}
-                  >
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ms.title || '(제목 없음)'}
-                      </div>
-                      {parentPath && (
-                        <div style={{ fontSize: 8.5, color: COLOR.textTertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {parentPath}
+        {contentType === 'ms' ? (
+          <>
+            {Object.entries(backlogByProject).map(([pid, msList]) => {
+              const p = projects.find(pr => pr.id === pid)
+              if (!p) return null
+              const c = getColor(p.color)
+              return (
+                <div key={pid} style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 0', marginBottom: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: c.dot }}>{p.name}</span>
+                    <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{msList.length}개</span>
+                  </div>
+                  {msList.map(ms => {
+                    const parentPath = getParentPath(ms)
+                    const tc = getTaskCount(ms.id)
+                    return (
+                      <div key={ms.id} draggable style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '4px 8px', marginBottom: 3, borderRadius: 5,
+                        background: `${c.dot}08`, border: `0.5px solid ${c.dot}18`,
+                        cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.background = `${c.dot}15`; e.currentTarget.style.borderColor = `${c.dot}40` }}
+                        onMouseLeave={e => { e.currentTarget.style.background = `${c.dot}08`; e.currentTarget.style.borderColor = `${c.dot}18` }}
+                      >
+                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ms.title || '(제목 없음)'}
+                          </div>
+                          {parentPath && (
+                            <div style={{ fontSize: 8.5, color: COLOR.textTertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {parentPath}
+                            </div>
+                          )}
                         </div>
+                        {tc > 0 && <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{tc}</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+            {backlogMs.length === 0 && (
+              <div style={{ textAlign: 'center', color: COLOR.textTertiary, fontSize: 11, padding: 20 }}>
+                {blAssign === 'unassigned' ? '미배정 MS가 없습니다' : '해당 필터에 맞는 MS가 없습니다'}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {Object.entries(tasksByProject).map(([pid, taskList]) => {
+              const p = projects.find(pr => pr.id === pid)
+              if (!p) return null
+              const c = getColor(p.color)
+              return (
+                <div key={pid} style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 0', marginBottom: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: c.dot }}>{p.name}</span>
+                    <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{taskList.length}건</span>
+                  </div>
+                  {taskList.map(task => (
+                    <div key={task.id} draggable style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 5,
+                      padding: '4px 8px', marginBottom: 3, borderRadius: 5,
+                      background: `${c.dot}06`, border: `0.5px solid ${c.dot}15`,
+                      cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.background = `${c.dot}12`; e.currentTarget.style.borderColor = `${c.dot}35` }}
+                      onMouseLeave={e => { e.currentTarget.style.background = `${c.dot}06`; e.currentTarget.style.borderColor = `${c.dot}15` }}
+                    >
+                      <div style={{
+                        width: 12, height: 12, borderRadius: 2, flexShrink: 0, marginTop: 1,
+                        border: `1.5px solid ${COLOR.textTertiary}`, background: '#fff',
+                      }} />
+                      <span style={{
+                        flex: 1, fontWeight: 400, color: COLOR.textPrimary, lineHeight: 1.4,
+                        whiteSpace: 'normal', wordBreak: 'break-word',
+                      }}>
+                        {task.text}
+                      </span>
+                      {task.dueDate && (
+                        <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate.slice(5)}</span>
                       )}
                     </div>
-                    {tc > 0 && <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{tc}</span>}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
-
-        {backlogMs.length === 0 && (
-          <div style={{ textAlign: 'center', color: COLOR.textTertiary, fontSize: 11, padding: 20 }}>
-            {blAssign === 'unassigned' ? '미배정 MS가 없습니다' : '해당 필터에 맞는 MS가 없습니다'}
-          </div>
+                  ))}
+                </div>
+              )
+            })}
+            {backlogTasks.length === 0 && (
+              <div style={{ textAlign: 'center', color: COLOR.textTertiary, fontSize: 11, padding: 20 }}>
+                {blAssign === 'unassigned' ? '미배정 할일이 없습니다' : '해당 필터에 맞는 할일이 없습니다'}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Hint */}
       <div style={{ padding: '8px 12px', borderTop: `1px solid ${COLOR.border}`, textAlign: 'center' }}>
-        <span style={{ fontSize: 10, color: COLOR.textTertiary }}>← 팀원 셀로 드래그하여 배정</span>
+        <span style={{ fontSize: 10, color: COLOR.textTertiary }}>← 셀로 드래그하여 {contentType === 'ms' ? 'MS' : '할일'} 배정</span>
       </div>
     </div>
   )
