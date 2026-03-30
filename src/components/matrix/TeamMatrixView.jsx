@@ -440,8 +440,9 @@ export default function TeamMatrixView() {
         )}
 
         {/* Original task-mode grid — shown when subView is 'matrix' */}
-        {subView === 'matrix' && <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div style={{ overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
+        {subView === 'matrix' && <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div style={{ flex: 1, overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
 
               {/* ── Project header row ── */}
@@ -598,13 +599,13 @@ export default function TeamMatrixView() {
 
               {/* ── 남은 할일 + 완료 통합 섹션 ── */}
               <div style={{ height: 16 }} />
-              {remainingRow && (
+              {false && remainingRow && (
                 <SectionHeader
                   config={{ ...remainingRow, label: '남은 할일 · 완료' }}
                   onToggle={handleToggleSection}
                 />
               )}
-              {remainingRow && !remainingRow.is_collapsed && (
+              {false && remainingRow && !remainingRow.is_collapsed && (
                 <>
                   <TaskRowWithDnd
                     label="남은 할일"
@@ -645,7 +646,9 @@ export default function TeamMatrixView() {
           <DragOverlay dropAnimation={null}>
             {activeTask ? <TaskOverlay task={activeTask} /> : null}
           </DragOverlay>
-        </DndContext>}
+        </DndContext>
+        <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
+        </div>}
 
       {/* Row Config Settings Modal */}
       {showRowConfig && userId && (

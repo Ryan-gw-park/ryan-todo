@@ -208,7 +208,7 @@ export default function PersonalMatrixView() {
             )}
           </DragOverlay>
         </DndContext>
-        {showMs && <MsBacklogSidebar projects={projects} milestones={milestones} tasks={tasks} />}
+        <MsBacklogSidebar projects={projects} milestones={milestones} tasks={tasks} />
         </div>
       </div>
     </div>
