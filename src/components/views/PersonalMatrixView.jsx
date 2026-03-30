@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import { DndContext, useDroppable, useDraggable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
-import { getColor, CATEGORIES } from '../../utils/colors'
+import { getColor } from '../../utils/colors'
 import InlineAdd from '../shared/InlineAdd'
 import MsBacklogSidebar from '../common/MsBacklogSidebar'
 

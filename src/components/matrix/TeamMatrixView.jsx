@@ -16,7 +16,6 @@ import RowConfigSettings from '../shared/RowConfigSettings'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
 import MsBacklogSidebar from '../common/MsBacklogSidebar'
-import { getMsPath, getVisibleMs } from '../../utils/milestoneTree'
 
 
 // Custom collision: pointerWithin → prefer task cards for reorder, fall back to category zone for cross-cell
@@ -54,7 +53,6 @@ export default function TeamMatrixView() {
 
   // Column collapse (shared with original MatrixView via store)
   const collapsed = collapseState.matrix || {}
-  const doneCollapsed = collapseState.matrixDone || {}
   const toggleCollapse = (pid) => storeToggle('matrix', pid)
 
   // DnD
@@ -202,6 +200,15 @@ export default function TeamMatrixView() {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>
         팀을 선택하세요. 사이드바에서 팀을 전환할 수 있습니다.
+      </div>
+    )
+  }
+
+  // members 로딩 전 guard — 그리드 열이 0개면 빈 화면 방지
+  if (members.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>
+        팀원 정보를 불러오는 중...
       </div>
     )
   }
