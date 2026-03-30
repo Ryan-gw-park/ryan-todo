@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
@@ -15,8 +15,6 @@ import ColorPicker from '../shared/ColorPicker'
 import RowConfigSettings from '../shared/RowConfigSettings'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import UniversalCard from '../common/UniversalCard'
-import MSBadge from '../common/MSBadge'
-import CompactMsRow from '../common/CompactMsRow'
 import MsBacklogSidebar from '../common/MsBacklogSidebar'
 import { getMsPath, getVisibleMs } from '../../utils/milestoneTree'
 
@@ -52,13 +50,7 @@ export default function TeamMatrixView() {
 
   const [members, setMembers] = useState([])
 
-  // 마일스톤 데이터
   const milestones = useStore(s => s.milestones)
-  const msMap = useMemo(() => {
-    const m = {}
-    milestones.forEach(ms => { m[ms.id] = ms })
-    return m
-  }, [milestones])
 
   // Column collapse (shared with original MatrixView via store)
   const collapsed = collapseState.matrix || {}
@@ -255,81 +247,68 @@ export default function TeamMatrixView() {
                 ))}
               </div>
 
-              {/* ── Project rows ── */}
+              {/* ── Project rows (1줄 병합) ── */}
               {allColumns.map(proj => {
                 const c = getColor(proj.color)
                 const projTasks = tasks.filter(t => t.projectId === proj.id && !t.done && t.teamId === currentTeamId)
                 const isCollapsed = collapsed[proj.id]
 
                 return (
-                  <div key={proj.id}>
-                    {/* Project header row — clickable to collapse */}
+                  <div key={proj.id} style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
+                    {/* Left: project name + toggle */}
                     <div
                       onClick={() => toggleCollapse(proj.id)}
-                      style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)`, cursor: 'pointer' }}
-                    >
-                      <div style={{
+                      style={{
                         padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
-                        display: 'flex', alignItems: 'center', gap: 5,
-                        background: isCollapsed ? '#fff' : `${c.dot}04`,
-                      }}>
-                        <span style={{ fontSize: 9, color: COLOR.textTertiary, width: 12, textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                        <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, flex: 1 }}>{proj.name}</span>
-                        <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{projTasks.length}건</span>
-                      </div>
-                      {/* Collapsed: per-member count */}
-                      {members.map(mem => {
-                        const count = projTasks.filter(t => t.assigneeId === mem.userId).length
-                        return (
-                          <div key={mem.id} style={{
-                            padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
-                            fontSize: FONT.tiny, color: COLOR.textTertiary,
-                            background: isCollapsed ? '#fff' : `${c.dot}04`,
-                          }}>
-                            {isCollapsed ? (count > 0 ? `${count}건` : '—') : ''}
-                          </div>
-                        )
-                      })}
+                        display: 'flex', alignItems: isCollapsed ? 'center' : 'flex-start', gap: 5,
+                        background: `${c.dot}04`, cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ fontSize: 9, color: COLOR.textTertiary, width: 12, textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: isCollapsed ? 0 : 2 }} />
+                      <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, flex: 1 }}>{proj.name}</span>
+                      <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{projTasks.length}건</span>
                     </div>
-
-                    {/* Expanded: task cells per member */}
-                    {!isCollapsed && (
-                      <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
-                        <div style={{ borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}` }} />
-                        {members.map(mem => {
-                          const cellTasks = projTasks.filter(t => t.assigneeId === mem.userId)
-                            .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                          const dropId = `${proj.id}:${mem.userId}`
-                          return (
-                            <CategoryDropZone
-                              key={mem.id}
-                              id={dropId}
-                              color={c}
-                              activeId={activeId}
-                              style={{ padding: '6px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}
-                            >
-                              {cellTasks.length === 0 ? (
-                                <span style={{ fontSize: FONT.tiny, color: '#e0e0e0' }}>—</span>
-                              ) : (
-                                <SortableContext items={cellTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                  {cellTasks.map(t => (
-                                    <TeamMatrixCard key={t.id} task={t} readOnly={mem.userId !== userId && !isOwner} milestone={msMap[t.keyMilestoneId]} />
-                                  ))}
-                                </SortableContext>
-                              )}
-                              <InlineAdd
-                                projectId={proj.id}
-                                category="today"
-                                color={c}
-                                extraFields={{ scope: 'assigned', assigneeId: mem.userId }}
-                                compact
-                              />
-                            </CategoryDropZone>
-                          )
-                        })}
-                      </div>
-                    )}
+                    {/* Right cells: collapsed=count, expanded=tasks */}
+                    {members.map(mem => {
+                      const cellTasks = projTasks.filter(t => t.assigneeId === mem.userId)
+                        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                      const dropId = `${proj.id}:${mem.userId}`
+                      return isCollapsed ? (
+                        <div key={mem.id} style={{
+                          padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                          fontSize: FONT.tiny, color: COLOR.textTertiary, background: `${c.dot}04`,
+                          display: 'flex', alignItems: 'center',
+                        }}>
+                          {cellTasks.length > 0 ? `${cellTasks.length}건` : '—'}
+                        </div>
+                      ) : (
+                        <CategoryDropZone
+                          key={mem.id}
+                          id={dropId}
+                          color={c}
+                          activeId={activeId}
+                          style={{ padding: '6px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}
+                        >
+                          {cellTasks.length === 0 ? (
+                            <span style={{ fontSize: FONT.tiny, color: '#e0e0e0' }}>—</span>
+                          ) : (
+                            <SortableContext items={cellTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                              {cellTasks.map(t => (
+                                <TeamMatrixCard key={t.id} task={t} readOnly={mem.userId !== userId && !isOwner} />
+                              ))}
+                            </SortableContext>
+                          )}
+                          <InlineAdd
+                            projectId={proj.id}
+                            category="today"
+                            color={c}
+                            extraFields={{ scope: 'assigned', assigneeId: mem.userId }}
+                            compact
+                          />
+                        </CategoryDropZone>
+                      )
+                    })}
                   </div>
                 )
               })}
@@ -378,7 +357,7 @@ function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
 }
 
 /* ═══ Team Matrix Card — DnD + highlight color + mobile menu ═══ */
-function TeamMatrixCard({ task, readOnly, isDone, milestone }) {
+function TeamMatrixCard({ task, readOnly, isDone }) {
   const { toggleDone, updateTask, openDetail } = useStore()
   const isMobile = window.innerWidth < 768
 
@@ -445,7 +424,6 @@ function TeamMatrixCard({ task, readOnly, isDone, milestone }) {
           opacity: isDone ? 0.5 : undefined,
           ...(hlColor ? { color: '#fff' } : {}),
         }}
-        renderMeta={milestone ? () => <MSBadge milestone={milestone} /> : undefined}
         renderExpanded={task.notes ? () => (
           <div style={{ fontSize: 12, color: hlColor ? 'rgba(255,255,255,0.8)' : '#888', lineHeight: 1.4 }}>
             {task.notes.length > 80 ? task.notes.slice(0, 80) + '…' : task.notes}

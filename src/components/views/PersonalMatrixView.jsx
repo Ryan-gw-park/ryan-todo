@@ -5,7 +5,6 @@ import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 import InlineAdd from '../shared/InlineAdd'
-import MSBadge from '../common/MSBadge'
 import MsBacklogSidebar from '../common/MsBacklogSidebar'
 
 /* ═══════════════════════════════════════════════════════
@@ -25,13 +24,6 @@ export default function PersonalMatrixView() {
   const isMobile = window.innerWidth < 768
   const userId = getCachedUserId()
   const milestones = useStore(s => s.milestones)
-  const [showMs, setShowMs] = useState(false)
-
-  const msMap = useMemo(() => {
-    const m = {}
-    milestones.forEach(ms => { m[ms.id] = ms })
-    return m
-  }, [milestones])
 
   const collapsed = collapseState.personalMatrix || {}
   const toggleCollapse = (pid) => storeToggle('personalMatrix', pid)
@@ -103,20 +95,6 @@ export default function PersonalMatrixView() {
             <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>개인 매트릭스</h1>
             <p style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary, marginTop: 4 }}>{dateStr}</p>
           </div>
-          <div style={{ display: 'flex', gap: 2, background: '#f5f4f0', borderRadius: 7, padding: 2 }}>
-            <button onClick={() => setShowMs(false)} style={{
-              border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
-              fontWeight: !showMs ? 600 : 400, background: !showMs ? '#fff' : 'transparent',
-              color: !showMs ? COLOR.textPrimary : COLOR.textTertiary,
-              boxShadow: !showMs ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-            }}>할일 모드</button>
-            <button onClick={() => setShowMs(true)} style={{
-              border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
-              fontWeight: showMs ? 600 : 400, background: showMs ? '#fff' : 'transparent',
-              color: showMs ? COLOR.textPrimary : COLOR.textTertiary,
-              boxShadow: showMs ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-            }}>MS 배정</button>
-          </div>
         </div>
 
         {/* 요약 */}
@@ -156,59 +134,48 @@ export default function PersonalMatrixView() {
                 const projTasks = myTasks.filter(t => t.projectId === proj.id && !t.done)
                 const isCollapsed = collapsed[proj.id]
                 return (
-                  <div key={proj.id}>
-                    {/* Project header — clickable to collapse */}
+                  <div key={proj.id} style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)` }}>
+                    {/* Left: project name + toggle */}
                     <div
                       onClick={() => toggleCollapse(proj.id)}
-                      style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)`, cursor: 'pointer' }}
-                    >
-                      <div style={{
+                      style={{
                         padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
-                        display: 'flex', alignItems: 'center', gap: 5, background: `${c.dot}04`,
-                      }}>
-                        <span style={{ fontSize: 9, color: COLOR.textTertiary, width: 12, textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                        <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, flex: 1 }}>{proj.name}</span>
-                        <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{projTasks.length}건</span>
-                      </div>
-                      {/* Collapsed summary per category */}
-                      {CAT_COLS.map(cat => {
-                        const count = myTasks.filter(t => t.projectId === proj.id && t.category === cat.key && !t.done).length
-                        return (
-                          <div key={cat.key} style={{
-                            padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
-                            fontSize: 10, color: COLOR.textTertiary, background: `${c.dot}04`,
-                          }}>
-                            {isCollapsed ? (count > 0 ? `${count}건` : '—') : ''}
-                          </div>
-                        )
-                      })}
+                        display: 'flex', alignItems: isCollapsed ? 'center' : 'flex-start', gap: 5,
+                        background: `${c.dot}04`, cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ fontSize: 9, color: COLOR.textTertiary, width: 12, textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: isCollapsed ? 0 : 2 }} />
+                      <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, flex: 1 }}>{proj.name}</span>
+                      <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{projTasks.length}건</span>
                     </div>
-
-                    {/* Expanded: task cells */}
-                    {!isCollapsed && (
-                      <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)` }}>
-                        <div style={{ borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}` }} />
-                        {CAT_COLS.map(cat => {
-                          const cellTasks = myTasks.filter(t => t.projectId === proj.id && t.category === cat.key && !t.done)
-                          const dropId = `${proj.id}:${cat.key}`
-                          return (
-                            <CellDrop key={dropId} id={dropId}>
-                              <div style={{ padding: '6px 8px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}>
-                                {cellTasks.length === 0 ? (
-                                  <span style={{ fontSize: 10, color: '#e0e0e0' }}>—</span>
-                                ) : cellTasks.map(t => (
-                                  <DraggableTask key={t.id} task={t} showMs={showMs} msMap={msMap} />
-                                ))}
-                                <div style={{ paddingLeft: 19, marginTop: 2 }}>
-                                  <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
-                                </div>
-                              </div>
-                            </CellDrop>
-                          )
-                        })}
-                      </div>
-                    )}
+                    {/* Right cells: collapsed=count, expanded=tasks */}
+                    {CAT_COLS.map(cat => {
+                      const cellTasks = myTasks.filter(t => t.projectId === proj.id && t.category === cat.key && !t.done)
+                      const dropId = `${proj.id}:${cat.key}`
+                      return isCollapsed ? (
+                        <div key={cat.key} style={{
+                          padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                          fontSize: FONT.tiny, color: COLOR.textTertiary, background: `${c.dot}04`,
+                          display: 'flex', alignItems: 'center',
+                        }}>
+                          {cellTasks.length > 0 ? `${cellTasks.length}건` : '—'}
+                        </div>
+                      ) : (
+                        <CellDrop key={dropId} id={dropId}>
+                          <div style={{ padding: '6px 8px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}>
+                            {cellTasks.length === 0 ? (
+                              <span style={{ fontSize: 10, color: '#e0e0e0' }}>—</span>
+                            ) : cellTasks.map(t => (
+                              <DraggableTask key={t.id} task={t} />
+                            ))}
+                            <div style={{ paddingLeft: 19, marginTop: 2 }}>
+                              <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
+                            </div>
+                          </div>
+                        </CellDrop>
+                      )
+                    })}
                   </div>
                 )
               })}
@@ -247,7 +214,7 @@ function CellDrop({ id, children }) {
   )
 }
 
-function DraggableTask({ task, showMs, msMap }) {
+function DraggableTask({ task }) {
   const { openDetail, toggleDone } = useStore()
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
   return (
@@ -278,9 +245,6 @@ function DraggableTask({ task, showMs, msMap }) {
       }}>
         {task.text}
       </span>
-      {showMs && task.keyMilestoneId && msMap[task.keyMilestoneId] && (
-        <MSBadge ms={msMap[task.keyMilestoneId]} size="xs" />
-      )}
       {task.dueDate && <span style={{ fontSize: FONT.ganttMs, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate.slice(5)}</span>}
     </div>
   )
