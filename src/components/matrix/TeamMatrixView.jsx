@@ -362,6 +362,21 @@ export default function TeamMatrixView() {
   )
 }
 
+/* ═══ Category Drop Zone — droppable cell ═══ */
+function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
+  const { isOver, setNodeRef } = useDroppable({ id })
+  const showHighlight = isOver && activeId
+
+  return (
+    <div ref={setNodeRef} style={{
+      ...cellStyle, display: 'flex', flexDirection: 'column', transition: 'background 0.08s',
+      ...(showHighlight ? { background: color.header, outline: `2px dashed ${color.dot}`, outlineOffset: -2 } : {}),
+    }}>
+      {children}
+    </div>
+  )
+}
+
 /* ═══ Team Matrix Card — DnD + highlight color + mobile menu ═══ */
 function TeamMatrixCard({ task, readOnly, isDone, milestone }) {
   const { toggleDone, updateTask, openDetail } = useStore()
