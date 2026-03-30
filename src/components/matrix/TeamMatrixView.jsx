@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { COLOR, FONT, SPACE, VIEW_WIDTH } from '../../styles/designTokens'
 import { DndContext, DragOverlay, useDroppable, PointerSensor, TouchSensor, useSensors, useSensor, pointerWithin, rectIntersection } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
@@ -20,7 +20,6 @@ import CompactMsRow from '../common/CompactMsRow'
 import MsBacklogSidebar from '../common/MsBacklogSidebar'
 import { getMsPath, getVisibleMs } from '../../utils/milestoneTree'
 
-const MilestoneMatrixView = lazy(() => import('./MilestoneMatrixView'))
 
 // Custom collision: pointerWithin → prefer task cards for reorder, fall back to category zone for cross-cell
 function matrixCollision(args) {
@@ -50,17 +49,8 @@ export default function TeamMatrixView() {
   const myRole = useStore(s => s.myRole)
   const isOwner = myRole === 'owner'
   const isMobile = window.innerWidth < 768
-  const LW = isMobile ? 80 : 110
-  const COL_GAP = 10
-  const COL_MIN = isMobile ? 200 : 0
 
-  const [matrixMode, setMatrixMode] = useState('task') // 'task' | 'milestone'
-
-  // Loop-38: sub-view tabs + depth toggle
-  const [subView, setSubView] = useState('matrix') // 'matrix' | 'project' | 'member'
-  const [depthFilter, setDepthFilter] = useState('0') // 'all' | '0' | '1' | '2'
   const [members, setMembers] = useState([])
-  const [showUnassigned, setShowUnassigned] = useState(false)
 
   // 마일스톤 데이터
   const milestones = useStore(s => s.milestones)
@@ -99,9 +89,6 @@ export default function TeamMatrixView() {
   ]
 
   const [config, setConfig] = useState(defaultConfig)
-  // 팀원 접기 상태: collapsedMembers Set에 포함된 팀원만 요약 모드
-  // 팀 섹션 펼치기 = 모든 팀원 상세 카드 표시 (기본), 개별 클릭으로 접기 토글
-  const [collapsedMembers, setCollapsedMembers] = useState(new Set())
   const [userId, setUserId] = useState(cachedUid)
   const [showRowConfig, setShowRowConfig] = useState(false)
 
@@ -155,20 +142,6 @@ export default function TeamMatrixView() {
     return () => window.removeEventListener('view-focus', handler)
   }, [])
 
-  const handleToggleSection = useCallback(async (configItem) => {
-    setConfig(prev => prev.map(c => c.id === configItem.id ? { ...c, is_collapsed: !c.is_collapsed } : c))
-    await useMatrixConfig.toggleCollapse(configItem.id, configItem.is_collapsed)
-  }, [])
-
-  const handleToggleMember = useCallback((mappedUserId) => {
-    setCollapsedMembers(prev => {
-      const next = new Set(prev)
-      if (next.has(mappedUserId)) next.delete(mappedUserId)
-      else next.add(mappedUserId)
-      return next
-    })
-  }, [])
-
   // DnD handlers
   const handleDragStart = (e) => setActiveId(e.active.id)
 
@@ -180,73 +153,17 @@ export default function TeamMatrixView() {
     if (!task) return
     const overId = over.id
 
-    // ── 팀원 행 drop ──
-    // Loop-31: category 강제 변경 제거 — R1이 scope='assigned' 자동 설정
-    if (typeof overId === 'string' && overId.startsWith('member:')) {
-      const targetMemberId = overId.split(':')[1]
-      updateTask(active.id, {
-        assigneeId: targetMemberId,
-      })
-      return
-    }
-
-    // ── 카테고리 drop zone (projectId:category) ──
+    // ── 셀 drop zone (projectId:memberId) ──
     if (typeof overId === 'string' && overId.includes(':')) {
-      const [targetProjectId, targetCategory] = overId.split(':')
-      const project = projects.find(p => p.id === targetProjectId)
+      const [targetProjectId, targetMemberId] = overId.split(':')
+      if (task.projectId === targetProjectId && task.assigneeId === targetMemberId) return
 
-      // Loop-31: 드롭 대상의 expected scope/assigneeId 결정
-      let expectedScope = task.scope
-      let expectedAssignee = task.assigneeId
-      if (project?.teamId) {
-        if (targetCategory === 'today' || targetCategory === 'next') {
-          expectedScope = 'assigned'
-          expectedAssignee = userId
-        } else if (targetCategory === 'backlog') {
-          expectedScope = 'team'
-          expectedAssignee = null
-        }
-      } else {
-        // Loop-35I: 개인 프로젝트 타겟 — scope='private'로 전환
-        expectedScope = 'private'
-        expectedAssignee = null
+      const patch = {
+        projectId: targetProjectId,
+        assigneeId: targetMemberId,
+        scope: 'assigned',
       }
-      const expectedDone = targetCategory === 'done'
-
-      // 조기 리턴: 모든 상태가 동일할 때만
-      const isSamePosition = (
-        task.projectId === targetProjectId &&
-        task.category === targetCategory &&
-        task.scope === expectedScope &&
-        task.assigneeId === expectedAssignee &&
-        task.done === expectedDone
-      )
-      if (isSamePosition) return
-
-      const patch = { projectId: targetProjectId, category: targetCategory }
-
-      // 자동 배정
-      if (project?.teamId) {
-        if (targetCategory === 'today' || targetCategory === 'next') {
-          patch.scope = 'assigned'
-          patch.assigneeId = userId
-        } else if (targetCategory === 'backlog') {
-          patch.scope = 'team'
-          patch.assigneeId = null
-        }
-      } else {
-        // Loop-35I: 개인 프로젝트 타겟 — scope='private'로 전환, teamId 해제
-        patch.scope = 'private'
-        patch.teamId = null
-        patch.assigneeId = null
-      }
-
-      // Loop-31: done 처리 — 완료 행 drop 시 done=true, 미완료 행 drop 시 done=false
-      if (targetCategory === 'done' && !task.done) {
-        patch.done = true
-      } else if (targetCategory !== 'done' && task.done) {
-        patch.done = false
-      }
+      if (task.done) patch.done = false
 
       updateTask(active.id, patch)
       return
@@ -256,86 +173,29 @@ export default function TeamMatrixView() {
     const overTask = tasks.find(t => t.id === overId)
     if (!overTask) return
 
-    if (task.projectId === overTask.projectId && task.category === overTask.category) {
+    if (task.projectId === overTask.projectId && task.assigneeId === overTask.assigneeId) {
       // Same cell: reorder
       const cellTasks = tasks
-        .filter(t => t.projectId === task.projectId && t.category === task.category)
-        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .filter(t => t.projectId === task.projectId && t.assigneeId === task.assigneeId && !t.done)
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
       const oldIndex = cellTasks.findIndex(t => t.id === active.id)
       const newIndex = cellTasks.findIndex(t => t.id === overId)
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         reorderTasks(arrayMove(cellTasks, oldIndex, newIndex))
       }
     } else {
-      // Cross-cell: 대상 task 위치로 이동
-      const project = projects.find(p => p.id === overTask.projectId)
-      const patch = { projectId: overTask.projectId, category: overTask.category }
-
-      if (project?.teamId) {
-        if (overTask.category === 'today' || overTask.category === 'next') {
-          patch.scope = 'assigned'
-          patch.assigneeId = userId
-        } else if (overTask.category === 'backlog') {
-          patch.scope = 'team'
-          patch.assigneeId = null
-        }
-      } else {
-        // Loop-35I: 개인 프로젝트 타겟 — scope='private'로 전환, teamId 해제
-        patch.scope = 'private'
-        patch.teamId = null
-        patch.assigneeId = null
+      // Cross-cell: 대상 task의 project + assignee로 이동
+      const patch = {
+        projectId: overTask.projectId,
+        assigneeId: overTask.assigneeId,
+        scope: 'assigned',
       }
-
-      // Loop-31: done 처리 — 대상 task의 done 상태 기준
-      if (overTask.done && !task.done) {
-        patch.done = true
-      } else if (!overTask.done && task.done) {
-        patch.done = false
-      }
-
+      if (task.done) patch.done = false
       updateTask(active.id, patch)
     }
   }
 
   // Group config rows
-  const sectionHeaders = config.filter(r => r.row_type === 'section_header')
-  const meHeader = sectionHeaders.find(r => r.section === 'me')
-  const teamHeader = sectionHeaders.find(r => r.section === 'team')
-  const taskRows = config.filter(r => r.row_type === 'task_row').sort((a, b) => a.sort_order - b.sort_order)
-  const memberRows = config.filter(r => r.row_type === 'member_row').sort((a, b) => a.sort_order - b.sort_order)
-  const remainingRow = config.find(r => r.row_type === 'remaining')
-  const completedRow = config.find(r => r.row_type === 'completed')
-
-  // Filter helpers
-  const myTasksForRow = (category) => tasks
-    .filter(t => {
-      if (t.category !== category) return false
-      if (t.done) return false
-      if (t.teamId === currentTeamId && t.assigneeId === userId && t.scope === 'assigned') return true
-      // scope='team'(미배정)은 "남은 할일"에만 표시 — 여기서 제외
-      if (t.scope === 'private' && t.createdBy === userId) return true
-      if (!t.teamId && !t.scope) return true
-      return false
-    })
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-
-  const memberTasks = (memberId) => tasks
-    .filter(t => t.assigneeId === memberId && t.scope === 'assigned' && t.teamId === currentTeamId && !t.done)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-
-  const remainingTasks = tasks
-    .filter(t => t.teamId === currentTeamId && t.scope === 'team' && !t.assigneeId && !t.done && t.category === 'backlog')
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-
-  const completedTasks = tasks
-    .filter(t => {
-      if (!t.done) return false
-      if (t.teamId === currentTeamId) return true
-      if (t.scope === 'private' && t.createdBy === userId) return true
-      if (!t.teamId && !t.scope) return true
-      return false
-    })
-    .sort((a, b) => a.sortOrder - b.sortOrder)
 
   // Loop-20.2: 전역 필터 적용
   const { filteredProjects, filteredTasks: _ft } = useProjectFilter(projects, tasks)
@@ -344,8 +204,6 @@ export default function TeamMatrixView() {
   const allColumns = currentTeamId
     ? filteredProjects.filter(p => p.teamId === currentTeamId)
     : filteredProjects
-  const N = allColumns.length
-  const rowCategoryMap = { me_today: 'today', me_next: 'next' }
 
   // teamId 로딩 전 guard — 모든 hooks 이후에 위치 (Rules of Hooks 준수)
   if (!currentTeamId) {
@@ -356,36 +214,6 @@ export default function TeamMatrixView() {
     )
   }
 
-  // 마일스톤 모드 → 별도 컴포넌트
-  if (matrixMode === 'milestone') {
-    return (
-      <div data-view="matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ maxWidth: VIEW_WIDTH.wide, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ marginBottom: 20, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>팀 매트릭스</h1>
-            </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <TeamModePill active={matrixMode} onChange={setMatrixMode} />
-              <button onClick={() => setShowRowConfig(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px solid ${COLOR.border}`, background: 'white', cursor: 'pointer', color: COLOR.textSecondary, fontSize: FONT.label, fontFamily: 'inherit', fontWeight: 500 }}>
-                <SettingsIcon /> 뷰 관리
-              </button>
-            </div>
-          </div>
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              <Suspense fallback={<div style={{ textAlign: 'center', color: COLOR.textTertiary, padding: 40 }}>로딩...</div>}>
-                <MilestoneMatrixView projects={filteredProjects} milestones={milestones} tasks={tasks} />
-              </Suspense>
-            </div>
-            <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
-          </div>
-        </div>
-        {showRowConfig && <RowConfigSettings teamId={currentTeamId} userId={userId} onClose={() => setShowRowConfig(false)} onSave={cfg => { setConfig(cfg); setShowRowConfig(false) }} />}
-      </div>
-    )
-  }
 
   return (
     <div data-view="matrix" style={{ padding: isMobile ? SPACE.viewPaddingMobile : SPACE.viewPadding }}>
@@ -399,7 +227,6 @@ export default function TeamMatrixView() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <TeamModePill active={matrixMode} onChange={setMatrixMode} />
             <button onClick={() => setShowRowConfig(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px solid ${COLOR.border}`, background: 'white', cursor: 'pointer', color: COLOR.textSecondary, fontSize: FONT.label, fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = COLOR.textTertiary; e.currentTarget.style.color = COLOR.textPrimary }}
@@ -410,245 +237,102 @@ export default function TeamMatrixView() {
           </div>
         </div>
 
-        {/* Header row 2: sub-view tabs + depth toggle (Loop-38) */}
-        <div style={{ marginBottom: 20, padding: isMobile ? '0 16px' : 0, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <SubViewPill active={subView} onChange={setSubView} />
-          <div style={{ width: 1, height: 20, background: '#e8e6df' }} />
-          <DepthToggle value={depthFilter} onChange={setDepthFilter} />
-        </div>
 
-        {/* Loop-38: conditional sub-view rendering */}
-        {/* subView === 'matrix' → rendered below via original DnD task grid */}
-        {subView === 'project' && (
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              <SubviewProject
-                projects={filteredProjects}
-                milestones={milestones}
-                tasks={tasks}
-                members={members}
-                depthFilter={depthFilter}
-              />
-            </div>
-            <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
-          </div>
-        )}
-        {subView === 'member' && (
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              <SubviewMember
-                projects={filteredProjects}
-                milestones={milestones}
-                tasks={tasks}
-                members={members}
-                userId={userId}
-                depthFilter={depthFilter}
-              />
-            </div>
-            <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
-          </div>
-        )}
-
-        {/* Original task-mode grid — shown when subView is 'matrix' */}
-        {subView === 'matrix' && <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div style={{ flex: 1, overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
-            <div style={{ minWidth: isMobile ? LW + N * (COL_MIN + COL_GAP) : 'auto' }}>
-
-              {/* ── Project header row ── */}
-              <div style={{ display: 'flex', gap: COL_GAP, marginBottom: 0 }}>
-                <div style={{ width: LW, flexShrink: 0, ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}) }} />
-                {allColumns.map(p => {
-                  const c = getColor(p.color)
-                  const pt = tasks.filter(t => t.projectId === p.id && !t.done)
-                  const isCol = collapsed[p.id]
-                  return (
-                    <div key={p.id} onClick={() => toggleCollapse(p.id)} style={{
-                      flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
-                      background: c.header, borderRadius: '10px 10px 0 0',
-                      padding: isCol ? '12px 0' : (isMobile ? '10px 10px' : '12px 16px'),
-                      display: 'flex', alignItems: 'center', justifyContent: isCol ? 'center' : 'space-between',
-                      height: 48, boxSizing: 'border-box', borderBottom: `2.5px solid ${c.dot}`,
-                      cursor: 'pointer', transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
-                      overflow: 'hidden',
-                    }}>
-                      {isCol ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <div style={{ width: 10, height: 10, borderRadius: 3, background: c.dot }} />
-                          <span style={{ fontSize: 10, fontWeight: 600, color: c.text }}>{pt.length}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <div style={{ width: 10, height: 10, borderRadius: 3, background: c.dot, flexShrink: 0 }} />
-                            <span style={{ fontSize: 13, fontWeight: 600, color: c.text, whiteSpace: 'nowrap' }}>{p.name}</span>
-                          </div>
-                          <span style={{ fontSize: 11, color: c.text, background: 'rgba(255,255,255,0.55)', borderRadius: 10, padding: '1px 8px', fontWeight: 600, flexShrink: 0 }}>{pt.length}</span>
-                        </>
-                      )}
-                    </div>
-                  )
-                })}
+          <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '0 12px' : 0 }}>
+            <div style={{ border: `0.5px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              {/* ── Column header: 프로젝트 | 팀원... ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
+                <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
+                  프로젝트
+                </div>
+                {members.map(mem => (
+                  <div key={mem.id} style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MemberAvatar name={mem.displayName || mem.name} size={20} />
+                    <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary }}>{mem.displayName || mem.name}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* ── 나 섹션 ── */}
-              {meHeader && (
-                <SectionHeader
-                  config={{ ...meHeader, label: userName }}
-                  onToggle={handleToggleSection}
-                />
-              )}
-              {meHeader && !meHeader.is_collapsed && taskRows.map(row => {
-                const category = rowCategoryMap[row.section] || 'today'
-                const rowTasks = myTasksForRow(category)
-                return (
-                  <TaskRowWithDnd
-                    key={row.id}
-                    label={row.label}
-                    emoji={category === 'today' ? '🎯' : '📌'}
-                    columns={allColumns}
-                    tasks={rowTasks}
-                    isMobile={isMobile}
-                    LW={LW}
-                    COL_GAP={COL_GAP}
-                    COL_MIN={COL_MIN}
-                    category={category}
-                    activeId={activeId}
-                    collapsed={collapsed}
-                    extraFields={currentTeamId ? { scope: 'assigned', assigneeId: userId } : undefined}
-                    msMap={msMap}
-                  />
-                )
-              })}
+              {/* ── Project rows ── */}
+              {allColumns.map(proj => {
+                const c = getColor(proj.color)
+                const projTasks = tasks.filter(t => t.projectId === proj.id && !t.done && t.teamId === currentTeamId)
+                const isCollapsed = collapsed[proj.id]
 
-              {/* ── 팀 섹션 ── */}
-              <div style={{ height: 16 }} />
-              {teamHeader && (
-                <SectionHeader
-                  config={{ ...teamHeader, label: teamName }}
-                  onToggle={handleToggleSection}
-                />
-              )}
-              {teamHeader && !teamHeader.is_collapsed && memberRows.map(row => {
-                const isMemberCollapsed = collapsedMembers.has(row.mapped_user_id)
-                const mTasks = memberTasks(row.mapped_user_id)
                 return (
-                  <MemberDropZone key={row.id} memberId={row.mapped_user_id} activeId={activeId}>
-                    {!isMemberCollapsed ? (
-                      <>
-                        {/* 펼친 상태: 이름 헤더 (전체 너비) + 상세 카드 */}
-                        <div
-                          onClick={() => handleToggleMember(row.mapped_user_id)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', cursor: 'pointer' }}
-                        >
-                          <MemberAvatar name={row.label} size={22} />
-                          <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textSecondary }}>{row.label}</span>
-                          <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>▾</span>
-                          <span style={{ fontSize: FONT.caption, color: COLOR.textTertiary, marginLeft: 4 }}>{mTasks.length}건</span>
-                        </div>
-                        <ReadOnlyRow
-                          columns={allColumns}
-                          tasks={mTasks}
-                          isMobile={isMobile}
-                          LW={LW}
-                          COL_GAP={COL_GAP}
-                          COL_MIN={COL_MIN}
-                          collapsed={collapsed}
-                          isOwner={isOwner}
-                          msMap={msMap}
-                        />
-                      </>
-                    ) : (
-                      /* 접힌 상태: 프로젝트별 카운트 표시 */
-                      <div
-                        onClick={() => handleToggleMember(row.mapped_user_id)}
-                        style={{ display: 'flex', gap: COL_GAP, cursor: 'pointer', alignItems: 'stretch' }}
-                      >
-                        <div style={{
-                          width: LW, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
-                          paddingTop: 10, paddingBottom: 10, paddingRight: 8, paddingLeft: 12,
-                          ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}),
-                        }}>
-                          <MemberAvatar name={row.label} size={22} />
-                          <span style={{ fontSize: 12, fontWeight: 600, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.label}</span>
-                          <span style={{ fontSize: 10, color: '#aaa' }}>▸</span>
-                        </div>
-                        {allColumns.map(p => {
-                                  const isCol = collapsed[p.id]
-                          const isPersonalCol = !p.teamId
-                          const count = isPersonalCol ? 0 : mTasks.filter(t => t.projectId === p.id).length
+                  <div key={proj.id}>
+                    {/* Project header row — clickable to collapse */}
+                    <div
+                      onClick={() => toggleCollapse(proj.id)}
+                      style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)`, cursor: 'pointer' }}
+                    >
+                      <div style={{
+                        padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        background: isCollapsed ? '#fff' : `${c.dot}04`,
+                      }}>
+                        <span style={{ fontSize: 9, color: COLOR.textTertiary, width: 12, textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                        <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, flex: 1 }}>{proj.name}</span>
+                        <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{projTasks.length}건</span>
+                      </div>
+                      {/* Collapsed: per-member count */}
+                      {members.map(mem => {
+                        const count = projTasks.filter(t => t.assigneeId === mem.userId).length
+                        return (
+                          <div key={mem.id} style={{
+                            padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                            fontSize: FONT.tiny, color: COLOR.textTertiary,
+                            background: isCollapsed ? '#fff' : `${c.dot}04`,
+                          }}>
+                            {isCollapsed ? (count > 0 ? `${count}건` : '—') : ''}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Expanded: task cells per member */}
+                    {!isCollapsed && (
+                      <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
+                        <div style={{ borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}` }} />
+                        {members.map(mem => {
+                          const cellTasks = projTasks.filter(t => t.assigneeId === mem.userId)
+                            .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                          const dropId = `${proj.id}:${mem.userId}`
                           return (
-                            <div key={p.id} style={{
-                              flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
-                              background: isPersonalCol ? '#f5f5f3' : '#fafafa',
-                              borderLeft: '1px solid rgba(0,0,0,0.04)',
-                              borderRight: '1px solid rgba(0,0,0,0.04)',
-                              borderTop: '1px solid rgba(0,0,0,0.06)',
-                              padding: isCol ? '8px 4px' : '8px 14px',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              minHeight: 36,
-                              transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
-                              overflow: 'hidden',
-                            }}>
-                              {count > 0 ? (
-                                <span style={{
-                                  fontSize: 12, fontWeight: 600, color: '#666',
-                                  background: '#eee', borderRadius: 10, padding: '2px 10px',
-                                }}>{count}</span>
+                            <CategoryDropZone
+                              key={mem.id}
+                              id={dropId}
+                              color={c}
+                              activeId={activeId}
+                              style={{ padding: '6px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}
+                            >
+                              {cellTasks.length === 0 ? (
+                                <span style={{ fontSize: FONT.tiny, color: '#e0e0e0' }}>—</span>
                               ) : (
-                                !isCol && <span style={{ fontSize: 11, color: '#ddd' }}>—</span>
+                                <SortableContext items={cellTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                  {cellTasks.map(t => (
+                                    <TeamMatrixCard key={t.id} task={t} readOnly={mem.userId !== userId && !isOwner} milestone={msMap[t.keyMilestoneId]} />
+                                  ))}
+                                </SortableContext>
                               )}
-                            </div>
+                              <InlineAdd
+                                projectId={proj.id}
+                                category="today"
+                                color={c}
+                                extraFields={{ scope: 'assigned', assigneeId: mem.userId }}
+                                compact
+                              />
+                            </CategoryDropZone>
                           )
                         })}
                       </div>
                     )}
-                  </MemberDropZone>
+                  </div>
                 )
               })}
-
-              {/* ── 남은 할일 + 완료 통합 섹션 ── */}
-              <div style={{ height: 16 }} />
-              {false && remainingRow && (
-                <SectionHeader
-                  config={{ ...remainingRow, label: '남은 할일 · 완료' }}
-                  onToggle={handleToggleSection}
-                />
-              )}
-              {false && remainingRow && !remainingRow.is_collapsed && (
-                <>
-                  <TaskRowWithDnd
-                    label="남은 할일"
-                    emoji="📋"
-                    columns={allColumns}
-                    tasks={remainingTasks}
-                    isMobile={isMobile}
-                    LW={LW}
-                    COL_GAP={COL_GAP}
-                    COL_MIN={COL_MIN}
-                    category="backlog"
-                    activeId={activeId}
-                    collapsed={collapsed}
-                    extraFields={currentTeamId ? { scope: 'team' } : undefined}
-                    msMap={msMap}
-                  />
-                  {completedRow && (
-                    <CompletedRow
-                      columns={allColumns}
-                      tasks={completedTasks}
-                      isMobile={isMobile}
-                      LW={LW}
-                      COL_GAP={COL_GAP}
-                      COL_MIN={COL_MIN}
-                      activeId={activeId}
-                      collapsed={collapsed}
-                      doneCollapsed={doneCollapsed}
-                      storeToggle={storeToggle}
-                      msMap={msMap}
-                    />
-                  )}
-                </>
-              )}
             </div>
           </div>
 
@@ -658,7 +342,7 @@ export default function TeamMatrixView() {
           </DragOverlay>
         </DndContext>
         <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
-        </div>}
+        </div>
 
       {/* Row Config Settings Modal */}
       {showRowConfig && userId && (
@@ -674,242 +358,6 @@ export default function TeamMatrixView() {
         />
       )}
       </div>
-    </div>
-  )
-}
-
-/* ═══ Section Header — lane-style: {name} ▾ ═══ */
-function SectionHeader({ config, onToggle }) {
-  return (
-    <div>
-      <div
-        onClick={() => onToggle(config)}
-        style={{
-          display: 'flex', alignItems: 'center',
-          padding: '0 0 4px',
-          cursor: 'pointer',
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>{config.label}</span>
-        <span style={{
-          fontSize: 11, color: '#bbb',
-          marginLeft: 6,
-          transition: 'transform 0.2s ease',
-          display: 'inline-block',
-          transform: config.is_collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-        }}>▾</span>
-      </div>
-      <div style={{ borderBottom: '1px solid #ece8e1', marginBottom: 6 }} />
-    </div>
-  )
-}
-
-/* ═══ Member Drop Zone — 팀원 행 드롭 대상 ═══ */
-function MemberDropZone({ memberId, activeId, children }) {
-  const { isOver, setNodeRef } = useDroppable({ id: `member:${memberId}` })
-  return (
-    <div ref={setNodeRef} style={{
-      transition: 'background 0.08s',
-      ...(isOver && activeId ? { background: 'rgba(49,130,206,0.06)', borderRadius: 8 } : {}),
-    }}>
-      {children}
-    </div>
-  )
-}
-
-/* ═══ Category Drop Zone ═══ */
-function CategoryDropZone({ id, color, activeId, style: cellStyle, children }) {
-  const { isOver, setNodeRef } = useDroppable({ id })
-  const showHighlight = isOver && activeId
-
-  return (
-    <div ref={setNodeRef} style={{
-      ...cellStyle, display: 'flex', flexDirection: 'column', transition: 'background 0.08s',
-      ...(showHighlight ? { background: color.header, outline: `2px dashed ${color.dot}`, outlineOffset: -2 } : {}),
-    }}>
-      {children}
-    </div>
-  )
-}
-
-/* ═══ Task Row with DnD — editable rows (나 섹션, 남은 할일) ═══ */
-function TaskRowWithDnd({ label, emoji, columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN, category, activeId, collapsed, extraFields, msMap }) {
-  return (
-    <div style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
-      <div style={{
-        width: LW, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6,
-        alignSelf: 'flex-start', paddingTop: 14, paddingRight: 8, paddingLeft: 12,
-        ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}),
-      }}>
-        {emoji && <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{emoji}</span>}
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#555', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{label}</span>
-      </div>
-
-      {columns.map(p => {
-        const c = getColor(p.color)
-        const isCol = collapsed[p.id]
-        const cellTasks = rowTasks.filter(t => t.projectId === p.id)
-        return (
-          <CategoryDropZone
-            key={p.id}
-            id={`${p.id}:${category}`}
-            color={c}
-            activeId={activeId}
-            style={{
-              flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
-              background: c.card,
-              borderLeft: '1px solid rgba(0,0,0,0.04)',
-              borderRight: '1px solid rgba(0,0,0,0.04)',
-              borderTop: '1px solid rgba(0,0,0,0.06)',
-              padding: isCol ? '8px 4px' : (isMobile ? '8px 8px' : '10px 14px'),
-              minHeight: 60,
-              transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
-              overflow: 'hidden',
-            }}
-          >
-            {isCol ? (
-              <div style={{ fontSize: 10, color: c.dot, fontWeight: 600, textAlign: 'center' }}>{cellTasks.length}</div>
-            ) : (
-              <>
-                <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: c.text, opacity: 0.7 }}>{label}</span>
-                  <span style={{ fontSize: 10, color: c.dot, fontWeight: 600 }}>{cellTasks.length}</span>
-                </div>
-                <SortableContext items={cellTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                  {cellTasks.map(task => (
-                    <TeamMatrixCard key={task.id} task={task} readOnly={false} milestone={msMap[task.keyMilestoneId]} />
-                  ))}
-                </SortableContext>
-                <InlineAdd projectId={p.id} category={category} color={c} extraFields={extraFields} />
-              </>
-            )}
-          </CategoryDropZone>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ═══ Member Detail Row — 팀장: 편집 가능, 팀원: 읽기전용 ═══ */
-function ReadOnlyRow({ columns, tasks: rowTasks, isMobile, LW, COL_GAP, COL_MIN, collapsed, isOwner, msMap }) {
-  return (
-    <div style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
-      <div style={{
-        width: LW, flexShrink: 0,
-        alignSelf: 'flex-start', paddingTop: 6, paddingRight: 8,
-        ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}),
-      }} />
-
-      {columns.map(p => {
-        const c = getColor(p.color)
-        const isCol = collapsed[p.id]
-        // 팀원 펼침 행: 개인 프로젝트 열은 빈 셀
-        const isPersonalCol = !p.teamId
-        const cellTasks = isPersonalCol ? [] : rowTasks.filter(t => t.projectId === p.id)
-        return (
-          <div key={p.id} style={{
-            flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
-            background: isPersonalCol ? '#f5f5f3' : c.card,
-            borderLeft: '1px solid rgba(0,0,0,0.04)',
-            borderRight: '1px solid rgba(0,0,0,0.04)',
-            borderTop: '1px solid rgba(0,0,0,0.06)',
-            padding: isCol ? '8px 4px' : (isMobile ? '8px 8px' : '10px 14px'),
-            minHeight: 40,
-            transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
-            overflow: 'hidden',
-          }}>
-            {isCol ? (
-              <div style={{ fontSize: 10, color: c.dot, fontWeight: 600, textAlign: 'center' }}>{cellTasks.length}</div>
-            ) : isPersonalCol ? (
-              <span style={{ fontSize: 11, color: '#ddd' }}>—</span>
-            ) : (
-              <>
-                <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: c.text, opacity: 0.7 }}>상세</span>
-                  <span style={{ fontSize: 10, color: c.dot, fontWeight: 600 }}>{cellTasks.length}</span>
-                </div>
-                {cellTasks.map(task => (
-                  <TeamMatrixCard key={task.id} task={task} readOnly={!isOwner} milestone={msMap[task.keyMilestoneId]} />
-                ))}
-              </>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ═══ Completed Row — 프로젝트별 접기/펼치기 ═══ */
-function CompletedRow({ columns, tasks: doneTasks, isMobile, LW, COL_GAP, COL_MIN, activeId, collapsed, doneCollapsed, storeToggle, msMap }) {
-  return (
-    <div style={{ display: 'flex', gap: COL_GAP, alignItems: 'stretch' }}>
-      <div style={{
-        width: LW, flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6,
-        alignSelf: 'flex-start', paddingTop: 14, paddingRight: 8, paddingLeft: 12,
-        ...(isMobile ? { position: 'sticky', left: 0, zIndex: 4, background: 'white' } : {}),
-      }}>
-        <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>✅</span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#999', lineHeight: 1.3, whiteSpace: 'nowrap' }}>완료</span>
-      </div>
-      {columns.map(p => {
-        const c = getColor(p.color)
-        const isCol = collapsed[p.id]
-        const cellTasks = doneTasks.filter(t => t.projectId === p.id)
-        const isDoneCollapsed = doneCollapsed[p.id] !== false && cellTasks.length > 0
-        return (
-          <CategoryDropZone
-            key={p.id}
-            id={`${p.id}:done`}
-            color={c}
-            activeId={activeId}
-            style={{
-              flex: isCol ? '0 0 48px' : 1, minWidth: isCol ? 48 : COL_MIN,
-              background: '#f7f7f5',
-              borderLeft: '1px solid rgba(0,0,0,0.04)',
-              borderRight: '1px solid rgba(0,0,0,0.04)',
-              borderBottom: '1px solid rgba(0,0,0,0.04)',
-              borderRadius: '0 0 10px 10px',
-              padding: isCol ? '8px 4px' : (isMobile ? '8px 8px' : '10px 14px'),
-              minHeight: 50,
-              transition: 'flex 0.25s ease, min-width 0.25s ease, padding 0.25s ease',
-              overflow: 'hidden',
-            }}
-          >
-            {isCol ? (
-              <div style={{ fontSize: 10, color: '#bbb', fontWeight: 600, textAlign: 'center' }}>{cellTasks.length}</div>
-            ) : (
-              <>
-                <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#ccc', flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#aaa', opacity: 0.7 }}>완료</span>
-                  <span style={{ fontSize: 10, color: '#bbb', fontWeight: 600 }}>{cellTasks.length}</span>
-                  {cellTasks.length > 0 && (
-                    <button onClick={(e) => { e.stopPropagation(); storeToggle('matrixDone', p.id) }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 10, fontFamily: 'inherit', padding: '0 4px' }}>
-                      {isDoneCollapsed ? '펼치기' : '접기'}
-                    </button>
-                  )}
-                </div>
-                <div style={{ minHeight: 20 }}>
-                  {isDoneCollapsed
-                    ? <div style={{ fontSize: 11, color: '#ccc', padding: '2px 0' }}>완료 {cellTasks.length}건</div>
-                    : (
-                      <SortableContext items={cellTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                        {cellTasks.map(task => (
-                          <TeamMatrixCard key={task.id} task={task} readOnly={false} isDone milestone={msMap[task.keyMilestoneId]} />
-                        ))}
-                      </SortableContext>
-                    )
-                  }
-                </div>
-              </>
-            )}
-          </CategoryDropZone>
-        )
-      })}
     </div>
   )
 }
@@ -1029,436 +477,9 @@ function MemberAvatar({ name, size = 22 }) {
   )
 }
 
-/* ═══ Mode Pill — [할일 모드][마일스톤 모드] ═══ */
-function TeamModePill({ active, onChange }) {
-  const items = [{ key: 'task', label: '할일 모드' }, { key: 'milestone', label: '마일스톤 모드' }]
-  return (
-    <div style={{ display: 'flex', gap: 2, background: '#fafaf8', borderRadius: 8, padding: 2 }}>
-      {items.map(it => (
-        <button key={it.key} onClick={() => onChange(it.key)} style={{
-          border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
-          fontWeight: active === it.key ? 600 : 400,
-          background: active === it.key ? '#fff' : 'transparent',
-          color: active === it.key ? COLOR.textPrimary : COLOR.textTertiary,
-          boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-        }}>{it.label}</button>
-      ))}
-    </div>
-  )
-}
 
-/* ═══ Sub-view Pill — [매트릭스][프로젝트별][담당자별] (Loop-38) ═══ */
-function SubViewPill({ active, onChange }) {
-  const items = [
-    { key: 'matrix', label: '매트릭스' },
-    { key: 'project', label: '프로젝트별' },
-    { key: 'member', label: '담당자별' },
-  ]
-  return (
-    <div style={{ display: 'flex', gap: 1, background: '#f5f4f0', borderRadius: 7, padding: 2 }}>
-      {items.map(it => (
-        <button key={it.key} onClick={() => onChange(it.key)} style={{
-          border: 'none', borderRadius: 5, padding: '4px 12px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer',
-          fontWeight: active === it.key ? 600 : 400,
-          background: active === it.key ? '#fff' : 'transparent',
-          color: active === it.key ? '#37352f' : '#a09f99',
-          boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-        }}>{it.label}</button>
-      ))}
-    </div>
-  )
-}
 
-/* ═══ Depth Toggle — [전체][L1][L2][L3] (Loop-38) ═══ */
-function DepthToggle({ value, onChange }) {
-  const items = [
-    { key: 'all', label: '전체' },
-    { key: '0', label: 'L1' },
-    { key: '1', label: 'L2' },
-    { key: '2', label: 'L3' },
-  ]
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 10.5, color: '#a09f99' }}>표시 단위:</span>
-      <div style={{ display: 'flex', gap: 2 }}>
-        {items.map(it => (
-          <button key={it.key} onClick={() => onChange(it.key)} style={{
-            border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 10, fontFamily: 'inherit', cursor: 'pointer',
-            fontWeight: value === it.key ? 600 : 400,
-            background: value === it.key ? '#1e293b' : '#f5f4f0',
-            color: value === it.key ? '#fff' : '#a09f99',
-          }}>{it.label}</button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
-/* ═══════════════════════════════════════════════════════════
-   Loop-38.2: Sub-view Components
-═══════════════════════════════════════════════════════════ */
 
-const S = {
-  textPrimary: '#37352f',
-  textSecondary: '#6b6a66',
-  textTertiary: '#a09f99',
-  border: '#e8e6df',
-}
 
-function Dot({ color, size = 7 }) {
-  return <div style={{ width: size, height: size, borderRadius: '50%', background: color, flexShrink: 0 }} />
-}
 
-function Avatar({ member, size = 18 }) {
-  const initial = (member?.displayName || member?.name || '?')[0].toUpperCase()
-  const bg = member?.color || '#888'
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', background: bg,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#fff', fontSize: size * 0.42, fontWeight: 600, flexShrink: 0,
-    }}>
-      {initial}
-    </div>
-  )
-}
-
-// Helper: filter milestones by depth
-function filterByDepth(milestones, projectId, depthFilter) {
-  const projMs = milestones.filter(m => m.project_id === projectId)
-  if (depthFilter === 'all') return projMs
-  const d = parseInt(depthFilter)
-  // Flat projects (maxDepth 0) always show their milestones
-  const hasDeepMs = projMs.some(m => (m.depth ?? 0) > 0)
-  if (!hasDeepMs) return projMs // flat project, show all
-  return projMs.filter(m => (m.depth ?? 0) === d)
-}
-
-// Helper: get task count for milestone
-function getMsTaskCount(msId, tasks) {
-  return tasks.filter(t => t.keyMilestoneId === msId && !t.deletedAt).length
-}
-
-// Helper: get assignee member
-function getAssignee(ms, members) {
-  if (!ms.owner_id) return null
-  return members.find(m => m.userId === ms.owner_id) || null
-}
-
-/* ═══ SubviewMatrix — member × project grid ═══ */
-function SubviewMatrix({ projects, milestones, tasks, members, depthFilter, showUnassigned, setShowUnassigned }) {
-  const N = projects.length
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: `90px repeat(${N}, 1fr)`, gap: 0 }}>
-      {/* Header row */}
-      <div style={{ borderBottom: `1px solid ${S.border}` }} />
-      {projects.map(p => {
-        const c = getColor(p.color)
-        const visibleMs = filterByDepth(milestones, p.id, depthFilter)
-        return (
-          <div key={p.id} style={{
-            background: `${c.dot}10`, padding: '7px 8px',
-            borderBottom: `1px solid ${S.border}`,
-            display: 'flex', alignItems: 'center', gap: 4,
-          }}>
-            <Dot color={c.dot} size={7} />
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: S.textPrimary }}>{p.name}</span>
-            <span style={{ fontSize: 9, color: S.textTertiary, marginLeft: 'auto' }}>{visibleMs.length}</span>
-          </div>
-        )
-      })}
-
-      {/* Member rows */}
-      {members.map(mem => (
-        <>
-          <div key={`label-${mem.id}`} style={{
-            display: 'flex', alignItems: 'flex-start', gap: 4,
-            padding: '6px 4px', borderBottom: `0.5px solid ${S.border}`,
-          }}>
-            <Avatar member={mem} size={20} />
-            <span style={{ fontSize: 10.5, fontWeight: 600, color: S.textPrimary, lineHeight: 1.6 }}>
-              {mem.displayName || mem.name}
-            </span>
-          </div>
-          {projects.map(p => {
-            const c = getColor(p.color)
-            const visibleMs = filterByDepth(milestones, p.id, depthFilter).filter(m => m.owner_id === mem.userId)
-            return (
-              <div key={`${mem.id}-${p.id}`} style={{
-                padding: '4px 4px', borderBottom: `0.5px solid ${S.border}`, background: `${c.dot}03`,
-              }}>
-                {visibleMs.length === 0 ? (
-                  <span style={{ fontSize: 10, color: '#e0e0e0', padding: '4px 8px', display: 'block' }}>—</span>
-                ) : visibleMs.map(ms => (
-                  <CompactMsRow
-                    key={ms.id}
-                    milestone={ms}
-                    milestones={milestones}
-                    color={c.dot}
-                    taskCount={getMsTaskCount(ms.id, tasks)}
-                    assignee={getAssignee(ms, members)}
-                  />
-                ))}
-              </div>
-            )
-          })}
-        </>
-      ))}
-
-      {/* Unassigned row */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 3, padding: '6px 4px',
-        cursor: 'pointer', borderBottom: `0.5px solid ${S.border}`,
-      }} onClick={() => setShowUnassigned(!showUnassigned)}>
-        <span style={{ fontSize: 9, color: S.textTertiary }}>{showUnassigned ? '▾' : '▸'}</span>
-        <span style={{ fontSize: 10, color: S.textTertiary, fontStyle: 'italic' }}>미배정</span>
-      </div>
-      {projects.map(p => {
-        const c = getColor(p.color)
-        const unassigned = filterByDepth(milestones, p.id, depthFilter).filter(m => !m.owner_id)
-        return (
-          <div key={`un-${p.id}`} style={{
-            padding: '4px 4px', borderBottom: `0.5px solid ${S.border}`, background: `${c.dot}02`,
-          }}>
-            {!showUnassigned ? (
-              <span style={{ fontSize: 10, color: S.textTertiary, padding: '2px 8px' }}>
-                {unassigned.length > 0 ? `${unassigned.length}개` : '—'}
-              </span>
-            ) : unassigned.map(ms => (
-              <CompactMsRow
-                key={ms.id}
-                milestone={ms}
-                milestones={milestones}
-                color={c.dot}
-                taskCount={getMsTaskCount(ms.id, tasks)}
-                assignee={null}
-              />
-            ))}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ═══ SubviewProject — 2-column project cards ═══ */
-function SubviewProject({ projects, milestones, tasks, members, depthFilter }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-      {projects.map(p => {
-        const c = getColor(p.color)
-        const visibleMs = filterByDepth(milestones, p.id, depthFilter)
-        const assigned = visibleMs.filter(m => m.owner_id)
-        const unassigned = visibleMs.filter(m => !m.owner_id)
-
-        // Group by member
-        const byMember = {}
-        assigned.forEach(m => {
-          const key = m.owner_id
-          if (!byMember[key]) byMember[key] = []
-          byMember[key].push(m)
-        })
-
-        return (
-          <div key={p.id} style={{
-            background: '#fff', borderRadius: 8, border: `0.5px solid ${S.border}`, overflow: 'hidden',
-          }}>
-            {/* Card header */}
-            <div style={{
-              background: `${c.dot}10`, padding: '8px 12px',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <Dot color={c.dot} size={8} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: S.textPrimary }}>{p.name}</span>
-              <span style={{ fontSize: 10, color: S.textTertiary, marginLeft: 'auto' }}>{visibleMs.length} MS</span>
-            </div>
-
-            {/* Card body */}
-            <div style={{ padding: '6px 8px' }}>
-              {Object.entries(byMember).map(([userId, msList]) => {
-                const mem = members.find(m => m.userId === userId)
-                return (
-                  <div key={userId} style={{ marginBottom: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px' }}>
-                      <Avatar member={mem} size={16} />
-                      <span style={{ fontSize: 10.5, fontWeight: 600, color: S.textPrimary }}>
-                        {mem?.displayName || mem?.name || '?'}
-                      </span>
-                      <span style={{ fontSize: 9, color: S.textTertiary }}>{msList.length}개</span>
-                    </div>
-                    {msList.map(ms => (
-                      <CompactMsRow
-                        key={ms.id}
-                        milestone={ms}
-                        milestones={milestones}
-                        color={c.dot}
-                        taskCount={getMsTaskCount(ms.id, tasks)}
-                        assignee={mem}
-                      />
-                    ))}
-                  </div>
-                )
-              })}
-
-              {/* Unassigned section */}
-              {unassigned.length > 0 && (
-                <div style={{ marginTop: 4, paddingTop: 4, borderTop: `0.5px dashed ${S.border}` }}>
-                  <span style={{ fontSize: 9.5, color: S.textTertiary, fontStyle: 'italic', padding: '0 4px' }}>
-                    미배정 ({unassigned.length})
-                  </span>
-                  {unassigned.slice(0, 5).map(ms => (
-                    <CompactMsRow
-                      key={ms.id}
-                      milestone={ms}
-                      milestones={milestones}
-                      color={c.dot}
-                      taskCount={getMsTaskCount(ms.id, tasks)}
-                      assignee={null}
-                    />
-                  ))}
-                  {unassigned.length > 5 && (
-                    <span style={{ fontSize: 9, color: S.textTertiary, padding: '2px 8px' }}>
-                      ...외 {unassigned.length - 5}개
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Empty state */}
-              {assigned.length === 0 && unassigned.length === 0 && (
-                <span style={{ fontSize: 10, color: S.textTertiary, padding: 8, display: 'block', textAlign: 'center' }}>
-                  마일스톤 없음
-                </span>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ═══ SubviewMember — member portfolio cards ═══ */
-function SubviewMember({ projects, milestones, tasks, members, userId, depthFilter }) {
-  const [showUnassignedCard, setShowUnassignedCard] = useState(false)
-
-  return (
-    <div>
-      {/* Member cards */}
-      {members.map(mem => {
-        const myMs = []
-        projects.forEach(p => {
-          const c = getColor(p.color)
-          const visibleMs = filterByDepth(milestones, p.id, depthFilter).filter(m => m.owner_id === mem.userId)
-          if (visibleMs.length) myMs.push({ project: p, color: c, ms: visibleMs })
-        })
-        const totalMs = myMs.reduce((a, g) => a + g.ms.length, 0)
-        const totalT = myMs.reduce((a, g) => a + g.ms.reduce((b, m) => b + getMsTaskCount(m.id, tasks), 0), 0)
-
-        return (
-          <div key={mem.id} style={{
-            marginBottom: 8, background: '#fff', borderRadius: 8,
-            border: `0.5px solid ${S.border}`, overflow: 'hidden',
-          }}>
-            {/* Card header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-              background: '#fafaf8', borderBottom: `0.5px solid ${S.border}`,
-            }}>
-              <Avatar member={mem} size={22} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: S.textPrimary }}>
-                {mem.displayName || mem.name}
-              </span>
-              <span style={{ fontSize: 10.5, color: S.textTertiary }}>{totalMs} MS · {totalT} 할일</span>
-              {totalT > 10 && (
-                <span style={{ fontSize: 9.5, color: '#ef4444', fontWeight: 600 }}>⚠ 과부하</span>
-              )}
-            </div>
-
-            {/* Card body */}
-            <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {myMs.length === 0 ? (
-                <span style={{ fontSize: 10.5, color: S.textTertiary, fontStyle: 'italic', padding: 4 }}>
-                  배정된 마일스톤 없음
-                </span>
-              ) : myMs.map(g => (
-                <div key={g.project.id} style={{ minWidth: 200, flex: '1 1 220px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px', marginBottom: 2 }}>
-                    <Dot color={g.color.dot} size={6} />
-                    <span style={{ fontSize: 10.5, fontWeight: 600, color: g.color.dot }}>{g.project.name}</span>
-                    <span style={{ fontSize: 9, color: S.textTertiary }}>{g.ms.length}개</span>
-                  </div>
-                  {g.ms.map(ms => (
-                    <CompactMsRow
-                      key={ms.id}
-                      milestone={ms}
-                      milestones={milestones}
-                      color={g.color.dot}
-                      taskCount={getMsTaskCount(ms.id, tasks)}
-                      assignee={mem}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-
-      {/* Unassigned card */}
-      {(() => {
-        const unassignedGroups = []
-        projects.forEach(p => {
-          const c = getColor(p.color)
-          const visibleMs = filterByDepth(milestones, p.id, depthFilter).filter(m => !m.owner_id)
-          if (visibleMs.length) unassignedGroups.push({ project: p, color: c, ms: visibleMs })
-        })
-        if (unassignedGroups.length === 0) return null
-        const totalUn = unassignedGroups.reduce((a, g) => a + g.ms.length, 0)
-
-        return (
-          <div style={{
-            marginTop: 8, background: '#fff', borderRadius: 8,
-            border: `0.5px solid ${S.border}`, overflow: 'hidden',
-          }}>
-            <div
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                background: '#fafaf8', borderBottom: `0.5px solid ${S.border}`, cursor: 'pointer',
-              }}
-              onClick={() => setShowUnassignedCard(!showUnassignedCard)}
-            >
-              <span style={{ fontSize: 9, color: S.textTertiary }}>{showUnassignedCard ? '▾' : '▸'}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: S.textTertiary }}>미배정</span>
-              <span style={{ fontSize: 10.5, color: S.textTertiary }}>{totalUn}개</span>
-            </div>
-            {showUnassignedCard && (
-              <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {unassignedGroups.map(g => (
-                  <div key={g.project.id} style={{ minWidth: 200, flex: '1 1 220px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px', marginBottom: 2 }}>
-                      <Dot color={g.color.dot} size={6} />
-                      <span style={{ fontSize: 10.5, fontWeight: 600, color: g.color.dot }}>{g.project.name}</span>
-                      <span style={{ fontSize: 9, color: S.textTertiary }}>{g.ms.length}개</span>
-                    </div>
-                    {g.ms.map(ms => (
-                      <CompactMsRow
-                        key={ms.id}
-                        milestone={ms}
-                        milestones={milestones}
-                        color={g.color.dot}
-                        taskCount={getMsTaskCount(ms.id, tasks)}
-                        assignee={null}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })()}
-    </div>
-  )
-}
