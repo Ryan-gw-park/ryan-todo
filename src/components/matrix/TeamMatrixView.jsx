@@ -91,7 +91,7 @@ export default function TeamMatrixView() {
   const cachedUid = getCachedUserId()
   const defaultConfig = [
     { id: '_me', section: 'me', label: userName, row_type: 'section_header', sort_order: 0, is_collapsed: false },
-    { id: '_me_today', section: 'me_today', label: '오늘 할일', row_type: 'task_row', sort_order: 1, parent_section: 'me' },
+    { id: '_me_today', section: 'me_today', label: '지금 할일', row_type: 'task_row', sort_order: 1, parent_section: 'me' },
     { id: '_me_next', section: 'me_next', label: '다음 할일', row_type: 'task_row', sort_order: 2, parent_section: 'me' },
     { id: '_team', section: 'team', label: teamName, row_type: 'section_header', sort_order: 3, is_collapsed: false },
     { id: '_remaining', section: 'remaining', label: '미배정', row_type: 'remaining', sort_order: 90 },
@@ -420,23 +420,33 @@ export default function TeamMatrixView() {
         {/* Loop-38: conditional sub-view rendering */}
         {/* subView === 'matrix' → rendered below via original DnD task grid */}
         {subView === 'project' && (
-          <SubviewProject
-            projects={filteredProjects}
-            milestones={milestones}
-            tasks={tasks}
-            members={members}
-            depthFilter={depthFilter}
-          />
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <SubviewProject
+                projects={filteredProjects}
+                milestones={milestones}
+                tasks={tasks}
+                members={members}
+                depthFilter={depthFilter}
+              />
+            </div>
+            <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
+          </div>
         )}
         {subView === 'member' && (
-          <SubviewMember
-            projects={filteredProjects}
-            milestones={milestones}
-            tasks={tasks}
-            members={members}
-            userId={userId}
-            depthFilter={depthFilter}
-          />
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <SubviewMember
+                projects={filteredProjects}
+                milestones={milestones}
+                tasks={tasks}
+                members={members}
+                userId={userId}
+                depthFilter={depthFilter}
+              />
+            </div>
+            <MsBacklogSidebar projects={filteredProjects} milestones={milestones} tasks={tasks} />
+          </div>
         )}
 
         {/* Original task-mode grid — shown when subView is 'matrix' */}
