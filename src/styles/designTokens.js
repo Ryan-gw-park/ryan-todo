@@ -25,10 +25,10 @@ export const FONT = {
   projectTitle: 17,    // 프로젝트 뷰 제목
   sectionTitle: 15,    // 프로젝트 카드 헤더 등
   subtitle: 14,        // 날짜, 부제
-  body: 13,            // 본문 텍스트, 할일 텍스트
+  body: 12,            // 본문 텍스트, 할일 텍스트
   label: 12,           // 라벨, 셀 헤더, 담당자 이름
   caption: 11,         // 보조 텍스트, 뱃지, 카운트
-  tiny: 10,            // 최소 텍스트, depth 뱃지, 아주 작은 보조
+  tiny: 9,             // 최소 텍스트, depth 뱃지, 아주 작은 보조
   ganttMs: 9,          // 간트 MS 바 내부 텍스트
   ganttTask: 9,        // 간트 할일 바 내부 텍스트 (8.5→9 통일)
 };

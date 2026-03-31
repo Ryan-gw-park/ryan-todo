@@ -1,216 +1,106 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
-import { COLOR, FONT, SPACE, GANTT, CHECKBOX } from '../../styles/designTokens'
+import { useState, useMemo, useCallback } from 'react'
+import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
-import { buildTree, flattenTreeWithTasks, countTasksRecursive } from '../../utils/milestoneTree'
-import { toX, getWeekDates, getTimelineStart, formatWeekLabel, getTodayX, getBarWidth } from '../../utils/ganttHelpers'
-import InlineTimelineView from '../views/InlineTimelineView'
+import { buildTree } from '../../utils/milestoneTree'
 import MsTaskTreeMode from './MsTaskTreeMode'
 
-const S = COLOR
+/* ═══════════════════════════════════════════════════════
+   UnifiedProjectView v5 — 전체 할일 + 타임라인 통합
+   좌측 트리 공유, 접기/펼치기 동기화, 주간/월간/분기 스케일
+   ═══════════════════════════════════════════════════════ */
 
-const ROW_H = 30
-const COL_W_DEFAULT = [155, 140, 140, 140, 140]
-const WEEK_W = 50 // Width per week in timeline mode
-const WEEK_COUNT = 24 // Show 24 weeks (6 months)
+const TREE_W = 340
 
-/* ═══ Check component ═══ */
-function Check({ done, onClick }) {
-  return (
-    <div
-      onClick={(e) => { e.stopPropagation(); onClick?.() }}
-      style={{
-        width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, flexShrink: 0, cursor: 'pointer',
-        border: done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
-        background: done ? CHECKBOX.checkedBg : '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      {done && (
-        <svg width={8} height={8} viewBox="0 0 12 12" fill="none">
-          <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-  )
+// ─── Date helpers ───
+function parseDate(s) { return s ? new Date(s + 'T00:00:00') : null }
+function daysBetween(a, b) { return Math.round((b - a) / 86400000) }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r }
+function formatWeek(d) { return `${d.getMonth() + 1}/${d.getDate()}` }
+function formatMonth(d) { return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}` }
+function formatQuarter(d) { return `${d.getFullYear()} Q${Math.floor(d.getMonth() / 3) + 1}` }
+function startOfWeek(d) { const r = new Date(d); const day = r.getDay(); r.setDate(r.getDate() - (day === 0 ? 6 : day - 1)); return r }
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
+function startOfQuarter(d) { return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1) }
+
+function getTimelineRange(milestones, tasks, projectId) {
+  const dates = []
+  milestones.filter(m => m.project_id === projectId).forEach(m => {
+    if (m.start_date) dates.push(new Date(m.start_date))
+    if (m.end_date) dates.push(new Date(m.end_date))
+  })
+  tasks.filter(t => t.projectId === projectId && !t.deletedAt).forEach(t => {
+    if (t.startDate) dates.push(new Date(t.startDate))
+    if (t.dueDate) dates.push(new Date(t.dueDate))
+  })
+  const valid = dates.filter(d => !isNaN(d))
+  let minD = valid.length > 0 ? new Date(Math.min(...valid)) : new Date()
+  let maxD = valid.length > 0 ? new Date(Math.max(...valid)) : addDays(new Date(), 90)
+  return { minD: addDays(minD, -14), maxD: addDays(maxD, 14) }
 }
 
-/* ═══ Pill toggle ═══ */
+function getColumns(minD, maxD, scale) {
+  const cols = []
+  if (scale === 'week') {
+    let cur = startOfWeek(minD)
+    while (cur <= maxD) { cols.push({ start: new Date(cur), label: formatWeek(cur) }); cur = addDays(cur, 7) }
+  } else if (scale === 'month') {
+    let cur = startOfMonth(minD)
+    while (cur <= maxD) { cols.push({ start: new Date(cur), label: formatMonth(cur) }); cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1) }
+  } else {
+    let cur = startOfQuarter(minD)
+    while (cur <= maxD) { cols.push({ start: new Date(cur), label: formatQuarter(cur) }); cur = new Date(cur.getFullYear(), cur.getMonth() + 3, 1) }
+  }
+  return cols
+}
+
+function getColWidth(scale) { return scale === 'week' ? 56 : scale === 'month' ? 80 : 100 }
+
+function getBarStyle(startStr, endStr, minD, colW, scale, barColor, opacity) {
+  const s = parseDate(startStr), e = parseDate(endStr)
+  if (!s || !e) return null
+  const dayW = scale === 'week' ? colW / 7 : scale === 'month' ? colW / 30 : colW / 90
+  const left = daysBetween(minD, s) * dayW
+  const width = Math.max(daysBetween(s, e) * dayW, colW * 0.4)
+  return { position: 'absolute', left, width, top: '50%', transform: 'translateY(-50%)', height: 16, borderRadius: 4, background: barColor, opacity }
+}
+
+// ─── Pill ───
 function Pill({ items, active, onChange }) {
   return (
-    <div style={{ display: 'flex', gap: 1, background: '#f5f4f0', borderRadius: 7, padding: 2 }}>
+    <div style={{ display: 'flex', gap: 1, background: COLOR.bgHover, borderRadius: 7, padding: 2 }}>
       {items.map(it => (
-        <button
-          key={it.key}
-          onClick={() => onChange(it.key)}
-          style={{
-            border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
-            fontWeight: active === it.key ? 600 : 400,
-            background: active === it.key ? '#fff' : 'transparent',
-            color: active === it.key ? S.textPrimary : S.textTertiary,
-            boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-          }}
-        >
-          {it.label}
-        </button>
+        <button key={it.key} onClick={() => onChange(it.key)} style={{
+          border: 'none', borderRadius: 5, padding: '4px 14px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
+          fontWeight: active === it.key ? 600 : 400,
+          background: active === it.key ? '#fff' : 'transparent',
+          color: active === it.key ? COLOR.textPrimary : COLOR.textTertiary,
+          boxShadow: active === it.key ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+        }}>{it.label}</button>
       ))}
     </div>
   )
 }
 
-/* ═══ Inline task add ═══ */
-function InlineAddTask({ msId, projectId, onDone }) {
-  const addTask = useStore(s => s.addTask)
-  const inputRef = useRef(null)
-  const [text, setText] = useState('')
-
-  const submit = useCallback(async () => {
-    const val = text.trim()
-    if (!val) { onDone?.(); return }
-    await addTask({
-      text: val,
-      projectId,
-      keyMilestoneId: msId,
-      category: 'backlog',
-    })
-    setText('')
-    setTimeout(() => inputRef.current?.focus(), 30)
-  }, [text, addTask, projectId, msId, onDone])
-
+// ─── Scale Pill ───
+function ScalePill({ scale, onChange }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 10px', minHeight: ROW_H }}>
-      <div style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid #e8e6df', flexShrink: 0 }} />
-      <input
-        ref={inputRef}
-        autoFocus
-        value={text}
-        onChange={e => setText(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') { e.preventDefault(); submit() }
-          if (e.key === 'Escape') { e.preventDefault(); onDone?.() }
-        }}
-        onBlur={submit}
-        onMouseDown={e => e.stopPropagation()}
-        placeholder="할일 입력..."
-        style={{
-          flex: 1, fontSize: FONT.body, border: 'none', outline: 'none',
-          background: 'transparent', color: S.textPrimary, fontFamily: 'inherit', padding: 0,
-        }}
-      />
-    </div>
-  )
-}
-
-/* ═══ Gantt row for timeline mode ═══ */
-function GanttRow({ row, timelineStart, todayX, weekCount, weekW, rowH }) {
-  const leafNode = row.leafNode
-  const task = row.task
-  const isFirstSubRow = row.isFirstSubRow
-  const barColor = row.color
-
-  // MS bar (first sub-row only) — thin, semi-transparent, at top of row
-  const msStartX = toX(leafNode?.start_date, timelineStart, weekW)
-  const msEndX = toX(leafNode?.end_date, timelineStart, weekW)
-  const msWidthRaw = msStartX !== null && msEndX !== null ? msEndX - msStartX : 0
-  const msWidth = msWidthRaw > 0 ? Math.max(msWidthRaw, weekW * 0.6) : 0
-
-  // Task bar — thicker, solid color
-  const taskStartX = toX(task?.startDate || task?.dueDate, timelineStart, weekW)
-  const taskEndX = toX(task?.dueDate || task?.startDate, timelineStart, weekW)
-  const taskWidthRaw = taskStartX !== null && taskEndX !== null
-    ? taskEndX - taskStartX
-    : 0
-  const taskWidth = taskWidthRaw > 0 || (task?.dueDate)
-    ? Math.max(taskWidthRaw, weekW * 0.5) // minimum half-week width
-    : 0
-
-  return (
-    <div style={{
-      position: 'relative',
-      minWidth: weekCount * weekW,
-      height: rowH,
-      flexShrink: 0,
-    }}>
-      {/* Week grid lines */}
-      {Array.from({ length: weekCount }, (_, i) => (
-        <div
-          key={i}
-          style={{
-            position: 'absolute',
-            left: i * weekW,
-            top: 0,
-            bottom: 0,
-            width: 1,
-            background: i === 0 ? 'transparent' : S.border,
-            opacity: 0.5,
-          }}
-        />
+    <div style={{ display: 'flex', gap: 1, background: COLOR.bgHover, borderRadius: 6, padding: 2 }}>
+      {[{ k: 'week', l: '주간' }, { k: 'month', l: '월간' }, { k: 'quarter', l: '분기' }].map(it => (
+        <button key={it.k} onClick={() => onChange(it.k)} style={{
+          border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer',
+          fontWeight: scale === it.k ? 600 : 400,
+          background: scale === it.k ? '#fff' : 'transparent',
+          color: scale === it.k ? COLOR.textPrimary : COLOR.textTertiary,
+          boxShadow: scale === it.k ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+        }}>{it.l}</button>
       ))}
-
-      {/* MS bar (first sub-row only) — semi-transparent with label */}
-      {isFirstSubRow && msStartX !== null && msWidth > 0 && (
-        <div
-          title={`${leafNode?.title || ''}: ${leafNode?.start_date} ~ ${leafNode?.end_date}`}
-          style={{
-            position: 'absolute',
-            left: Math.max(msStartX, 0),
-            top: (rowH - GANTT.msBarHeight) / 2,
-            height: GANTT.msBarHeight,
-            width: msWidth,
-            borderRadius: GANTT.barRadius,
-            background: `${barColor}30`,
-            border: `1px solid ${barColor}45`,
-            fontSize: FONT.ganttMs, color: barColor, paddingLeft: 4,
-            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: `${GANTT.msBarHeight}px`,
-          }}
-        >
-          {msWidth > 20 ? (leafNode?.title?.length > 20 ? leafNode.title.slice(0, 20) + '…' : leafNode?.title || '') : ''}
-        </div>
-      )}
-
-      {/* Task bar — solid with label */}
-      {task && taskStartX !== null && (
-        <div
-          title={`${task.text}: ${task.startDate || task.dueDate} ~ ${task.dueDate || task.startDate}`}
-          style={{
-            position: 'absolute',
-            left: Math.max(taskStartX, 0),
-            top: (rowH - GANTT.taskBarHeight) / 2,
-            height: task.done ? GANTT.taskBarDoneHeight : GANTT.taskBarHeight,
-            width: taskWidth,
-            borderRadius: GANTT.barRadius,
-            background: task.done ? S.textTertiary : `${barColor}cc`,
-            opacity: task.done ? 0.4 : 1,
-            fontSize: FONT.ganttTask, color: '#fff', paddingLeft: 4,
-            overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: `${GANTT.taskBarHeight}px`,
-            cursor: 'grab',
-          }}
-        >
-          {!task.done && taskWidth > 20 ? (task.text?.length > 18 ? task.text.slice(0, 18) + '…' : task.text || '') : ''}
-        </div>
-      )}
-
-      {/* Today red line */}
-      {todayX >= 0 && todayX <= weekCount * weekW && (
-        <div
-          style={{
-            position: 'absolute',
-            left: todayX,
-            top: 0,
-            bottom: 0,
-            width: 1.5,
-            background: COLOR.todayLine,
-            opacity: GANTT.todayLineOpacity,
-            zIndex: 1,
-          }}
-        />
-      )}
     </div>
   )
 }
 
-/* ═══ Main: UnifiedProjectView ═══ */
+/* ═══ Main ═══ */
 export default function UnifiedProjectView({ projectId }) {
   const project = useStore(s => s.projects.find(p => p.id === projectId))
   const milestones = useStore(s => s.milestones)
@@ -224,187 +114,76 @@ export default function UnifiedProjectView({ projectId }) {
   const { pkm, loading: pkmLoading } = useProjectKeyMilestone(projectId)
 
   const tree = useMemo(() => buildTree(milestones, projectId), [milestones, projectId])
+  const color = project ? getColor(project.color) : null
+  const pkmId = pkm?.id || null
+  const dotColor = color?.dot || '#888'
+
   const [rightMode, setRightMode] = useState('전체 할일')
-  const [addingTaskLeafId, setAddingTaskLeafId] = useState(null)
-  const [editingMsId, setEditingMsId] = useState(null)
+  const [scale, setScale] = useState('week')
 
-  // Column widths (resizable)
-  const [colWidths, setColWidths] = useState(COL_W_DEFAULT)
-  const dragCol = useRef(null)
-  const dragStartX = useRef(0)
-  const dragStartW = useRef(0)
+  // ─── Shared collapsed state ───
+  const [collapsed, setCollapsed] = useState(new Set())
+  const toggleNode = useCallback((id) => {
+    setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }, [])
+  const expandAll = useCallback(() => setCollapsed(new Set()), [])
+  const collapseAll = useCallback(() => {
+    const ids = new Set()
+    const walk = (nodes) => nodes.forEach(n => { if ((n.children || []).length > 0) { ids.add(n.id); walk(n.children) } })
+    walk(tree)
+    setCollapsed(ids)
+  }, [tree])
 
-  // Main divider
-  const [extraTreeWidth, setExtraTreeWidth] = useState(0)
+  // ─── Timeline context ───
+  const { minD, maxD } = useMemo(() => getTimelineRange(milestones, tasks, projectId), [milestones, tasks, projectId])
+  const columns = useMemo(() => getColumns(minD, maxD, scale), [minD, maxD, scale])
+  const colW = getColWidth(scale)
+  const today = new Date()
+  const todayLabel = scale === 'week' ? formatWeek(startOfWeek(today)) : scale === 'month' ? formatMonth(today) : formatQuarter(today)
+  const timelineCtx = { columns, colW, minD, scale, todayLabel }
+
+  // ─── Project tasks ───
+  const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
+  const backlogTasks = useMemo(() => projectTasks.filter(t => !t.keyMilestoneId), [projectTasks])
 
   const isMobile = window.innerWidth < 768
 
-  // Flatten tree with tasks
-  const color = project ? getColor(project.color) : null
-  const pkmId = pkm?.id || null
-
-  const { rows, maxDepth } = useMemo(() => {
-    if (!project) return { rows: [], maxDepth: 1 }
-    return flattenTreeWithTasks(tree, tasks, projectId, color?.dot || '#888')
-  }, [tree, tasks, projectId, project, color])
-
-  // rowspan tracking
-  const rendered = useRef({})
-
-  // Total tree width
-  const totalTreeWidth = useMemo(() => {
-    return colWidths.slice(0, maxDepth).reduce((a, b) => a + b, 0) + extraTreeWidth
-  }, [colWidths, maxDepth, extraTreeWidth])
-
-  // Project tasks for backlog
-  const projectTasks = useMemo(() => {
-    return tasks.filter(t => t.projectId === projectId && !t.deletedAt)
-  }, [tasks, projectId])
-
-  const backlogTasks = useMemo(() => {
-    return projectTasks.filter(t => !t.keyMilestoneId)
-  }, [projectTasks])
-
-  // Timeline mode state — auto-calculate range from project data
-  const { timelineStart, weekCount } = useMemo(() => {
-    const projectMs = milestones.filter(m => m.project_id === projectId)
-    const allDates = [
-      ...projectMs.flatMap(m => [m.start_date, m.end_date || m.due_date]),
-      ...projectTasks.flatMap(t => [t.startDate, t.dueDate]),
-    ].filter(Boolean).map(d => new Date(d)).filter(d => !isNaN(d))
-
-    if (allDates.length === 0) return { timelineStart: getTimelineStart(), weekCount: WEEK_COUNT }
-
-    const minDate = new Date(Math.min(...allDates))
-    const maxDate = new Date(Math.max(...allDates))
-
-    // 2주 여백 추가 (앞뒤)
-    const start = new Date(minDate)
-    start.setDate(start.getDate() - 14)
-    // 월요일로 정렬
-    const dow = start.getDay()
-    start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1))
-
-    const end = new Date(maxDate)
-    end.setDate(end.getDate() + 14)
-    const diffWeeks = Math.ceil((end - start) / (7 * 864e5))
-    return { timelineStart: start, weekCount: Math.max(diffWeeks, 12) }
-  }, [milestones, projectTasks, projectId])
-
-  const weekDates = useMemo(() => getWeekDates(timelineStart, weekCount), [timelineStart, weekCount])
-  const todayX = useMemo(() => getTodayX(timelineStart, WEEK_W), [timelineStart])
-
-  // Column resize handler
-  const handleColResizeStart = useCallback((colIdx, e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    dragCol.current = colIdx
-    dragStartX.current = e.clientX
-    dragStartW.current = colWidths[colIdx]
-
-    const handleMove = (ev) => {
-      const delta = ev.clientX - dragStartX.current
-      setColWidths(prev => {
-        const next = [...prev]
-        next[dragCol.current] = Math.max(80, Math.min(300, dragStartW.current + delta))
-        return next
-      })
-    }
-    const handleUp = () => {
-      dragCol.current = null
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
-    }
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
-  }, [colWidths])
-
-  // Main divider resize
-  const handleDividerStart = useCallback((e) => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startExtra = extraTreeWidth
-    const handleMove = (ev) => {
-      setExtraTreeWidth(Math.max(-100, Math.min(200, startExtra + (ev.clientX - startX))))
-    }
-    const handleUp = () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
-    }
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
-  }, [extraTreeWidth])
-
-  // CRUD handlers
-  const handleAddChildMs = useCallback(async (parentId) => {
-    if (!pkmId) return
-    const data = await addMilestone(projectId, pkmId, '', parentId)
-    if (data) setEditingMsId(data.id)
-  }, [pkmId, projectId, addMilestone])
-
-  const handleDeleteMs = useCallback((nodeId, title) => {
-    openConfirmDialog({
-      title: '마일스톤 삭제',
-      message: `"${title || '제목 없음'}"을(를) 삭제하시겠습니까?\n하위 마일스톤도 모두 삭제됩니다.`,
-      confirmText: '삭제',
-      onConfirm: () => deleteMilestone(nodeId),
-    })
-  }, [deleteMilestone, openConfirmDialog])
-
-  const handleMsEditFinish = useCallback((msId, value) => {
-    setEditingMsId(null)
-    if (value !== null && value !== undefined) {
-      updateMilestone(msId, { title: value })
-    }
-  }, [updateMilestone])
-
   if (!project) return null
-
   if (pkmLoading) {
-    return (
-      <div style={{ padding: 40, color: S.textTertiary, textAlign: 'center', fontSize: FONT.body }}>
-        로딩 중...
-      </div>
-    )
+    return <div style={{ padding: 40, color: COLOR.textTertiary, textAlign: 'center', fontSize: FONT.body }}>로딩 중...</div>
   }
-
-  // Reset rendered tracking each render
-  rendered.current = {}
-
-  // Mobile layout
   if (isMobile) {
-    return (
-      <div data-view="unified-project" style={{ padding: '12px 16px', fontFamily: "'Noto Sans KR','Inter',-apple-system,sans-serif" }}>
-        <div style={{ fontSize: 12, color: S.textTertiary, textAlign: 'center' }}>
-          모바일에서는 간략 보기만 지원됩니다
-        </div>
-      </div>
-    )
+    return <div style={{ padding: 40, fontSize: FONT.label, color: COLOR.textTertiary, textAlign: 'center' }}>모바일에서는 간략 보기만 지원됩니다</div>
   }
 
   return (
-    <div data-view="unified-project" style={{ height: '100%', display: 'flex', flexDirection: 'column', fontFamily: "'Noto Sans KR','Inter',-apple-system,sans-serif", color: S.textPrimary }}>
+    <div data-view="unified-project" style={{ height: '100%', display: 'flex', flexDirection: 'column', color: COLOR.textPrimary }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 12px', borderBottom: `0.5px solid ${S.border}`, flexShrink: 0 }}>
-        <div style={{ width: 11, height: 11, borderRadius: '50%', background: color?.dot, flexShrink: 0 }} />
-        <span style={{ fontSize: FONT.projectTitle, fontWeight: 700 }}>{project.name}</span>
-        <div style={{ marginLeft: 'auto' }}>
+      <div style={{ padding: '10px 20px 12px', borderBottom: `1px solid ${COLOR.border}`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+          <span style={{ fontSize: FONT.projectTitle, fontWeight: 700 }}>{project.name}</span>
+          <div style={{ flex: 1 }} />
           <Pill
             items={[{ key: '전체 할일', label: '전체 할일' }, { key: '타임라인', label: '타임라인' }]}
             active={rightMode}
             onChange={setRightMode}
           />
         </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button onClick={expandAll} style={toolBtnStyle}>모두 펼치기</button>
+          <button onClick={collapseAll} style={toolBtnStyle}>모두 접기</button>
+          {rightMode === '타임라인' && (
+            <>
+              <div style={{ width: 1, height: 16, background: COLOR.border, margin: '0 4px' }} />
+              <ScalePill scale={scale} onChange={setScale} />
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Main container */}
+      {/* Content */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Timeline mode → full InlineTimelineView */}
-        {rightMode === '타임라인' && (
-          <InlineTimelineView projectId={projectId} />
-        )}
-
-        {/* Task list mode → MS-grouped single list */}
         {rightMode === '전체 할일' && (
           <MsTaskTreeMode
             tree={tree}
@@ -419,9 +198,168 @@ export default function UnifiedProjectView({ projectId }) {
             updateMilestone={updateMilestone}
             deleteMilestone={deleteMilestone}
             openConfirmDialog={openConfirmDialog}
+            externalCollapsed={collapsed}
+            onToggleNode={toggleNode}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
           />
+        )}
+
+        {rightMode === '타임라인' && (
+          <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
+            <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden', display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
+              {/* Column header */}
+              <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 2 }}>
+                <div style={{ width: TREE_W, flexShrink: 0, padding: '6px 8px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>
+                  마일스톤 / 할일
+                </div>
+                <div style={{ display: 'flex' }}>
+                  {columns.map((col, i) => {
+                    const isToday = col.label === todayLabel
+                    return (
+                      <div key={i} style={{
+                        width: colW, flexShrink: 0, padding: '6px 4px', fontSize: FONT.tiny, fontWeight: isToday ? 700 : 500,
+                        color: isToday ? '#E53E3E' : COLOR.textTertiary, textAlign: 'center',
+                        borderRight: `1px solid ${isToday ? '#E53E3E' : COLOR.border}`,
+                        background: isToday ? 'rgba(229,62,62,0.04)' : 'transparent',
+                      }}>{col.label}</div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Tree rows */}
+              {tree.length === 0 && (
+                <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>마일스톤이 없습니다</div>
+              )}
+              {tree.map(node => (
+                <TimelineMsRow
+                  key={node.id} node={node} depth={0} dotColor={dotColor}
+                  collapsed={collapsed} toggleNode={toggleNode}
+                  timelineCtx={timelineCtx}
+                  projectTasks={projectTasks}
+                  toggleDone={toggleDone}
+                />
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
   )
+}
+
+/* ═══ TimelineMsRow — 타임라인 모드 재귀 노드 ═══ */
+function TimelineMsRow({ node, depth, dotColor, collapsed, toggleNode, timelineCtx, projectTasks, toggleDone }) {
+  const hasChildren = (node.children || []).length > 0
+  const isCollapsed = collapsed.has(node.id)
+  const [hover, setHover] = useState(false)
+
+  const allTasks = projectTasks.filter(t => t.keyMilestoneId === node.id && !t.deletedAt)
+  const activeTasks = allTasks.filter(t => !t.done).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+
+  const { columns, colW, minD, scale, todayLabel } = timelineCtx
+
+  return (
+    <>
+      {/* MS row */}
+      <div
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${COLOR.border}`, minHeight: 30 }}
+      >
+        {/* Left tree */}
+        <div style={{
+          width: TREE_W, flexShrink: 0, padding: '4px 8px', paddingLeft: 8 + depth * 22,
+          display: 'flex', alignItems: 'center', gap: 5,
+          borderRight: `1px solid ${COLOR.border}`,
+        }}>
+          {hasChildren ? (
+            <span onClick={() => toggleNode(node.id)}
+              style={{ fontSize: 11, color: COLOR.textSecondary, width: 12, textAlign: 'center', cursor: 'pointer',
+                transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
+          ) : <span style={{ width: 12, flexShrink: 0 }} />}
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+          <span style={{
+            fontSize: FONT.label, fontWeight: depth === 0 ? 600 : 500, color: COLOR.textPrimary,
+            flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.3,
+          }}>{node.title || '(제목 없음)'}</span>
+        </div>
+
+        {/* Right: Gantt */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', height: '100%' }}>
+            {columns.map((col, i) => {
+              const isToday = col.label === todayLabel
+              return (
+                <div key={i} style={{
+                  width: colW, flexShrink: 0,
+                  borderRight: `1px solid ${isToday ? '#E53E3E' : COLOR.border}`,
+                  background: isToday ? 'rgba(229,62,62,0.03)' : 'transparent',
+                }} />
+              )
+            })}
+          </div>
+          {/* MS bar */}
+          {node.start_date && node.end_date && (() => {
+            const bs = getBarStyle(node.start_date, node.end_date, minD, colW, scale, dotColor, hasChildren ? 0.25 : 0.5)
+            return bs ? <div style={bs} /> : null
+          })()}
+        </div>
+      </div>
+
+      {/* Task rows (only when expanded) */}
+      {!isCollapsed && activeTasks.map(t => (
+        <div key={t.id} style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${COLOR.border}`, minHeight: 26 }}>
+          <div style={{
+            width: TREE_W, flexShrink: 0, padding: '3px 8px', paddingLeft: 8 + (depth + 1) * 22 + 14,
+            display: 'flex', alignItems: 'center', gap: 5,
+            borderRight: `1px solid ${COLOR.border}`,
+          }}>
+            <div onClick={() => toggleDone(t.id)} style={{
+              width: 12, height: 12, borderRadius: 3, flexShrink: 0, cursor: 'pointer',
+              border: t.done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
+              background: t.done ? CHECKBOX.checkedBg : '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {t.done && <svg width={7} height={7} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+            </div>
+            <span style={{
+              fontSize: FONT.caption, color: COLOR.textPrimary, flex: 1,
+              whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.3,
+            }}>{t.text}</span>
+          </div>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', height: '100%' }}>
+              {columns.map((col, i) => (
+                <div key={i} style={{ width: colW, flexShrink: 0, borderRight: `1px solid ${COLOR.border}` }} />
+              ))}
+            </div>
+            {t.startDate && t.dueDate && (() => {
+              const bs = getBarStyle(t.startDate, t.dueDate, minD, colW, scale, dotColor, 0.4)
+              return bs ? <div style={{ ...bs, height: 12, borderRadius: 3 }} /> : null
+            })()}
+          </div>
+        </div>
+      ))}
+
+      {/* Children */}
+      {hasChildren && !isCollapsed && node.children.map(child => (
+        <TimelineMsRow
+          key={child.id} node={child} depth={depth + 1} dotColor={dotColor}
+          collapsed={collapsed} toggleNode={toggleNode}
+          timelineCtx={timelineCtx}
+          projectTasks={projectTasks}
+          toggleDone={toggleDone}
+        />
+      ))}
+    </>
+  )
+}
+
+/* ═══ Toolbar button style ═══ */
+const toolBtnStyle = {
+  border: 'none', borderRadius: 5, padding: '3px 10px',
+  fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer',
+  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
 }
