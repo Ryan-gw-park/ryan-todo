@@ -110,13 +110,13 @@ export default function PersonalMatrixView() {
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ flex: 1, overflowX: 'auto', padding: isMobile ? '0 12px' : 0 }}>
             {/* Grid header */}
-            <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)`, gap: 0, border: '0.5px solid #e8e6df', borderRadius: '10px 10px 0 0', overflow: 'hidden' }}>
-              <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(${CAT_COLS.length}, 1fr)`, gap: 0, border: `1px solid ${COLOR.border}`, borderRadius: '10px 10px 0 0', overflow: 'hidden' }}>
+              <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
                 프로젝트
               </div>
               {CAT_COLS.map(cat => (
                 <div key={cat.key} style={{
-                  padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                  padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`,
                   fontSize: FONT.caption, fontWeight: 600,
                   color: cat.key === 'today' ? COLOR.danger : cat.key === 'next' ? COLOR.textPrimary : COLOR.textTertiary,
                 }}>
@@ -128,7 +128,7 @@ export default function PersonalMatrixView() {
             </div>
 
             {/* Project rows */}
-            <div style={{ border: '0.5px solid #e8e6df', borderTop: 'none', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
+            <div style={{ border: `1px solid ${COLOR.border}`, borderTop: 'none', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
               {projectsWithTasks.map(proj => {
                 const c = getColor(proj.color)
                 const projTasks = myTasks.filter(t => t.projectId === proj.id && !t.done)
@@ -139,7 +139,7 @@ export default function PersonalMatrixView() {
                     <div
                       onClick={() => toggleCollapse(proj.id)}
                       style={{
-                        padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                        padding: '8px 10px', borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`,
                         display: 'flex', alignItems: isCollapsed ? 'center' : 'flex-start', gap: 5,
                         background: `${c.dot}04`, cursor: 'pointer',
                       }}
@@ -155,7 +155,7 @@ export default function PersonalMatrixView() {
                       const dropId = `${proj.id}:${cat.key}`
                       return isCollapsed ? (
                         <div key={cat.key} style={{
-                          padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                          padding: '8px 10px', borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`,
                           fontSize: FONT.tiny, color: COLOR.textTertiary, background: `${c.dot}04`,
                           display: 'flex', alignItems: 'center',
                         }}>
@@ -163,7 +163,7 @@ export default function PersonalMatrixView() {
                         </div>
                       ) : (
                         <CellDrop key={dropId} id={dropId}>
-                          <div style={{ padding: '6px 8px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}>
+                          <div style={{ padding: '6px 8px', borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`, minHeight: 36 }}>
                             {cellTasks.length === 0 ? (
                               <span style={{ fontSize: 10, color: '#e0e0e0' }}>—</span>
                             ) : cellTasks.map(t => (

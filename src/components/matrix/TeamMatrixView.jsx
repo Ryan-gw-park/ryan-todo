@@ -240,14 +240,14 @@ export default function TeamMatrixView() {
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <DndContext sensors={sensors} collisionDetection={matrixCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '0 12px' : 0 }}>
-            <div style={{ border: `0.5px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {/* ── Column header: 프로젝트 | 팀원... ── */}
               <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
-                <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
+                <div style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`, fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary }}>
                   프로젝트
                 </div>
                 {members.map(mem => (
-                  <div key={mem.id} style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div key={mem.id} style={{ padding: '8px 10px', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <MemberAvatar name={mem.displayName || mem.name} size={20} />
                     <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary }}>{mem.displayName || mem.name}</span>
                   </div>
@@ -266,7 +266,7 @@ export default function TeamMatrixView() {
                     <div
                       onClick={() => toggleCollapse(proj.id)}
                       style={{
-                        padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                        padding: '8px 10px', borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`,
                         display: 'flex', alignItems: isCollapsed ? 'center' : 'flex-start', gap: 5,
                         background: `${c.dot}04`, cursor: 'pointer',
                       }}
@@ -283,7 +283,7 @@ export default function TeamMatrixView() {
                       const dropId = `${proj.id}:${mem.userId}`
                       return isCollapsed ? (
                         <div key={mem.id} style={{
-                          padding: '8px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`,
+                          padding: '8px 10px', borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`,
                           fontSize: FONT.tiny, color: COLOR.textTertiary, background: `${c.dot}04`,
                           display: 'flex', alignItems: 'center',
                         }}>
@@ -295,7 +295,7 @@ export default function TeamMatrixView() {
                           id={dropId}
                           color={c}
                           activeId={activeId}
-                          style={{ padding: '6px 10px', borderBottom: `0.5px solid ${COLOR.border}`, borderRight: `0.5px solid ${COLOR.border}`, minHeight: 36 }}
+                          style={{ padding: '6px 10px', borderBottom: `1px solid ${COLOR.border}`, borderRight: `1px solid ${COLOR.border}`, minHeight: 36 }}
                         >
                           {cellTasks.length === 0 ? (
                             <span style={{ fontSize: FONT.tiny, color: '#e0e0e0' }}>—</span>
