@@ -69,7 +69,7 @@ export default function MsTaskTreeMode({
     return () => window.removeEventListener('keydown', handler)
   }, [undo])
 
-  const showToast = (msg) => {
+  function showToast(msg) {
     setToast({ msg, canUndo: true })
     setTimeout(() => setToast(null), 4000)
   }

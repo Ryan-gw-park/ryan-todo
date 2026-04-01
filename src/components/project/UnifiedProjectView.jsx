@@ -80,7 +80,7 @@ export default function UnifiedProjectView({ projectId }) {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [undo])
-  const showToast = (msg) => { setToast({ msg, canUndo: true }); setTimeout(() => setToast(null), 4000) }
+  function showToast(msg) { setToast({ msg, canUndo: true }); setTimeout(() => setToast(null), 4000) }
 
   // ─── Shared collapsed state ───
   const [collapsed, setCollapsed] = useState(new Set())
