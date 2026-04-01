@@ -19,15 +19,12 @@ import Sidebar from './components/layout/Sidebar'
 // React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
 const TodayView = lazy(() => import('./components/views/TodayView'))
 const AllTasksView = lazy(() => import('./components/views/AllTasksView'))
-const MatrixView = lazy(() => import('./components/views/MatrixView'))
+// MatrixView removed — replaced by UnifiedGridView
 const ProjectView = lazy(() => import('./components/views/ProjectView'))
 const TimelineView = lazy(() => import('./components/views/TimelineView'))
 const InlineTimelineView = lazy(() => import('./components/views/InlineTimelineView'))
 const MemoryView = lazy(() => import('./components/views/MemoryView'))
-const TeamMatrixView = lazy(() => import('./components/matrix/TeamMatrixView'))
-const WeeklyPlannerView = lazy(() => import('./components/views/WeeklyPlannerView'))
-const PersonalMatrixView = lazy(() => import('./components/views/PersonalMatrixView'))
-const PersonalWeeklyView = lazy(() => import('./components/views/PersonalWeeklyView'))
+const UnifiedGridView = lazy(() => import('./components/views/UnifiedGridView'))
 // PersonalTimelineView replaced by InlineTimelineView with scope="personal"
 const ProjectLayer = lazy(() => import('./components/project/ProjectLayer'))
 const TeamSettings = lazy(() => import('./components/team/TeamSettings'))
@@ -87,12 +84,12 @@ function AppShell({ mobile }) {
   // Loop-39: 3-section sidebar view routing — team views always use team components
   const views = {
     today: TodayView, allTasks: AllTasksView, memory: MemoryView,
-    'team-matrix': TeamMatrixView,
+    'team-matrix': () => <UnifiedGridView initialView="matrix" initialScope="team" />,
     'team-timeline': InlineTimelineView,
-    'team-weekly': WeeklyPlannerView,
-    'personal-matrix': PersonalMatrixView,
+    'team-weekly': () => <UnifiedGridView initialView="weekly" initialScope="team" />,
+    'personal-matrix': () => <UnifiedGridView initialView="matrix" initialScope="personal" />,
     'personal-timeline': () => <InlineTimelineView scope="personal" />,
-    'personal-weekly': PersonalWeeklyView,
+    'personal-weekly': () => <UnifiedGridView initialView="weekly" initialScope="personal" />,
     project: ProjectView, projectLayer: ProjectLayer,
   }
   const ViewComponent = views[currentView] || TodayView
