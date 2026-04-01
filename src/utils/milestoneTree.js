@@ -259,7 +259,42 @@ export function getMsPath(msId, milestones) {
 }
 
 /**
+ * parent_id 체인을 따라 실제 depth 계산 (DB depth 필드 사용하지 않음)
+ * @param {object} ms - milestone 객체
+ * @param {Array} allMs - 같은 프로젝트의 전체 milestones 배열
+ * @returns {number} 0부터 시작하는 depth
+ */
+export function computeDepth(ms, allMs) {
+  let d = 0, cur = ms
+  const visited = new Set()
+  while (cur && cur.parent_id) {
+    if (visited.has(cur.id)) break // 순환 참조 방지
+    visited.add(cur.id)
+    cur = allMs.find(m => m.id === cur.parent_id)
+    if (cur) d++
+  }
+  return d
+}
+
+/**
+ * 프로젝트 내 MS의 실제 최대 depth 계산 (parent_id 기반)
+ * @param {Array} milestones - flat milestones array
+ * @param {string} projectId - project ID
+ * @returns {number} 최대 depth (0 = 단일 레벨)
+ */
+export function getProjectMaxDepth(milestones, projectId) {
+  const projMs = milestones.filter(m => m.project_id === projectId)
+  let max = 0
+  projMs.forEach(m => {
+    const d = computeDepth(m, projMs)
+    if (d > max) max = d
+  })
+  return max
+}
+
+/**
  * Filter milestones by depth level for a project (Loop-38)
+ * depth 필드 대신 parent_id 체인으로 실제 depth 계산
  * @param {Array} milestones - flat milestones array
  * @param {string} projectId - project ID (pkmId or project_id)
  * @param {string} depthFilter - 'all' | '0' | '1' | '2'
@@ -269,5 +304,5 @@ export function getVisibleMs(milestones, projectId, depthFilter) {
   const projMs = milestones.filter(m => m.project_id === projectId)
   if (depthFilter === 'all') return projMs
   const d = parseInt(depthFilter)
-  return projMs.filter(m => (m.depth ?? 0) === d)
+  return projMs.filter(m => computeDepth(m, projMs) === d)
 }

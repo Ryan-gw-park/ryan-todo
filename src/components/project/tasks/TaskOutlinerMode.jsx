@@ -4,9 +4,8 @@ import { getColor, CATEGORIES } from '../../../utils/colors'
 import useTeamMembers from '../../../hooks/useTeamMembers'
 import { CategorySection } from './index'
 
-const NON_DONE_CATS = CATEGORIES.filter(c => c.key !== 'done')
-
 export default function TaskOutlinerMode({ projectId }) {
+  const NON_DONE_CATS = useMemo(() => CATEGORIES.filter(c => c.key !== 'done'), [])
   const { projects, tasks, collapseState, setCollapseValue, currentTeamId } = useStore()
   const allTasks = useMemo(() => tasks, [tasks])
   const isMobile = window.innerWidth < 768

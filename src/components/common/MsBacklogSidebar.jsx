@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { COLOR, FONT } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
+import { computeDepth, getProjectMaxDepth } from '../../utils/milestoneTree'
 
 /* ═══════════════════════════════════════════════════════
    MsBacklogSidebar — MS 배정 모드 백로그 사이드바
@@ -22,15 +23,10 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
 
   const setDepth = (pid, d) => setDepthMap(prev => ({ ...prev, [pid]: d }))
 
-  // Compute max depth per project
+  // Compute max depth per project — parent_id 체인 기반 (DB depth 필드 사용 안함)
   const maxDepthMap = useMemo(() => {
     const map = {}
-    projects.forEach(p => {
-      const projMs = milestones.filter(m => m.project_id === p.id)
-      let max = 0
-      projMs.forEach(m => { if ((m.depth ?? 0) > max) max = m.depth ?? 0 })
-      map[p.id] = max
-    })
+    projects.forEach(p => { map[p.id] = getProjectMaxDepth(milestones, p.id) })
     return map
   }, [projects, milestones])
 
@@ -43,10 +39,11 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
       result = result.filter(m => m.project_id === blProject)
     }
 
-    // Depth filter — per project
+    // Depth filter — parent_id 체인 기반 실제 depth (DB depth 필드 사용 안함)
     result = result.filter(m => {
       const targetDepth = depthMap[m.project_id] ?? 0
-      return (m.depth ?? 0) === targetDepth
+      const projMs = milestones.filter(ms => ms.project_id === m.project_id)
+      return computeDepth(m, projMs) === targetDepth
     })
 
     // Assignment filter
@@ -103,7 +100,9 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
     if (!ms.parent_id) return null
     const parts = []
     let current = msMap[ms.parent_id]
-    while (current) {
+    const visited = new Set()
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id)
       parts.unshift(current.title || '?')
       current = current.parent_id ? msMap[current.parent_id] : null
     }

@@ -529,6 +529,14 @@ const useStore = create((set, get) => ({
     const currentTask = get().tasks.find(x => x.id === id)
     if (!currentTask) return
     const resolvedPatch = applyTransitionRules(currentTask, patch)
+    // 개인 프로젝트 scope 보호 — 어떤 경로로든 개인 프로젝트에 속한 할일은 scope='private'
+    const targetProjectId = resolvedPatch.projectId || currentTask.projectId
+    const targetProject = targetProjectId ? get().projects.find(p => p.id === targetProjectId) : null
+    if (targetProject && !targetProject.teamId) {
+      resolvedPatch.scope = 'private'
+      resolvedPatch.teamId = null
+      if (resolvedPatch.assigneeId !== undefined) delete resolvedPatch.assigneeId
+    }
     set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...resolvedPatch } : t) }))
     const t = get().tasks.find(x => x.id === id)
     if (!t) return
@@ -770,8 +778,21 @@ const useStore = create((set, get) => ({
     const d = db()
     if (!d) return null
     const userId = getCachedUserId()
-    const parentMs = parentId ? get().milestones.find(m => m.id === parentId) : null
-    const depth = parentMs ? (parentMs.depth || 0) + 1 : 0
+    // depth: parent_id 체인을 따라가서 실제 depth 계산 (DB depth 필드 의존 안함)
+    const computeDepthChain = (pid) => {
+      let depth = 0, cur = pid
+      const visited = new Set()
+      while (cur) {
+        if (visited.has(cur)) break
+        visited.add(cur)
+        const parent = get().milestones.find(m => m.id === cur)
+        if (!parent) break
+        depth++
+        cur = parent.parent_id
+      }
+      return depth
+    }
+    const depth = parentId ? computeDepthChain(parentId) : 0
     const siblings = get().milestones.filter(m => m.project_id === projectId && m.parent_id === parentId)
     const sortOrder = siblings.length
 
@@ -842,8 +863,21 @@ const useStore = create((set, get) => ({
   moveMilestone: async (id, newParentId) => {
     const d = db()
     if (!d) return
-    const parentMs = newParentId ? get().milestones.find(m => m.id === newParentId) : null
-    const depth = parentMs ? (parentMs.depth || 0) + 1 : 0
+    // depth: parent_id 체인을 따라가서 실제 depth 계산 (DB depth 필드 의존 안함)
+    const computeDepthChain = (pid) => {
+      let depth = 0, cur = pid
+      const visited = new Set()
+      while (cur) {
+        if (visited.has(cur)) break
+        visited.add(cur)
+        const parent = get().milestones.find(m => m.id === cur)
+        if (!parent) break
+        depth++
+        cur = parent.parent_id
+      }
+      return depth
+    }
+    const depth = newParentId ? computeDepthChain(newParentId) : 0
     const projectId = get().milestones.find(m => m.id === id)?.project_id
     const siblings = get().milestones.filter(m => m.project_id === projectId && m.parent_id === newParentId && m.id !== id)
     const sortOrder = siblings.length

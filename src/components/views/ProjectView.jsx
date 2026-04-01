@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import useStore from '../../hooks/useStore'
 import { getColor, CATEGORIES } from '../../utils/colors'
 // ProjectFilter removed — scope determined by sidebar (Loop-39)
@@ -6,9 +6,8 @@ import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { CategorySection } from '../project/tasks'
 
-const NON_DONE_CATS = CATEGORIES.filter(c => c.key !== 'done')
-
 export default function ProjectView() {
+  const NON_DONE_CATS = useMemo(() => CATEGORIES.filter(c => c.key !== 'done'), [])
   const { projects, tasks, collapseState, setCollapseValue, currentTeamId } = useStore()
   const { filteredProjects } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
