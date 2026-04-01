@@ -293,7 +293,7 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
               const dropId = `mat:${proj.id}:${cat.key}`
               return (
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
-                  <div style={{ padding: '6px 8px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 36 }}>
+                  <div style={{ padding: '6px 8px', minHeight: 36 }}>
                     {isCol ? (
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
@@ -350,7 +350,7 @@ function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, e
               const dropId = `tmat:${proj.id}:${mem.userId}`
               return (
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
-                  <div style={{ padding: '6px 8px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 36 }}>
+                  <div style={{ padding: '6px 8px', minHeight: 36 }}>
                     {isCol ? (
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
@@ -436,7 +436,7 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
               return (
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                   <div style={{
-                    padding: '5px 6px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 40,
+                    padding: '5px 6px', minHeight: 40,
                     background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                   }}>
                     {dayTasks.map(t => (
@@ -508,7 +508,7 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
             return (
               <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                 <div style={{
-                  padding: '5px 6px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 48,
+                  padding: '5px 6px', minHeight: 48,
                   background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                 }}>
                   {dayTasks.map(t => {
@@ -553,7 +553,8 @@ function DroppableCell({ id, activeId, children }) {
   const showHighlight = isOver && activeId
   return (
     <div ref={setNodeRef} style={{
-      display: 'flex', flexDirection: 'column', transition: 'background 0.08s',
+      borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`,
+      transition: 'background 0.08s',
       ...(showHighlight ? { background: 'rgba(49,130,206,0.06)', outline: `2px dashed #3182CE`, outlineOffset: -2 } : {}),
     }}>
       {children}
