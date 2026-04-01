@@ -368,7 +368,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               style={{ flex: 1, fontSize: FONT.label, fontWeight: depth === 0 ? 600 : 500, border: 'none', outline: 'none', background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0, minWidth: 0 }}
             />
           ) : (
-            <span onDoubleClick={() => setEditingMsId(node.id)} style={{
+            <span onClick={() => setEditingMsId(node.id)} style={{
               fontSize: FONT.label, fontWeight: depth === 0 ? 600 : 500, color: COLOR.textPrimary,
               flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35, cursor: 'text',
             }}>{node.title || '(제목 없음)'}</span>
@@ -531,7 +531,7 @@ function DragTask({ task, msId, isEditing, onStartEdit, onFinishEdit, onToggle, 
           style={{ flex: 1, fontSize: FONT.body, border: 'none', outline: 'none', background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0 }}
         />
       ) : (
-        <span onDoubleClick={onStartEdit} style={{
+        <span onClick={onStartEdit} style={{
           flex: 1, fontSize: FONT.body, color: task.done ? COLOR.textTertiary : COLOR.textPrimary, lineHeight: 1.35,
           whiteSpace: 'normal', wordBreak: 'break-word',
           textDecoration: task.done ? 'line-through' : 'none', cursor: 'text',
