@@ -27,6 +27,8 @@ const CATS = [
 ]
 const DAY_LABELS = ['월', '화', '수', '목', '금']
 
+const EMPTY_OBJ = {}
+
 // ─── Date helpers ───
 function getMonday(d) {
   const date = new Date(d)
@@ -57,7 +59,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const userId = getCachedUserId()
   const isMobile = window.innerWidth < 768
   const collapseKey = scope === 'team' ? 'matrix' : 'personalMatrix'
-  const collapsed = useStore(s => s.collapseState[collapseKey] || {})
+  const collapseState = useStore(s => s.collapseState)
+  const collapsed = collapseState[collapseKey] || EMPTY_OBJ
   const toggleCollapse = useStore(s => s.toggleCollapse)
   const toggleProjectCollapse = useCallback((pid) => toggleCollapse(collapseKey, pid), [collapseKey, toggleCollapse])
 
