@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import useStore from './hooks/useStore'
 import { useAlarmEngine } from './hooks/useAlarmEngine'
@@ -82,7 +82,7 @@ function AppShell({ mobile }) {
   }, [currentView])
 
   // Loop-39: 3-section sidebar view routing — team views always use team components
-  const views = {
+  const views = useMemo(() => ({
     today: TodayView, allTasks: AllTasksView, memory: MemoryView,
     'team-matrix': () => <UnifiedGridView initialView="matrix" initialScope="team" />,
     'team-timeline': InlineTimelineView,
@@ -91,7 +91,7 @@ function AppShell({ mobile }) {
     'personal-timeline': () => <InlineTimelineView scope="personal" />,
     'personal-weekly': () => <UnifiedGridView initialView="weekly" initialScope="personal" />,
     project: ProjectView, projectLayer: ProjectLayer,
-  }
+  }), [])
   const ViewComponent = views[currentView] || TodayView
 
   // 모바일에서 team/personal scope 뷰 접근 시 today로 리다이렉트
