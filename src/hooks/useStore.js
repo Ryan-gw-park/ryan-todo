@@ -514,7 +514,7 @@ const useStore = create((set, get) => ({
       : { scope: 'private', createdBy: userId }
     const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', alarm: null, ...teamDefaults, ...task }
     // 개인 프로젝트 강제 보정 — ...task spread 후에도 scope/teamId 보장
-    if (isPersonalProject) { t.scope = 'private'; t.teamId = null }
+    if (isPersonalProject) { t.scope = 'private'; t.teamId = null; t.assigneeId = null }
     set(s => ({ tasks: [...s.tasks, t] }))
     const d = db()
     if (!d) { set({ syncStatus: 'error' }); return }
