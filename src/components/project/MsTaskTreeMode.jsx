@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
+import useTeamMembers from '../../hooks/useTeamMembers'
 
 
 /* ═══════════════════════════════════════════════════════
@@ -14,6 +15,7 @@ const TREE_W = 340
 export default function MsTaskTreeMode({
   tree, projectTasks, backlogTasks, projectId, pkmId, color,
   toggleDone, openDetail, addMilestone, updateMilestone, deleteMilestone, openConfirmDialog,
+  externalCollapsed, onToggleNode, onExpandAll, onCollapseAll,
 }) {
   const addTask = useStore(s => s.addTask)
   const updateTask = useStore(s => s.updateTask)
@@ -21,8 +23,21 @@ export default function MsTaskTreeMode({
   const moveMilestone = useStore(s => s.moveMilestone)
   const reorderMilestones = useStore(s => s.reorderMilestones)
   const milestones = useStore(s => s.milestones)
+  const currentTeamId = useStore(s => s.currentTeamId)
 
-  const [collapsed, setCollapsed] = useState(new Set())
+  // ─── Member map (assigneeId → displayName) ───
+  const [memberMap, setMemberMap] = useState({})
+  useEffect(() => {
+    if (!currentTeamId) return
+    useTeamMembers.getMembers(currentTeamId).then(members => {
+      const map = {}
+      members.forEach(m => { map[m.userId] = m.displayName || m.name || '?' })
+      setMemberMap(map)
+    })
+  }, [currentTeamId])
+
+  const [internalCollapsed, setInternalCollapsed] = useState(new Set())
+  const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed
   const [hoverId, setHoverId] = useState(null)
   const [editingMsId, setEditingMsId] = useState(null)
   const [editingTaskId, setEditingTaskId] = useState(null)
@@ -61,16 +76,22 @@ export default function MsTaskTreeMode({
 
   // ─── Collapse/Expand ───
   const toggleNode = useCallback((id) => {
-    setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  }, [])
+    if (onToggleNode) { onToggleNode(id); return }
+    setInternalCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }, [onToggleNode])
 
-  const expandAll = useCallback(() => setCollapsed(new Set()), [])
+  const expandAll = useCallback(() => {
+    if (onExpandAll) { onExpandAll(); return }
+    setInternalCollapsed(new Set())
+  }, [onExpandAll])
+
   const collapseAll = useCallback(() => {
+    if (onCollapseAll) { onCollapseAll(); return }
     const ids = new Set()
     const walk = (nodes) => nodes.forEach(n => { if ((n.children || []).length > 0) { ids.add(n.id); walk(n.children) } })
     walk(tree)
-    setCollapsed(ids)
-  }, [tree])
+    setInternalCollapsed(ids)
+  }, [onCollapseAll, tree])
 
   // ─── MS CRUD ───
   const handleAddChildMs = useCallback(async (parentId) => {
@@ -192,10 +213,12 @@ export default function MsTaskTreeMode({
       <div style={{ padding: '0 20px' }}>
 
         {/* Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 4, background: '#fff' }}>
-          <button onClick={expandAll} style={toolBtnStyle}>모두 펼치기</button>
-          <button onClick={collapseAll} style={toolBtnStyle}>모두 접기</button>
-        </div>
+        {!externalCollapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 4, background: '#fff' }}>
+            <button onClick={expandAll} style={toolBtnStyle}>모두 펼치기</button>
+            <button onClick={collapseAll} style={toolBtnStyle}>모두 접기</button>
+          </div>
+        )}
 
         {/* Grid */}
         <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 8 }}>
@@ -254,6 +277,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
   onTaskEditFinish, onAddTaskSubmit,
   toggleDone, openDetail, projectTasks, countAll,
   dragState, setDragState, onTaskDrop, onMsDropChild, onMsReorder,
+  memberMap,
 }) {
   const hasChildren = (node.children || []).length > 0
   const isCollapsed = collapsed.has(node.id)
@@ -331,9 +355,9 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
         >
           {hasChildren ? (
             <span onClick={ev => { ev.stopPropagation(); ev.preventDefault(); toggleNode(node.id) }}
-              style={{ fontSize: 12, color: COLOR.textSecondary, width: 14, textAlign: 'center', cursor: 'pointer',
+              style={{ fontSize: 11, color: COLOR.textSecondary, width: 12, textAlign: 'center', cursor: 'pointer',
                 transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
-          ) : <span style={{ width: 14, flexShrink: 0 }} />}
+          ) : <span style={{ width: 12, flexShrink: 0 }} />}
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
 
           {isEditing ? (
@@ -341,11 +365,11 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               onBlur={e => onMsEditFinish(node.id, e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onMsEditFinish(node.id, e.target.value) } if (e.key === 'Escape') setEditingMsId(null) }}
               onMouseDown={e => e.stopPropagation()}
-              style={{ flex: 1, fontSize: FONT.label, fontWeight: depth === 0 ? 700 : 600, border: 'none', outline: 'none', background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0, minWidth: 0 }}
+              style={{ flex: 1, fontSize: FONT.label, fontWeight: depth === 0 ? 600 : 500, border: 'none', outline: 'none', background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0, minWidth: 0 }}
             />
           ) : (
             <span onDoubleClick={() => setEditingMsId(node.id)} style={{
-              fontSize: FONT.label, fontWeight: depth === 0 ? 700 : 600, color: COLOR.textPrimary,
+              fontSize: FONT.label, fontWeight: depth === 0 ? 600 : 500, color: COLOR.textPrimary,
               flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35, cursor: 'text',
             }}>{node.title || '(제목 없음)'}</span>
           )}
@@ -400,6 +424,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               isLast={i === activeTasks.length - 1}
               showAddOnLast={isHover}
               onAddClick={() => setAddingTaskMsId(node.id)}
+              memberMap={memberMap}
             />
           ))}
 
@@ -456,6 +481,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               projectTasks={projectTasks} countAll={countAll}
               dragState={dragState} setDragState={setDragState}
               onTaskDrop={onTaskDrop} onMsDropChild={onMsDropChild} onMsReorder={onMsReorder}
+              memberMap={memberMap}
             />
           ))}
           {/* + 마일스톤 추가 (hover only) */}
@@ -467,7 +493,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
 }
 
 /* ═══ DragTask ═══ */
-function DragTask({ task, msId, isEditing, onStartEdit, onFinishEdit, onToggle, onDetail, setDragState, isLast, showAddOnLast, onAddClick }) {
+function DragTask({ task, msId, isEditing, onStartEdit, onFinishEdit, onToggle, onDetail, setDragState, isLast, showAddOnLast, onAddClick, memberMap }) {
   const [hover, setHover] = useState(false)
   return (
     <div
@@ -510,6 +536,15 @@ function DragTask({ task, msId, isEditing, onStartEdit, onFinishEdit, onToggle, 
           whiteSpace: 'normal', wordBreak: 'break-word',
           textDecoration: task.done ? 'line-through' : 'none', cursor: 'text',
         }}>{task.text}</span>
+      )}
+
+      {/* Assignee avatar */}
+      {task.assigneeId && memberMap?.[task.assigneeId] && (
+        <div style={{
+          width: 16, height: 16, borderRadius: '50%', background: '#888',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 7, fontWeight: 600, flexShrink: 0,
+        }}>{(memberMap[task.assigneeId] || '?')[0].toUpperCase()}</div>
       )}
 
       {/* Due date */}
