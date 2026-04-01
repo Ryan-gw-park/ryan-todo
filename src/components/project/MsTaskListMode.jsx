@@ -3,7 +3,6 @@ import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { countTasksRecursive } from '../../utils/milestoneTree'
 
-const S = COLOR
 
 /* ═══════════════════════════════════════════════════════
    MsTaskListMode — 프로젝트 '전체 할일' 단일 목록
@@ -89,7 +88,7 @@ export default function MsTaskListMode({
               display: 'flex', alignItems: 'center', gap: 8,
               padding: `8px 16px 8px ${16 + indent}px`,
               background: depth === 0 ? '#fafaf8' : '#fff',
-              borderBottom: `0.5px solid ${S.border}`,
+              borderBottom: `0.5px solid ${COLOR.border}`,
               cursor: isLeaf && leafTasks.length > 0 ? 'pointer' : 'default',
             }}
             onMouseEnter={e => e.currentTarget.querySelector('.ms-hover')?.style.setProperty('opacity', '1')}
@@ -99,7 +98,7 @@ export default function MsTaskListMode({
             {(isLeaf ? leafTasks.length > 0 : true) ? (
               <span
                 onClick={() => isLeaf ? leafTasks.length > 0 && toggleMs(node.id) : toggleMs(node.id)}
-                style={{ fontSize: 9, color: S.textTertiary, width: 12, textAlign: 'center', cursor: 'pointer',
+                style={{ fontSize: 9, color: COLOR.textTertiary, width: 12, textAlign: 'center', cursor: 'pointer',
                   transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)' }}
               >▾</span>
             ) : <span style={{ width: 12 }} />}
@@ -124,7 +123,7 @@ export default function MsTaskListMode({
                 style={{
                   flex: 1, fontSize: depth === 0 ? 13 : 12.5, fontWeight: depth === 0 ? 700 : 600,
                   border: 'none', outline: 'none', background: 'transparent',
-                  color: S.textPrimary, fontFamily: 'inherit', padding: 0,
+                  color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0,
                 }}
               />
             ) : (
@@ -133,7 +132,7 @@ export default function MsTaskListMode({
                 style={{
                   flex: 1, fontSize: depth === 0 ? 13 : 12.5,
                   fontWeight: depth === 0 ? 700 : 600,
-                  color: S.textPrimary, lineHeight: 1.4, cursor: 'text',
+                  color: COLOR.textPrimary, lineHeight: 1.4, cursor: 'text',
                 }}
               >
                 {node.title || '(제목 없음)'}
@@ -146,7 +145,7 @@ export default function MsTaskListMode({
                 <div style={{ width: 32, height: 3, borderRadius: 2, background: '#e8e6df' }}>
                   <div style={{ width: `${taskCount.done / taskCount.total * 100}%`, height: 3, borderRadius: 2, background: color?.dot || '#888', transition: 'width 0.2s' }} />
                 </div>
-                <span style={{ fontSize: 10, color: S.textTertiary, fontWeight: 500 }}>{taskCount.done}/{taskCount.total}</span>
+                <span style={{ fontSize: 10, color: COLOR.textTertiary, fontWeight: 500 }}>{taskCount.done}/{taskCount.total}</span>
               </div>
             )}
 
@@ -207,9 +206,9 @@ export default function MsTaskListMode({
                     style={{
                       padding: `5px 16px 5px ${16 + indent + 20 + 24}px`,
                       fontSize: 12, color: '#d0d0d0', cursor: 'pointer',
-                      borderBottom: `0.5px solid ${S.border}`,
+                      borderBottom: `0.5px solid ${COLOR.border}`,
                     }}
-                    onMouseEnter={e => e.currentTarget.style.color = S.textTertiary}
+                    onMouseEnter={e => e.currentTarget.style.color = COLOR.textTertiary}
                     onMouseLeave={e => e.currentTarget.style.color = '#d0d0d0'}
                   >+ 추가</div>
                 )
@@ -226,7 +225,7 @@ export default function MsTaskListMode({
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 32px' }}>
         {/* MS sections */}
         {tree.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: S.textTertiary, fontSize: FONT.body }}>
+          <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>
             마일스톤이 없습니다
           </div>
         ) : renderNodes(tree, 0)}
@@ -235,7 +234,7 @@ export default function MsTaskListMode({
         <div
           onClick={() => handleAddChildMs(null)}
           style={{ padding: '12px 16px', fontSize: 12, color: '#d0d0d0', cursor: 'pointer' }}
-          onMouseEnter={e => e.currentTarget.style.color = S.textTertiary}
+          onMouseEnter={e => e.currentTarget.style.color = COLOR.textTertiary}
           onMouseLeave={e => e.currentTarget.style.color = '#d0d0d0'}
         >+ 마일스톤 추가</div>
 
@@ -260,7 +259,7 @@ function TaskRow({ task, indent, color, isEditing, onStartEdit, onFinishEdit, on
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: `6px 16px 6px ${16 + indent}px`,
-        borderBottom: `0.5px solid ${S.border}`,
+        borderBottom: `0.5px solid ${COLOR.border}`,
         background: hover ? '#fafaf8' : '#fff',
         transition: 'background 0.1s',
         minHeight: 36,
@@ -302,14 +301,14 @@ function TaskRow({ task, indent, color, isEditing, onStartEdit, onFinishEdit, on
           onMouseDown={e => e.stopPropagation()}
           style={{
             flex: 1, fontSize: FONT.body, border: 'none', outline: 'none',
-            background: 'transparent', color: S.textPrimary, fontFamily: 'inherit', padding: 0,
+            background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0,
           }}
         />
       ) : (
         <span
           onDoubleClick={onStartEdit}
           style={{
-            flex: 1, fontSize: FONT.body, color: task.done ? S.textTertiary : S.textPrimary,
+            flex: 1, fontSize: FONT.body, color: task.done ? COLOR.textTertiary : COLOR.textPrimary,
             textDecoration: task.done ? 'line-through' : 'none',
             lineHeight: 1.4, cursor: 'text',
           }}
@@ -330,7 +329,7 @@ function TaskRow({ task, indent, color, isEditing, onStartEdit, onFinishEdit, on
       )}
 
       {/* Due date */}
-      {task.dueDate && <span style={{ fontSize: FONT.tiny, color: S.textTertiary, flexShrink: 0 }}>{task.dueDate}</span>}
+      {task.dueDate && <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate}</span>}
 
       {/* Detail arrow */}
       <div
@@ -360,8 +359,8 @@ function DoneTasksGroup({ tasks, indent, color, onToggle, onDetail }) {
         onClick={() => setOpen(!open)}
         style={{
           padding: `4px 16px 4px ${16 + indent}px`,
-          fontSize: 11, color: S.textTertiary, cursor: 'pointer',
-          borderBottom: `0.5px solid ${S.border}`, background: '#fcfcfb',
+          fontSize: 11, color: COLOR.textTertiary, cursor: 'pointer',
+          borderBottom: `0.5px solid ${COLOR.border}`, background: '#fcfcfb',
           display: 'flex', alignItems: 'center', gap: 6,
         }}
       >
@@ -375,7 +374,7 @@ function DoneTasksGroup({ tasks, indent, color, onToggle, onDetail }) {
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: `4px 16px 4px ${16 + indent}px`,
-            borderBottom: `0.5px solid ${S.border}`, cursor: 'pointer',
+            borderBottom: `0.5px solid ${COLOR.border}`, cursor: 'pointer',
           }}
         >
           <div style={{ width: 14 }} />
@@ -389,7 +388,7 @@ function DoneTasksGroup({ tasks, indent, color, onToggle, onDetail }) {
           >
             <svg width={8} height={8} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
-          <span style={{ fontSize: FONT.body, color: S.textTertiary, textDecoration: 'line-through', flex: 1 }}>{t.text}</span>
+          <span style={{ fontSize: FONT.body, color: COLOR.textTertiary, textDecoration: 'line-through', flex: 1 }}>{t.text}</span>
         </div>
       ))}
     </div>
@@ -416,7 +415,7 @@ function InlineAddRow({ indent, onSubmit, onDone }) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8,
       padding: `5px 16px 5px ${16 + indent}px`,
-      borderBottom: `0.5px solid ${S.border}`,
+      borderBottom: `0.5px solid ${COLOR.border}`,
     }}>
       <div style={{ width: 14 }} />
       <div style={{ width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, border: `1.5px solid #e8e6df`, flexShrink: 0 }} />
@@ -433,7 +432,7 @@ function InlineAddRow({ indent, onSubmit, onDone }) {
         placeholder="할일 입력 후 Enter"
         style={{
           flex: 1, fontSize: FONT.body, border: 'none', outline: 'none',
-          background: 'transparent', color: S.textPrimary, fontFamily: 'inherit', padding: 0,
+          background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit', padding: 0,
         }}
       />
     </div>
@@ -444,20 +443,20 @@ function InlineAddRow({ indent, onSubmit, onDone }) {
 function BacklogSection({ tasks, onToggle, onOpen }) {
   const [open, setOpen] = useState(false)
   return (
-    <div style={{ borderTop: `1.5px dashed ${S.border}`, marginTop: 8 }}>
+    <div style={{ borderTop: `1.5px dashed ${COLOR.border}`, marginTop: 8 }}>
       <div
         onClick={() => setOpen(!open)}
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', cursor: 'pointer' }}
       >
-        <span style={{ fontSize: FONT.label, color: S.textTertiary }}>⊙</span>
-        <span style={{ fontSize: FONT.label, fontWeight: 500, color: S.textTertiary }}>백로그</span>
-        <span style={{ fontSize: FONT.caption, color: S.textTertiary }}>{tasks.length}건</span>
-        <span style={{ fontSize: 9, color: S.textTertiary, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontSize: FONT.label, color: COLOR.textTertiary }}>⊙</span>
+        <span style={{ fontSize: FONT.label, fontWeight: 500, color: COLOR.textTertiary }}>백로그</span>
+        <span style={{ fontSize: FONT.caption, color: COLOR.textTertiary }}>{tasks.length}건</span>
+        <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
       </div>
       {open && tasks.map(t => (
         <div
           key={t.id}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 40px', borderBottom: `0.5px solid ${S.border}`, cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 40px', borderBottom: `0.5px solid ${COLOR.border}`, cursor: 'pointer' }}
           onClick={() => onOpen(t)}
         >
           <div
@@ -471,7 +470,7 @@ function BacklogSection({ tasks, onToggle, onOpen }) {
           >
             {t.done && <svg width={8} height={8} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </div>
-          <span style={{ flex: 1, fontSize: FONT.body, color: t.done ? S.textTertiary : S.textPrimary, textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
+          <span style={{ flex: 1, fontSize: FONT.body, color: t.done ? COLOR.textTertiary : COLOR.textPrimary, textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
         </div>
       ))}
     </div>
