@@ -82,6 +82,10 @@ export default function UnifiedProjectView({ projectId }) {
   }, [undo])
   function showToast(msg) { setToast({ msg, canUndo: true }); setTimeout(() => setToast(null), 4000) }
 
+  // ─── Project tasks (must be before timelineDates/handlers that reference them) ───
+  const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
+  const backlogTasks = useMemo(() => projectTasks.filter(t => !t.keyMilestoneId), [projectTasks])
+
   // ─── Shared collapsed state ───
   const [collapsed, setCollapsed] = useState(new Set())
   const toggleNode = useCallback((id) => {
@@ -113,10 +117,6 @@ export default function UnifiedProjectView({ projectId }) {
   const colW = getColWidth(scale)
   const todayLabel = getTodayLabel(scale)
   const timelineCtx = { columns, colW, minD, scale, todayLabel }
-
-  // ─── Project tasks ───
-  const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
-  const backlogTasks = useMemo(() => projectTasks.filter(t => !t.keyMilestoneId), [projectTasks])
 
   // ─── Timeline DnD handlers ───
   const handleTimelineTaskDrop = useCallback((taskId, fromMsId, toMsId) => {
