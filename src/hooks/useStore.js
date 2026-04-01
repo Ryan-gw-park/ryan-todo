@@ -506,7 +506,9 @@ const useStore = create((set, get) => ({
     const userId = await getCurrentUserId()
     // 프로젝트 소속 확인 — 팀 프로젝트면 해당 팀으로 설정
     const project = task.projectId ? get().projects.find(p => p.id === task.projectId) : null
-    const effectiveTeamId = project?.teamId || teamId
+    // 개인 프로젝트(teamId 없음)면 반드시 scope='private', 팀 프로젝트면 해당 팀
+    const isPersonalProject = project && !project.teamId
+    const effectiveTeamId = isPersonalProject ? null : (project?.teamId || teamId)
     const teamDefaults = effectiveTeamId
       ? { teamId: effectiveTeamId, scope: task.scope || 'team', createdBy: userId }
       : { scope: 'private', createdBy: userId }
