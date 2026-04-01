@@ -271,33 +271,29 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
 
   return (
     <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}` }}>
-        <div style={{ width: 160, flexShrink: 0, padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>프로젝트</div>
+      {/* Grid container — shared columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${CATS.length}, 1fr)` }}>
+        <div style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface }}>프로젝트</div>
         {CATS.map(cat => (
-          <div key={cat.key} style={{ flex: 1, padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: cat.key === 'today' ? COLOR.danger : COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div key={cat.key} style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: cat.key === 'today' ? COLOR.danger : COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: cat.color }} />
             {cat.label}
             <span style={{ fontWeight: 400, color: COLOR.textTertiary, fontSize: FONT.tiny }}>{catCounts[cat.key]}</span>
           </div>
         ))}
-      </div>
-
-      {/* Rows */}
-      {projects.map(proj => {
-        const c = getColor(proj.color)
-        const projTasks = myTasks.filter(t => t.projectId === proj.id && !t.done)
-        const isCol = collapsed[proj.id]
-        return (
-          <div key={proj.id} style={{ display: 'flex', borderBottom: `1px solid ${COLOR.border}` }}>
-            <ProjectCell proj={proj} color={c} count={projTasks.length} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />
-            {CATS.map(cat => {
+        {projects.map(proj => {
+          const c = getColor(proj.color)
+          const projTasks = myTasks.filter(t => t.projectId === proj.id && !t.done)
+          const isCol = collapsed[proj.id]
+          return [
+            <ProjectCell key={`p-${proj.id}`} proj={proj} color={c} count={projTasks.length} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />,
+            ...CATS.map(cat => {
               const cellTasks = myTasks.filter(t => t.projectId === proj.id && t.category === cat.key && !t.done)
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
               const dropId = `mat:${proj.id}:${cat.key}`
               return (
-                <DroppableCell key={cat.key} id={dropId} activeId={activeId}>
-                  <div style={{ flex: 1, padding: '6px 8px', borderRight: `1px solid ${COLOR.border}`, minHeight: 36 }}>
+                <DroppableCell key={dropId} id={dropId} activeId={activeId}>
+                  <div style={{ padding: '6px 8px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 36 }}>
                     {isCol ? (
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
@@ -311,10 +307,10 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
                   </div>
                 </DroppableCell>
               )
-            })}
-          </div>
-        )
-      })}
+            })
+          ]
+        })}
+      </div>
 
       {projects.length === 0 && (
         <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>표시할 프로젝트가 없습니다</div>
@@ -333,32 +329,28 @@ function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, e
 
   return (
     <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}` }}>
-        <div style={{ width: 160, flexShrink: 0, padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>프로젝트</div>
+      {/* Grid container */}
+      <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
+        <div style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface }}>프로젝트</div>
         {members.map(m => (
-          <div key={m.id} style={{ flex: 1, padding: '8px 8px', borderRight: `1px solid ${COLOR.border}`, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
+          <div key={m.id} style={{ padding: '8px 8px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface, display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
             <MiniAvatar name={m.displayName || m.name} size={20} />
             <span style={{ fontSize: FONT.caption, fontWeight: 600, color: COLOR.textPrimary }}>{m.displayName || m.name}</span>
           </div>
         ))}
-      </div>
-
-      {/* Rows */}
-      {projects.map(proj => {
-        const c = getColor(proj.color)
-        const projTasks = tasks.filter(t => t.projectId === proj.id && !t.done && t.teamId === currentTeamId)
-        const isCol = collapsed[proj.id]
-        return (
-          <div key={proj.id} style={{ display: 'flex', borderBottom: `1px solid ${COLOR.border}` }}>
-            <ProjectCell proj={proj} color={c} count={projTasks.length} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />
-            {members.map(mem => {
+        {projects.map(proj => {
+          const c = getColor(proj.color)
+          const projTasks = tasks.filter(t => t.projectId === proj.id && !t.done && t.teamId === currentTeamId)
+          const isCol = collapsed[proj.id]
+          return [
+            <ProjectCell key={`p-${proj.id}`} proj={proj} color={c} count={projTasks.length} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />,
+            ...members.map(mem => {
               const cellTasks = projTasks.filter(t => t.assigneeId === mem.userId)
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
               const dropId = `tmat:${proj.id}:${mem.userId}`
               return (
-                <DroppableCell key={mem.id} id={dropId} activeId={activeId}>
-                  <div style={{ flex: 1, padding: '6px 8px', borderRight: `1px solid ${COLOR.border}`, minHeight: 36 }}>
+                <DroppableCell key={dropId} id={dropId} activeId={activeId}>
+                  <div style={{ padding: '6px 8px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 36 }}>
                     {isCol ? (
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
@@ -372,10 +364,10 @@ function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, e
                   </div>
                 </DroppableCell>
               )
-            })}
-          </div>
-        )
-      })}
+            })
+          ]
+        })}
+      </div>
 
       {projects.length === 0 && (
         <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>표시할 프로젝트가 없습니다</div>
@@ -406,36 +398,32 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
 
   return (
     <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}` }}>
-        <div style={{ width: 160, flexShrink: 0, padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>프로젝트</div>
+      {/* Grid container */}
+      <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(5, 1fr)' }}>
+        <div style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface }}>프로젝트</div>
         {weekDays.map((d, i) => {
           const ds = fmtDate(d)
           const isToday = ds === todayStr
           return (
             <div key={i} style={{
-              flex: 1, padding: '8px 8px', fontSize: FONT.caption, fontWeight: isToday ? 700 : 500,
+              padding: '8px 8px', fontSize: FONT.caption, fontWeight: isToday ? 700 : 500,
               color: isToday ? '#E53E3E' : COLOR.textTertiary, textAlign: 'center',
-              borderRight: `1px solid ${COLOR.border}`,
-              background: isToday ? 'rgba(229,62,62,0.04)' : 'transparent',
+              borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`,
+              background: isToday ? 'rgba(229,62,62,0.04)' : COLOR.bgSurface,
             }}>
               {DAY_LABELS[i]} {d.getMonth() + 1}/{d.getDate()}
               {isToday && <span style={{ fontSize: FONT.ganttMs, marginLeft: 3 }}>오늘</span>}
             </div>
           )
         })}
-      </div>
-
-      {/* Rows */}
-      {projectsWithTasks.map(proj => {
-        const c = getColor(proj.color)
-        return (
-          <div key={proj.id} style={{ display: 'flex', borderBottom: `1px solid ${COLOR.border}`, minHeight: 40 }}>
-            <div style={{ width: 160, flexShrink: 0, padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 5, borderRight: `1px solid ${COLOR.border}` }}>
+        {projectsWithTasks.map(proj => {
+          const c = getColor(proj.color)
+          return [
+            <div key={`p-${proj.id}`} style={{ padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 5, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}` }}>
               <div style={{ width: 7, height: 7, borderRadius: 2, background: c.dot, flexShrink: 0, marginTop: 3 }} />
               <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, whiteSpace: 'normal', wordBreak: 'break-word' }}>{proj.name}</span>
-            </div>
-            {weekDays.map((d, di) => {
+            </div>,
+            ...weekDays.map((d, di) => {
               const ds = fmtDate(d)
               const isToday = ds === todayStr
               const dayTasks = weekTasks.filter(t => {
@@ -446,9 +434,9 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
               })
               const dropId = `pw:${proj.id}:${ds}`
               return (
-                <DroppableCell key={di} id={dropId} activeId={activeId}>
+                <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                   <div style={{
-                    flex: 1, padding: '5px 6px', borderRight: `1px solid ${COLOR.border}`, minHeight: 40,
+                    padding: '5px 6px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 40,
                     background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                   }}>
                     {dayTasks.map(t => (
@@ -458,10 +446,10 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
                   </div>
                 </DroppableCell>
               )
-            })}
-          </div>
-        )
-      })}
+            })
+          ]
+        })}
+      </div>
 
       {projectsWithTasks.length === 0 && (
         <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>이번 주 예정된 할일이 없습니다</div>
@@ -484,34 +472,30 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
 
   return (
     <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}` }}>
-        <div style={{ width: 160, flexShrink: 0, padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>팀원</div>
+      {/* Grid container */}
+      <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(5, 1fr)' }}>
+        <div style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface }}>팀원</div>
         {weekDays.map((d, i) => {
           const ds = fmtDate(d)
           const isToday = ds === todayStr
           return (
             <div key={i} style={{
-              flex: 1, padding: '8px 8px', fontSize: FONT.caption, fontWeight: isToday ? 700 : 500,
+              padding: '8px 8px', fontSize: FONT.caption, fontWeight: isToday ? 700 : 500,
               color: isToday ? '#E53E3E' : COLOR.textTertiary, textAlign: 'center',
-              borderRight: `1px solid ${COLOR.border}`,
-              background: isToday ? 'rgba(229,62,62,0.04)' : 'transparent',
+              borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`,
+              background: isToday ? 'rgba(229,62,62,0.04)' : COLOR.bgSurface,
             }}>
               {DAY_LABELS[i]} {d.getMonth() + 1}/{d.getDate()}
               {isToday && <span style={{ fontSize: FONT.ganttMs, marginLeft: 3 }}>오늘</span>}
             </div>
           )
         })}
-      </div>
-
-      {/* Rows = Members */}
-      {members.map(mem => (
-        <div key={mem.id} style={{ display: 'flex', borderBottom: `1px solid ${COLOR.border}`, minHeight: 48 }}>
-          <div style={{ width: 160, flexShrink: 0, padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 8, borderRight: `1px solid ${COLOR.border}` }}>
+        {members.map(mem => [
+          <div key={`m-${mem.id}`} style={{ padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 8, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}` }}>
             <MiniAvatar name={mem.displayName || mem.name} size={24} />
             <span style={{ fontSize: FONT.body, fontWeight: 600, color: COLOR.textPrimary }}>{mem.displayName || mem.name}</span>
-          </div>
-          {weekDays.map((d, di) => {
+          </div>,
+          ...weekDays.map((d, di) => {
             const ds = fmtDate(d)
             const isToday = ds === todayStr
             const dayTasks = tasks.filter(t => {
@@ -522,9 +506,9 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
             }).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
             const dropId = `tw:${mem.userId}:${ds}`
             return (
-              <DroppableCell key={di} id={dropId} activeId={activeId}>
+              <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                 <div style={{
-                  flex: 1, padding: '5px 6px', borderRight: `1px solid ${COLOR.border}`, minHeight: 48,
+                  padding: '5px 6px', borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, minHeight: 48,
                   background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                 }}>
                   {dayTasks.map(t => {
@@ -535,9 +519,9 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
                 </div>
               </DroppableCell>
             )
-          })}
-        </div>
-      ))}
+          })
+        ])}
+      </div>
     </div>
   )
 }
@@ -550,10 +534,10 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
 function ProjectCell({ proj, color, count, isCollapsed, onToggle }) {
   return (
     <div onClick={onToggle} style={{
-      width: 160, flexShrink: 0, padding: '8px 10px',
+      padding: '8px 10px',
       display: 'flex', alignItems: isCollapsed ? 'center' : 'flex-start', gap: 5,
-      borderRight: `1px solid ${COLOR.border}`, cursor: 'pointer',
-      background: `${color.dot}04`,
+      borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`,
+      cursor: 'pointer', background: `${color.dot}04`,
     }}>
       <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, width: 12, textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)', flexShrink: 0 }}>▾</span>
       <div style={{ width: 7, height: 7, borderRadius: 2, background: color.dot, flexShrink: 0, marginTop: isCollapsed ? 0 : 2 }} />
