@@ -3,6 +3,11 @@ import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 
+const toolBtnStyle = {
+  border: 'none', borderRadius: 5, padding: '3px 10px',
+  fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
+  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
+}
 
 /* ═══════════════════════════════════════════════════════
    MsTaskTreeMode v5 — 프로젝트 '전체 할일' 들여쓰기 트리
@@ -647,11 +652,4 @@ function Toast({ msg, canUndo, onUndo, onClose }) {
       <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}>✕</button>
     </div>
   )
-}
-
-/* ═══ Toolbar button style ═══ */
-const toolBtnStyle = {
-  border: 'none', borderRadius: 5, padding: '3px 10px',
-  fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
-  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
 }

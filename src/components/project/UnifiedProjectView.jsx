@@ -16,6 +16,11 @@ import {
    ═══════════════════════════════════════════════════════ */
 
 const TREE_W = 340
+const toolBtnStyle = {
+  border: 'none', borderRadius: 5, padding: '3px 10px',
+  fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer',
+  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
+}
 
 // ─── Pill (local) ───
 function Pill({ items, active, onChange }) {
@@ -297,11 +302,4 @@ export default function UnifiedProjectView({ projectId }) {
       {toast && <Toast msg={toast.msg} canUndo={toast.canUndo} onUndo={undo} onClose={() => setToast(null)} />}
     </div>
   )
-}
-
-/* ═══ Toolbar button style ═══ */
-const toolBtnStyle = {
-  border: 'none', borderRadius: 5, padding: '3px 10px',
-  fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer',
-  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
 }
