@@ -510,7 +510,7 @@ const useStore = create((set, get) => ({
     const isPersonalProject = project && !project.teamId
     const effectiveTeamId = isPersonalProject ? null : (project?.teamId || teamId)
     const teamDefaults = effectiveTeamId
-      ? { teamId: effectiveTeamId, scope: task.scope || 'team', createdBy: userId }
+      ? { teamId: effectiveTeamId, scope: task.scope || 'assigned', assigneeId: task.assigneeId || userId, createdBy: userId }
       : { scope: 'private', createdBy: userId }
     const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', alarm: null, ...teamDefaults, ...task }
     // 개인 프로젝트 강제 보정 — ...task spread 후에도 scope/teamId 보장
@@ -836,9 +836,19 @@ const useStore = create((set, get) => ({
       get().milestones.filter(m => m.parent_id === targetId).forEach(m => walk(m.id))
     }
     walk(id)
-    set(s => ({ milestones: s.milestones.filter(m => !toDelete.has(m.id)) }))
+    set(s => ({
+      milestones: s.milestones.filter(m => !toDelete.has(m.id)),
+      tasks: s.tasks.map(t => toDelete.has(t.keyMilestoneId) ? { ...t, keyMilestoneId: null } : t),
+    }))
     const { error } = await d.from('key_milestones').delete().eq('id', id)
     if (error) console.error('[useStore] deleteMilestone:', error)
+    // DB에서도 연결된 할일의 key_milestone_id 초기화 (CASCADE 대상 아님)
+    const d2 = db()
+    if (d2) {
+      for (const msId of toDelete) {
+        await d2.from('tasks').update({ key_milestone_id: null, updated_at: new Date().toISOString() }).eq('key_milestone_id', msId)
+      }
+    }
   },
 
   reorderMilestones: async (reordered) => {

@@ -7,7 +7,7 @@ import {
 import {
   SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable'
-import useStore from '../../hooks/useStore'
+import useStore, { getCachedUserId } from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
 import { CheckIcon } from '../shared/Icons'
 import { parseDateFromText } from '../../utils/dateParser'
@@ -30,6 +30,7 @@ export default function TodayView() {
   const { projects, tasks, moveTaskTo, reorderTasks, collapseState, toggleCollapse, setCollapseGroup } = useStore()
   const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const isMobile = window.innerWidth < 768
+  const userId = getCachedUserId()
 
   const [activeId, setActiveId] = useState(null)
   const [showMs, setShowMs] = useState(false)
@@ -188,7 +189,7 @@ export default function TodayView() {
             {filteredProjects.map(p => {
               const c = getColor(p.color)
               const todayTasks = tasks
-                .filter(t => t.projectId === p.id && t.category === 'today' && !t.done)
+                .filter(t => t.projectId === p.id && t.category === 'today' && !t.done && (!t.teamId || t.assigneeId === userId || t.createdBy === userId))
                 .sort((a, b) => a.sortOrder - b.sortOrder)
               return (
                 <ProjectCard key={p.id} project={p} color={c} todayTasks={todayTasks} activeId={activeId} isCollapsed={collapsed[p.id]} onToggleCollapse={() => toggleProject(p.id)} showMs={showMs} msMap={msMap} />
