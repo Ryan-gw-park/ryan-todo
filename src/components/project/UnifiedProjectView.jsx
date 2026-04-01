@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
+import { COLOR, FONT } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
@@ -7,8 +7,7 @@ import { buildTree } from '../../utils/milestoneTree'
 import MsTaskTreeMode from './MsTaskTreeMode'
 import {
   getTimelineRange, getColumns, getColWidth, getTodayLabel,
-  ColumnHeader, ScalePill, Toast, TimelineMsRow, DraggableBar, ColumnGrid,
-  parseDate, addDays, fmtISO, getDayWidth, daysBetween,
+  ScalePill, Toast, TimelineMsRow,
 } from '../timeline/TimelineShared'
 
 /* ═══════════════════════════════════════════════════════
@@ -277,6 +276,7 @@ export default function UnifiedProjectView({ projectId }) {
               {tree.map(node => (
                 <TimelineMsRow
                   key={node.id} node={node} depth={0} dotColor={dotColor}
+                  treeW={TREE_W}
                   collapsed={collapsed} toggleNode={toggleNode}
                   timelineCtx={timelineCtx}
                   projectTasks={projectTasks}
