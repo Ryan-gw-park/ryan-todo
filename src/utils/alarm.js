@@ -45,8 +45,15 @@ export function shouldFireAlarm(alarm) {
   if (!alarm?.enabled || alarm.notified) return false
   const next = getNextAlarmTime(alarm)
   if (!next) return false
-  const diff = Math.abs(next - new Date())
-  return diff <= 60_000
+  const now = new Date()
+  // 미래 시간이면 아직 아님
+  if (next > now) {
+    const diff = next - now
+    return diff <= 60_000
+  }
+  // 과거 시간 — 최근 60초 이내에 지난 것만 발동 (오래된 것은 무시)
+  const elapsed = now - next
+  return elapsed <= 60_000
 }
 
 /**

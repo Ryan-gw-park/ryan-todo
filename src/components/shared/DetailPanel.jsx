@@ -12,8 +12,18 @@ import MilestoneSelector from './MilestoneSelector'
 import useTeamMembers from '../../hooks/useTeamMembers'
 
 function getDefaultAlarmDatetime(dueDate) {
-  const d = dueDate ? new Date(dueDate + 'T09:00') : new Date()
-  if (!dueDate) {
+  const now = new Date()
+  let d
+  if (dueDate) {
+    d = new Date(dueDate + 'T09:00')
+    // dueDate가 과거이면 내일 09:00으로 보정
+    if (d <= now) {
+      d = new Date(now)
+      d.setDate(d.getDate() + 1)
+      d.setHours(9, 0, 0, 0)
+    }
+  } else {
+    d = new Date(now)
     d.setDate(d.getDate() + 1)
     d.setHours(9, 0, 0, 0)
   }
@@ -333,8 +343,10 @@ function AlarmSection({ task, updateTask }) {
   }
 
   const handleDatetimeChange = (e) => {
+    const newDatetime = e.target.value
+    if (!newDatetime) return
     updateTask(task.id, {
-      alarm: { ...alarm, datetime: e.target.value, notified: false }
+      alarm: { ...alarm, datetime: newDatetime, notified: false }
     })
   }
 
