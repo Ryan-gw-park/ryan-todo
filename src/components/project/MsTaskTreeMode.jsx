@@ -3,11 +3,6 @@ import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 
-const toolBtnStyle = {
-  border: 'none', borderRadius: 5, padding: '3px 10px',
-  fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer',
-  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
-}
 
 /* ═══════════════════════════════════════════════════════
    MsTaskTreeMode v5 — 프로젝트 '전체 할일' 들여쓰기 트리
@@ -220,8 +215,8 @@ export default function MsTaskTreeMode({
         {/* Toolbar */}
         {!externalCollapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 4, background: '#fff' }}>
-            <button onClick={expandAll} style={toolBtnStyle}>모두 펼치기</button>
-            <button onClick={collapseAll} style={toolBtnStyle}>모두 접기</button>
+            <button onClick={expandAll} style={{ border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer', background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500 }}>모두 펼치기</button>
+            <button onClick={collapseAll} style={{ border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.caption, fontFamily: 'inherit', cursor: 'pointer', background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500 }}>모두 접기</button>
           </div>
         )}
 

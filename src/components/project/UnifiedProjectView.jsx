@@ -16,11 +16,6 @@ import {
    ═══════════════════════════════════════════════════════ */
 
 const TREE_W = 340
-const toolBtnStyle = {
-  border: 'none', borderRadius: 5, padding: '3px 10px',
-  fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer',
-  background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500,
-}
 
 // ─── Pill (local) ───
 function Pill({ items, active, onChange }) {
@@ -217,8 +212,8 @@ export default function UnifiedProjectView({ projectId }) {
           />
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={expandAll} style={toolBtnStyle}>모두 펼치기</button>
-          <button onClick={collapseAll} style={toolBtnStyle}>모두 접기</button>
+          <button onClick={expandAll} style={{ border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer', background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500 }}>모두 펼치기</button>
+          <button onClick={collapseAll} style={{ border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer', background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500 }}>모두 접기</button>
           {rightMode === '타임라인' && (
             <>
               <div style={{ width: 1, height: 16, background: COLOR.border, margin: '0 4px' }} />
