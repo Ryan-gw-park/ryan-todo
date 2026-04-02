@@ -5,6 +5,9 @@ export default function useProjectFilter(projects, tasks) {
   // Loop-39: projectFilter UI removed — scope is now determined by sidebar navigation.
   // Always use 'all' to prevent stale localStorage values from filtering out projects.
   const filter = 'all'
+
+  // 아카이브된 프로젝트는 모든 뷰에서 제외
+  projects = projects.filter(p => !p.archivedAt)
   const localProjectOrder = useStore(s => s.localProjectOrder)
 
   // 로컬 순서 적용 정렬 함수

@@ -4,7 +4,7 @@ import { getDb } from '../utils/supabase'
 // ─── Select 컬럼 최적화 ───
 // tasks: alarm, deleted_at 컬럼은 DB에 없을 수 있으므로 select('*') 유지 (기존 fallback 로직 활용)
 const TASK_COLUMNS = '*'
-const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id, description, start_date, due_date, status, created_by'
+const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id, description, start_date, due_date, status, created_by, archived_at'
 const MEMO_COLUMNS = 'id, title, notes, color, sort_order, created_at, updated_at'
 
 // ─── 스냅샷 키 ───
@@ -162,6 +162,7 @@ function mapProject(r) {
     teamId: r.team_id || null,
     userId: r.user_id || null,
     ownerId: r.owner_id || null,
+    archivedAt: r.archived_at || null,
   }
 }
 function mapTask(r) {
@@ -674,6 +675,7 @@ const useStore = create((set, get) => ({
       description: p.description ?? '', start_date: p.start_date || null,
       due_date: p.due_date || null, status: p.status || 'active',
       created_by: p.created_by || null,
+      archived_at: p.archivedAt || null,
     })
     if (error) console.error('[Ryan Todo] updateProject:', error)
   },
@@ -725,6 +727,62 @@ const useStore = create((set, get) => ({
       if (error) console.error('[Ryan Todo] deleteProject:', error)
     }
     get().showToast('프로젝트가 삭제됐습니다')
+  },
+
+  // ─── Archive / Unarchive ───
+  archiveProject: async (id) => {
+    const project = get().projects.find(p => p.id === id)
+    if (!project) return
+
+    // 권한 체크: 팀 프로젝트 → 팀 소속 전원, 개인 프로젝트 → 본인만
+    if (project.teamId) {
+      const teamId = get().currentTeamId
+      if (project.teamId !== teamId) {
+        get().showToast('이 팀 프로젝트에 대한 권한이 없습니다')
+        return
+      }
+    } else {
+      const userId = _cachedUserId || (await getCurrentUserId())
+      if (project.userId && project.userId !== userId) {
+        get().showToast('다른 사용자의 개인 프로젝트는 아카이브할 수 없습니다')
+        return
+      }
+    }
+
+    const now = new Date().toISOString()
+    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, archivedAt: now } : p) }))
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('projects').update({ archived_at: now }).eq('id', id)
+    if (error) console.error('[Ryan Todo] archiveProject:', error)
+    get().showToast('프로젝트가 아카이브됐습니다')
+  },
+
+  unarchiveProject: async (id) => {
+    const project = get().projects.find(p => p.id === id)
+    if (!project) return
+
+    // 권한 체크: 팀 프로젝트 → 팀 소속 전원, 개인 프로젝트 → 본인만
+    if (project.teamId) {
+      const teamId = get().currentTeamId
+      if (project.teamId !== teamId) {
+        get().showToast('이 팀 프로젝트에 대한 권한이 없습니다')
+        return
+      }
+    } else {
+      const userId = _cachedUserId || (await getCurrentUserId())
+      if (project.userId && project.userId !== userId) {
+        get().showToast('다른 사용자의 개인 프로젝트는 복원할 수 없습니다')
+        return
+      }
+    }
+
+    set(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, archivedAt: null } : p) }))
+    const d = db()
+    if (!d) return
+    const { error } = await d.from('projects').update({ archived_at: null }).eq('id', id)
+    if (error) console.error('[Ryan Todo] unarchiveProject:', error)
+    get().showToast('프로젝트가 복원됐습니다')
   },
 
   reorderProjects: async (newList) => {

@@ -50,6 +50,7 @@ export default function Sidebar() {
     userName, addProject,
     sidebarCollapsed, toggleSidebar,
     selectedProjectId, enterProjectLayer,
+    archiveProject, unarchiveProject,
   } = useStore()
 
   const [showTeamSwitcher, setShowTeamSwitcher] = useState(false)
@@ -74,10 +75,12 @@ export default function Sidebar() {
 
   const [sidebarHovered, setSidebarHovered] = useState(false)
 
-  // 프로젝트 분리: 팀 / 개인
+  // 프로젝트 분리: 팀 / 개인 (활성 + 아카이브)
   const sortProjectsLocally = useStore(s => s.sortProjectsLocally)
-  const teamProjects = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId && currentTeamId))
-  const personalProjects = sortProjectsLocally(projects.filter(p => !p.teamId))
+  const teamProjects = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId && currentTeamId && !p.archivedAt))
+  const personalProjects = sortProjectsLocally(projects.filter(p => !p.teamId && !p.archivedAt))
+  const archivedTeamProjects = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId && currentTeamId && p.archivedAt))
+  const archivedPersonalProjects = sortProjectsLocally(projects.filter(p => !p.teamId && p.archivedAt))
 
   // 알림 뱃지
   const refreshTrigger = useStore(s => s.notificationRefreshTrigger)
@@ -242,7 +245,17 @@ export default function Sidebar() {
           <>
             {!collapsed && <SubSectionHeader label="팀 프로젝트" collapsed={sectionCollapsed.projTeam} onClick={() => toggleSection('projTeam')} onAdd={() => { setAddProjectScope('team'); setShowAddProject(true) }} />}
             {!sectionCollapsed.projTeam && teamProjects.map(p => (
-              <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} />
+              <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
+            ))}
+          </>
+        )}
+
+        {/* 팀 아카이브 */}
+        {currentTeamId && archivedTeamProjects.length > 0 && !collapsed && (
+          <>
+            <SubSectionHeader label="팀 아카이브" collapsed={sectionCollapsed.archiveTeam !== false} onClick={() => toggleSection('archiveTeam')} />
+            {sectionCollapsed.archiveTeam === false && archivedTeamProjects.map(p => (
+              <ArchiveProjectItem key={p.id} project={p} onRestore={() => unarchiveProject(p.id)} collapsed={collapsed} />
             ))}
           </>
         )}
@@ -250,8 +263,18 @@ export default function Sidebar() {
         {/* 개인 프로젝트 */}
         {!collapsed && <SubSectionHeader label="개인 프로젝트" collapsed={sectionCollapsed.projPersonal} onClick={() => toggleSection('projPersonal')} onAdd={() => { setAddProjectScope('personal'); setShowAddProject(true) }} />}
         {!sectionCollapsed.projPersonal && personalProjects.map(p => (
-          <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} />
+          <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
         ))}
+
+        {/* 개인 아카이브 */}
+        {archivedPersonalProjects.length > 0 && !collapsed && (
+          <>
+            <SubSectionHeader label="개인 아카이브" collapsed={sectionCollapsed.archivePersonal !== false} onClick={() => toggleSection('archivePersonal')} />
+            {sectionCollapsed.archivePersonal === false && archivedPersonalProjects.map(p => (
+              <ArchiveProjectItem key={p.id} project={p} onRestore={() => unarchiveProject(p.id)} collapsed={collapsed} />
+            ))}
+          </>
+        )}
       </div>
 
       {/* ── Footer — same padding/margin rhythm as nav items ── */}
@@ -400,7 +423,7 @@ function NavItem({ icon, label, isActive, onClick, collapsed, indent = 0 }) {
   )
 }
 
-function ProjectItem({ project, isActive, onClick, collapsed, indent = 0 }) {
+function ProjectItem({ project, isActive, onClick, collapsed, indent = 0, archiveFn }) {
   const [hovered, setHovered] = useState(false)
   const openModal = useStore(s => s.openModal)
   const color = getColor(project.color)
@@ -439,14 +462,25 @@ function ProjectItem({ project, isActive, onClick, collapsed, indent = 0 }) {
             {project.name}
           </span>
           {hovered && (
-            <span
-              onClick={e => { e.stopPropagation(); openModal({ type: 'projectSettings', projectId: project.id }) }}
-              style={{ fontSize: 15, color: '#b4b2a9', padding: '0 4px', cursor: 'pointer', flexShrink: 0 }}
-              onMouseEnter={e => e.currentTarget.style.color = '#666'}
-              onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
-            >
-              ⚙
-            </span>
+            <>
+              <span
+                title="아카이브"
+                onClick={e => { e.stopPropagation(); archiveFn && archiveFn(project.id) }}
+                style={{ fontSize: 13, color: '#b4b2a9', padding: '0 2px', cursor: 'pointer', flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#666'}
+                onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+              >
+                📦
+              </span>
+              <span
+                onClick={e => { e.stopPropagation(); openModal({ type: 'projectSettings', projectId: project.id }) }}
+                style={{ fontSize: 15, color: '#b4b2a9', padding: '0 4px', cursor: 'pointer', flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#666'}
+                onMouseLeave={e => e.currentTarget.style.color = '#b4b2a9'}
+              >
+                ⚙
+              </span>
+            </>
           )}
         </>
       )}
@@ -551,5 +585,49 @@ function AddProjectModal({ scope, currentTeamId, addProject, onClose }) {
         </div>
       </div>
     </>
+  )
+}
+
+function ArchiveProjectItem({ project, onRestore, collapsed }) {
+  const [hovered, setHovered] = useState(false)
+  const color = getColor(project.color)
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: S.gap,
+        padding: `${S.itemPy}px ${S.itemPx}px ${S.itemPy}px ${S.itemPx + 12}px`,
+        margin: `1px ${S.itemMx}px`,
+        borderRadius: S.radius,
+        fontSize: S.fontNav,
+        color: '#a09f99',
+        background: hovered ? '#f5f4f0' : 'transparent',
+        transition: 'background .12s',
+      }}
+    >
+      <div style={{
+        width: S.iconW, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: color.dot, opacity: 0.45,
+        }} />
+      </div>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontStyle: 'italic' }}>
+        {project.name}
+      </span>
+      {hovered && (
+        <span
+          title="복원"
+          onClick={e => { e.stopPropagation(); onRestore() }}
+          style={{ fontSize: 12, color: '#1D9E75', padding: '0 4px', cursor: 'pointer', flexShrink: 0, fontWeight: 500 }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+        >
+          복원
+        </span>
+      )}
+    </div>
   )
 }
