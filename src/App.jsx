@@ -15,6 +15,7 @@ import UpdateToast from './components/shared/UpdateToast'
 import { ViewSkeleton, LoadingSpinner } from './components/shared/Skeleton'
 import { SyncProviderWrapper } from './sync/SyncContext'
 import Sidebar from './components/layout/Sidebar'
+import useViewUrlSync from './hooks/useViewUrlSync'
 
 // React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
 const TodayView = lazy(() => import('./components/views/TodayView'))
@@ -45,10 +46,8 @@ function AppShell({ mobile }) {
   const { currentView, setView, closeDetail, detailTask, showProjectMgr } = useStore()
   const showNotificationPanel = useStore(s => s.showNotificationPanel)
 
-  // 뷰 초기화 — 'today'는 데이터 로딩 전에도 안전하게 렌더 가능
-  useEffect(() => {
-    setView('today')
-  }, [])
+  // URL ↔ Store 양방향 동기화 (뷰 초기화도 URL 기반으로 처리)
+  useViewUrlSync()
 
   // Idle 프리로드 — 첫 화면 후 유휴 시간에 다른 뷰 미리 로드
   useEffect(() => {
