@@ -9,7 +9,7 @@ import { buildTree } from '../../utils/milestoneTree'
 import {
   getTimelineRange, getColumns, getColWidth, getTodayLabel,
   ColumnHeader, ScalePill, Toast, TimelineMsRow, DraggableBar, ColumnGrid,
-  parseDate, daysBetween, addDays, fmtISO, getDayWidth, getBarStyle,
+  parseDate, addDays, fmtISO, getBarStyle,
 } from '../timeline/TimelineShared'
 
 /* ═══════════════════════════════════════════════════════
@@ -177,13 +177,11 @@ export default function InlineTimelineView({ scope, projectId }) {
     showToast('기간 변경 완료')
   }, [tasks, milestones, updateTask, updateMilestone, pushUndo])
 
-  // ─── Auto-scroll to today ───
+  // ─── Auto-scroll to today (왼쪽 트리 영역 보존) ───
   useEffect(() => {
     if (!gridRef.current) return
-    const dayW = getDayWidth(colW, scale)
-    const todayOffset = daysBetween(minD, new Date()) * dayW
     setTimeout(() => {
-      if (gridRef.current) gridRef.current.scrollLeft = Math.max(0, todayOffset - 200)
+      if (gridRef.current) gridRef.current.scrollLeft = 0
     }, 100)
   }, [scale])
 

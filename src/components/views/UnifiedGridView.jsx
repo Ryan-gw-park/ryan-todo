@@ -332,9 +332,7 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        {cellTasks.map(t => (
-                          <TaskCard key={t.id} task={t} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
-                        ))}
+                        <MsGroupedTasks tasks={cellTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                         <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
                       </>
                     )}
@@ -389,9 +387,7 @@ function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, e
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        {cellTasks.map(t => (
-                          <TaskCard key={t.id} task={t} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
-                        ))}
+                        <MsGroupedTasks tasks={cellTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                         <InlineAdd projectId={proj.id} category="today" color={c} extraFields={{ scope: 'assigned', assigneeId: mem.userId }} compact />
                       </>
                     )}
@@ -473,9 +469,7 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
                     padding: '5px 6px', minHeight: 40,
                     background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                   }}>
-                    {dayTasks.map(t => (
-                      <TaskCard key={t.id} task={t} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showMs />
-                    ))}
+                    <MsGroupedTasks tasks={dayTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                     {dayTasks.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
                   </div>
                 </DroppableCell>
@@ -545,10 +539,7 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
                   padding: '5px 6px', minHeight: 48,
                   background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                 }}>
-                  {dayTasks.map(t => {
-                    const proj = projectMap[t.projectId]
-                    return <TaskCard key={t.id} task={t} project={proj} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject showMs />
-                  })}
+                  <MsGroupedTasks tasks={dayTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject projectMap={projectMap} />
                   {dayTasks.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
                 </div>
               </DroppableCell>
@@ -578,6 +569,70 @@ function ProjectCell({ proj, color, count, isCollapsed, onToggle }) {
       <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary, flex: 1, whiteSpace: 'normal', wordBreak: 'break-word' }}>{proj.name}</span>
       <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{count}건</span>
     </div>
+  )
+}
+
+/* ─── MS Grouped Tasks — 셀 안에서 할일을 MS별로 그룹핑 ─── */
+function MsGroupedTasks({ tasks: cellTasks, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, project, projectMap }) {
+  const getProj = (t) => project || (projectMap && projectMap[t.projectId]) || null
+  const milestones = useStore(s => s.milestones)
+
+  const groups = useMemo(() => {
+    const msMap = {}
+    const noMs = []
+    cellTasks.forEach(t => {
+      if (t.keyMilestoneId) {
+        if (!msMap[t.keyMilestoneId]) msMap[t.keyMilestoneId] = []
+        msMap[t.keyMilestoneId].push(t)
+      } else {
+        noMs.push(t)
+      }
+    })
+    const result = []
+    Object.entries(msMap).forEach(([msId, msTasks]) => {
+      const ms = milestones.find(m => m.id === msId)
+      result.push({ msId, msTitle: ms?.title || '(제목 없음)', tasks: msTasks })
+    })
+    result.sort((a, b) => (a.tasks[0]?.sortOrder || 0) - (b.tasks[0]?.sortOrder || 0))
+    return { msGroups: result, ungrouped: noMs }
+  }, [cellTasks, milestones])
+
+  if (groups.msGroups.length === 0) {
+    return cellTasks.map(t => (
+      <TaskCard key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
+    ))
+  }
+
+  return (
+    <>
+      {groups.msGroups.map(g => (
+        <div key={g.msId} style={{ marginBottom: 4 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '2px 2px 1px', marginBottom: 1,
+          }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: COLOR.textTertiary, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: COLOR.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {g.msTitle}
+            </span>
+            <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{g.tasks.length}</span>
+          </div>
+          {g.tasks.map(t => (
+            <TaskCard key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
+          ))}
+        </div>
+      ))}
+      {groups.ungrouped.length > 0 && (
+        <div style={{ marginTop: groups.msGroups.length > 0 ? 2 : 0 }}>
+          {groups.msGroups.length > 0 && (
+            <div style={{ height: '0.5px', background: COLOR.border, margin: '3px 0' }} />
+          )}
+          {groups.ungrouped.map(t => (
+            <TaskCard key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 
