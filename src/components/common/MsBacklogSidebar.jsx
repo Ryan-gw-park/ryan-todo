@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useDraggable } from '@dnd-kit/core'
 import { COLOR, FONT } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { getColor } from '../../utils/colors'
@@ -204,34 +205,9 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
                     <span style={{ fontSize: 11, fontWeight: 600, color: c.dot }}>{p.name}</span>
                     <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{msList.length}개</span>
                   </div>
-                  {msList.map(ms => {
-                    const parentPath = getParentPath(ms)
-                    const tc = getTaskCount(ms.id)
-                    return (
-                      <div key={ms.id} draggable style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        padding: '4px 8px', marginBottom: 3, borderRadius: 5,
-                        background: `${c.dot}08`, border: `0.5px solid ${c.dot}18`,
-                        cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.background = `${c.dot}15`; e.currentTarget.style.borderColor = `${c.dot}40` }}
-                        onMouseLeave={e => { e.currentTarget.style.background = `${c.dot}08`; e.currentTarget.style.borderColor = `${c.dot}18` }}
-                      >
-                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {ms.title || '(제목 없음)'}
-                          </div>
-                          {parentPath && (
-                            <div style={{ fontSize: 8.5, color: COLOR.textTertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {parentPath}
-                            </div>
-                          )}
-                        </div>
-                        {tc > 0 && <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{tc}</span>}
-                      </div>
-                    )
-                  })}
+                  {msList.map(ms => (
+                    <BacklogMsItem key={ms.id} ms={ms} dotColor={c.dot} getParentPath={getParentPath} getTaskCount={getTaskCount} />
+                  ))}
                 </div>
               )
             })}
@@ -255,29 +231,7 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
                     <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{taskList.length}건</span>
                   </div>
                   {taskList.map(task => (
-                    <div key={task.id} draggable style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 5,
-                      padding: '4px 8px', marginBottom: 3, borderRadius: 5,
-                      background: `${c.dot}06`, border: `0.5px solid ${c.dot}15`,
-                      cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.background = `${c.dot}12`; e.currentTarget.style.borderColor = `${c.dot}35` }}
-                      onMouseLeave={e => { e.currentTarget.style.background = `${c.dot}06`; e.currentTarget.style.borderColor = `${c.dot}15` }}
-                    >
-                      <div style={{
-                        width: 12, height: 12, borderRadius: 2, flexShrink: 0, marginTop: 1,
-                        border: `1.5px solid ${COLOR.textTertiary}`, background: '#fff',
-                      }} />
-                      <span style={{
-                        flex: 1, fontWeight: 400, color: COLOR.textPrimary, lineHeight: 1.4,
-                        whiteSpace: 'normal', wordBreak: 'break-word',
-                      }}>
-                        {task.text}
-                      </span>
-                      {task.dueDate && (
-                        <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate.slice(5)}</span>
-                      )}
-                    </div>
+                    <BacklogTaskItem key={task.id} task={task} dotColor={c.dot} />
                   ))}
                 </div>
               )
@@ -295,6 +249,77 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
       <div style={{ padding: '8px 12px', borderTop: `1px solid ${COLOR.border}`, textAlign: 'center' }}>
         <span style={{ fontSize: 10, color: COLOR.textTertiary }}>← 셀로 드래그하여 {contentType === 'ms' ? 'MS' : '할일'} 배정</span>
       </div>
+    </div>
+  )
+}
+
+/* ─── Draggable backlog items (dnd-kit) ─── */
+
+function BacklogMsItem({ ms, dotColor, getParentPath, getTaskCount }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `bl-ms:${ms.id}` })
+  const parentPath = getParentPath(ms)
+  const tc = getTaskCount(ms.id)
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      ref={setNodeRef} {...attributes} {...listeners}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '4px 8px', marginBottom: 3, borderRadius: 5,
+        background: hover ? `${dotColor}15` : `${dotColor}08`,
+        border: `0.5px solid ${hover ? `${dotColor}40` : `${dotColor}18`}`,
+        cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
+        opacity: isDragging ? 0.3 : 1,
+      }}
+    >
+      <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 500, color: COLOR.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {ms.title || '(제목 없음)'}
+        </div>
+        {parentPath && (
+          <div style={{ fontSize: 8.5, color: COLOR.textTertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {parentPath}
+          </div>
+        )}
+      </div>
+      {tc > 0 && <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{tc}</span>}
+    </div>
+  )
+}
+
+function BacklogTaskItem({ task, dotColor }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `bl-task:${task.id}` })
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      ref={setNodeRef} {...attributes} {...listeners}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 5,
+        padding: '4px 8px', marginBottom: 3, borderRadius: 5,
+        background: hover ? `${dotColor}12` : `${dotColor}06`,
+        border: `0.5px solid ${hover ? `${dotColor}35` : `${dotColor}15`}`,
+        cursor: 'grab', fontSize: 11, transition: 'all 0.1s',
+        opacity: isDragging ? 0.3 : 1,
+      }}
+    >
+      <div style={{
+        width: 12, height: 12, borderRadius: 2, flexShrink: 0, marginTop: 1,
+        border: `1.5px solid ${COLOR.textTertiary}`, background: '#fff',
+      }} />
+      <span style={{
+        flex: 1, fontWeight: 400, color: COLOR.textPrimary, lineHeight: 1.4,
+        whiteSpace: 'normal', wordBreak: 'break-word',
+      }}>
+        {task.text}
+      </span>
+      {task.dueDate && (
+        <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate.slice(5)}</span>
+      )}
     </div>
   )
 }

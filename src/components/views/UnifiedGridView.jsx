@@ -53,7 +53,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const [scope, setScope] = useState(initialScope) // 'team' | 'personal'
 
   // ─── Store ───
-  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally } = useStore()
+  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone } = useStore()
   const currentTeamId = useStore(s => s.currentTeamId)
   const milestones = useStore(s => s.milestones)
   const userId = getCachedUserId()
@@ -113,7 +113,17 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
   const [activeId, setActiveId] = useState(null)
-  const activeTask = activeId ? tasks.find(t => t.id === activeId) : null
+  const activeItem = useMemo(() => {
+    if (!activeId) return null
+    const id = String(activeId)
+    if (id.startsWith('bl-ms:')) {
+      const ms = milestones.find(m => m.id === id.slice(6))
+      return ms ? { type: 'ms', data: ms } : null
+    }
+    const taskId = id.startsWith('bl-task:') ? id.slice(8) : id
+    const task = tasks.find(t => t.id === taskId)
+    return task ? { type: 'task', data: task } : null
+  }, [activeId, tasks, milestones])
 
   const handleDragStart = (e) => setActiveId(e.active.id)
 
@@ -121,38 +131,53 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
     setActiveId(null)
     const { active, over } = e
     if (!over) return
-    const task = tasks.find(t => t.id === active.id)
-    if (!task) return
+    const activeIdStr = String(active.id)
     const overId = String(over.id)
 
     // Parse drop zone ID → extract patch
     // Format: "mat:projId:category" | "tmat:projId:memberId" | "pw:projId:dateStr" | "tw:memberId:dateStr"
     const parts = overId.split(':')
     if (parts.length < 3) return
-
     const mode = parts[0]
+
+    // ─── Backlog MS drop → owner 배정 ───
+    if (activeIdStr.startsWith('bl-ms:')) {
+      const msId = activeIdStr.slice(6)
+      if (mode === 'tmat') {
+        const [, , targetMemberId] = parts
+        updateMilestone(msId, { owner_id: targetMemberId })
+      }
+      // mat/pw/tw에는 MS 드롭 미적용
+      return
+    }
+
+    // ─── Task drop (그리드 내부 or 백로그) ───
+    const taskId = activeIdStr.startsWith('bl-task:') ? activeIdStr.slice(8) : activeIdStr
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+
     if (mode === 'mat') {
       // Personal matrix: project + category
       const [, targetProjId, targetCat] = parts
       if (task.projectId === targetProjId && task.category === targetCat) return
-      moveTaskTo(active.id, targetProjId, targetCat)
+      moveTaskTo(taskId, targetProjId, targetCat)
     } else if (mode === 'tmat') {
       // Team matrix: project + assignee
       const [, targetProjId, targetMemberId] = parts
       if (task.projectId === targetProjId && task.assigneeId === targetMemberId) return
-      updateTask(active.id, { projectId: targetProjId, assigneeId: targetMemberId, scope: 'assigned' })
+      updateTask(taskId, { projectId: targetProjId, assigneeId: targetMemberId, scope: 'assigned' })
     } else if (mode === 'pw') {
       // Personal weekly: project + date
       const [, , targetDate] = parts
       if (task.dueDate === targetDate) return
-      updateTask(active.id, { dueDate: targetDate })
+      updateTask(taskId, { dueDate: targetDate })
     } else if (mode === 'tw') {
       // Team weekly: member + date
       const [, targetMemberId, targetDate] = parts
       if (task.assigneeId === targetMemberId && task.dueDate === targetDate) return
-      updateTask(active.id, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
+      updateTask(taskId, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
     }
-  }, [tasks, moveTaskTo, updateTask])
+  }, [tasks, moveTaskTo, updateTask, updateMilestone])
 
   // ─── Date strings ───
   const today = new Date()
@@ -237,22 +262,31 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
               )}
             </div>
 
+            {/* Sidebar — DndContext 안에 위치해야 dnd-kit DnD 통신 가능 */}
+            <MsBacklogSidebar projects={displayProjects} milestones={milestones} tasks={tasks} />
+
             <DragOverlay dropAnimation={null}>
-              {activeTask ? (
+              {activeItem?.type === 'task' ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
                   background: '#fff', borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                   border: '1px solid rgba(0,0,0,0.06)', transform: 'rotate(2deg)', cursor: 'grabbing', maxWidth: 240,
                 }}>
                   <div style={{ width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, border: `1.5px solid ${CHECKBOX.borderColor}`, flexShrink: 0 }} />
-                  <span style={{ fontSize: FONT.body, color: COLOR.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeTask.text}</span>
+                  <span style={{ fontSize: FONT.body, color: COLOR.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeItem.data.text}</span>
+                </div>
+              ) : activeItem?.type === 'ms' ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                  background: '#fff', borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                  border: '1px solid rgba(0,0,0,0.06)', transform: 'rotate(2deg)', cursor: 'grabbing', maxWidth: 240,
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: COLOR.textTertiary, flexShrink: 0 }} />
+                  <span style={{ fontSize: FONT.body, fontWeight: 500, color: COLOR.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeItem.data.title || '(제목 없음)'}</span>
                 </div>
               ) : null}
             </DragOverlay>
           </DndContext>
-
-          {/* Sidebar */}
-          <MsBacklogSidebar projects={displayProjects} milestones={milestones} tasks={tasks} />
         </div>
       </div>
     </div>
