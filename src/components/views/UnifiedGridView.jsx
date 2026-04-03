@@ -577,6 +577,7 @@ function ProjectCell({ proj, color, count, isCollapsed, onToggle }) {
 function MsGroupedTasks({ tasks: cellTasks, cellMilestones, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, project, projectMap }) {
   const getProj = (t) => project || (projectMap && projectMap[t.projectId]) || null
   const allMilestones = useStore(s => s.milestones)
+  const openModal = useStore(s => s.openModal)
 
   const groups = useMemo(() => {
     const msMap = {}
@@ -594,7 +595,6 @@ function MsGroupedTasks({ tasks: cellTasks, cellMilestones, editingId, setEditin
       const ms = allMilestones.find(m => m.id === msId)
       result.push({ msId, msTitle: ms?.title || '(제목 없음)', tasks: msTasks })
     })
-    // 할일 없는 MS도 표시 (cellMilestones에서 조회)
     if (cellMilestones) {
       const msWithTasks = new Set(Object.keys(msMap))
       cellMilestones.forEach(ms => {
@@ -626,6 +626,12 @@ function MsGroupedTasks({ tasks: cellTasks, cellMilestones, editingId, setEditin
               {g.msTitle}
             </span>
             <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{g.tasks.length > 0 ? g.tasks.length : ''}</span>
+            <span
+              onClick={e => { e.stopPropagation(); openModal({ type: 'milestoneDetail', milestoneId: g.msId, returnTo: null }) }}
+              style={{ fontSize: 11, color: COLOR.textTertiary, cursor: 'pointer', flexShrink: 0, padding: '0 2px', lineHeight: 1 }}
+              onMouseEnter={e => e.currentTarget.style.color = COLOR.textPrimary}
+              onMouseLeave={e => e.currentTarget.style.color = COLOR.textTertiary}
+            >›</span>
           </div>
           {g.tasks.map(t => (
             <TaskCard key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
