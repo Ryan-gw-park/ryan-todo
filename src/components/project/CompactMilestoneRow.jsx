@@ -209,7 +209,7 @@ export default function CompactMilestoneRow({
             </div>
           )}
           {/* Detail button */}
-          {!isBacklog && onOpenMilestoneDetail && hover && (
+          {!isBacklog && onOpenMilestoneDetail && (
             <button
               onClick={e => { e.stopPropagation(); onOpenMilestoneDetail(milestone.id) }}
               onPointerDown={e => e.stopPropagation()}
