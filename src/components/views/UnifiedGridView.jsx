@@ -334,7 +334,7 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        <MsGroupedTasks tasks={cellTasks} cellMilestones={milestones.filter(m => m.project_id === proj.id && (m.owner_id === userId || !m.owner_id))} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                        <MsGroupedTasks tasks={cellTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                         <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
                       </>
                     )}
@@ -474,7 +474,7 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
                     padding: '5px 6px', minHeight: 40,
                     background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                   }}>
-                    <MsGroupedTasks tasks={dayTasks} cellMilestones={milestones.filter(m => m.project_id === proj.id && (m.owner_id === userId || !m.owner_id))} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                    <MsGroupedTasks tasks={dayTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                     {dayTasks.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
                   </div>
                 </DroppableCell>

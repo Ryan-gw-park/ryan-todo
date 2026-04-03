@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { COLOR, FONT, SPACE } from '../../styles/designTokens'
+import { COLOR, FONT, SPACE, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { getCachedUserId } from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
