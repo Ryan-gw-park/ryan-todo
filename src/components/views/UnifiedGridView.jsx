@@ -297,6 +297,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
    Personal Matrix — 행=프로젝트, 열=카테고리
    ═══════════════════════════════════════════════════════ */
 function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, activeId }) {
+  const milestones = useStore(s => s.milestones)
+  const userId = getCachedUserId()
   const catCounts = useMemo(() => {
     const c = {}
     CATS.forEach(cat => { c[cat.key] = myTasks.filter(t => t.category === cat.key && !t.done).length })
@@ -332,7 +334,7 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        <MsGroupedTasks tasks={cellTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                        <MsGroupedTasks tasks={cellTasks} cellMilestones={milestones.filter(m => m.project_id === proj.id && (m.owner_id === userId || !m.owner_id))} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                         <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
                       </>
                     )}
@@ -411,6 +413,8 @@ function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, e
    Personal Weekly — 행=프로젝트, 열=요일
    ═══════════════════════════════════════════════════════ */
 function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todayStr, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, activeId }) {
+  const milestones = useStore(s => s.milestones)
+  const userId = getCachedUserId()
   // 이번 주에 할일이 있는 프로젝트만
   const weekTasks = useMemo(() =>
     myTasks.filter(t => {
@@ -470,7 +474,7 @@ function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDateStrs, todaySt
                     padding: '5px 6px', minHeight: 40,
                     background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                   }}>
-                    <MsGroupedTasks tasks={dayTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                    <MsGroupedTasks tasks={dayTasks} cellMilestones={milestones.filter(m => m.project_id === proj.id && (m.owner_id === userId || !m.owner_id))} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                     {dayTasks.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
                   </div>
                 </DroppableCell>
@@ -528,7 +532,7 @@ function TeamWeeklyGrid({ projects, tasks, members, weekDays, weekDateStrs, toda
             const ds = fmtDate(d)
             const isToday = ds === todayStr
             const dayTasks = tasks.filter(t => {
-              if (t.done || t.assigneeId !== mem.userId) return false
+              if (t.done || t.assigneeId !== mem.userId || t.teamId !== currentTeamId) return false
               if (t.dueDate === ds) return true
               if (!t.dueDate && t.category === 'today' && ds === todayStr) return true
               return false
