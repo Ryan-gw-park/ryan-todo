@@ -87,7 +87,7 @@ export default function InlineTimelineView({ scope, projectId }) {
 
   // ─── Projects ───
   const displayProjects = useMemo(() => {
-    let base = scope === 'personal' ? projects : filteredProjects
+    let base = scope === 'personal' ? projects : filteredProjects.filter(p => p.teamId === currentTeamId)
     if (isProjectMode) return base.filter(p => p.id === projectId)
     return base
   }, [projects, filteredProjects, scope, isProjectMode, projectId])
