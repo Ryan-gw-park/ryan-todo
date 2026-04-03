@@ -91,13 +91,13 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       return currentTeamId ? filteredProjects.filter(p => p.teamId === currentTeamId) : []
     }
     // Personal: all projects with my tasks
-    const myTasks = tasks.filter(t => t.assigneeId === userId || t.createdBy === userId)
+    const myTasks = tasks.filter(t => t.assigneeId === userId)
     const projIds = new Set(myTasks.map(t => t.projectId))
     return sortProjectsLocally(projects).filter(p => projIds.has(p.id))
   }, [scope, currentTeamId, filteredProjects, tasks, userId, projects, sortProjectsLocally])
 
   const myTasks = useMemo(() => {
-    if (scope === 'personal') return tasks.filter(t => t.assigneeId === userId || t.createdBy === userId)
+    if (scope === 'personal') return tasks.filter(t => t.assigneeId === userId)
     return filteredTasks
   }, [scope, tasks, filteredTasks, userId])
 
