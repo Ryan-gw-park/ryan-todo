@@ -288,6 +288,46 @@ export default function InlineTimelineView({ scope, projectId }) {
                       onMsReorder={handleMsReorder} onBarDragEnd={handleBarDragEnd}
                     />
                   ))}
+                  {/* MS 미연결 할일 */}
+                  {!isCol && (() => {
+                    const unlinkedTasks = projTasks.filter(t => !t.keyMilestoneId && !t.done && !t.deletedAt)
+                      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                    if (unlinkedTasks.length === 0) return null
+                    return unlinkedTasks.map(t => (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${COLOR.border}`, minHeight: 26 }}>
+                        <div style={{
+                          width: TREE_W, flexShrink: 0, padding: '3px 8px', paddingLeft: 8 + 1 * 22 + 14,
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          borderRight: `1px solid ${COLOR.border}`,
+                        }}>
+                          <div onClick={ev => { ev.stopPropagation(); toggleDone(t.id) }} style={{
+                            width: 12, height: 12, borderRadius: 3, flexShrink: 0, cursor: 'pointer',
+                            border: t.done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
+                            background: t.done ? CHECKBOX.checkedBg : '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {t.done && <svg width={7} height={7} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                          </div>
+                          <span style={{
+                            fontSize: FONT.caption, color: COLOR.textSecondary, flex: 1,
+                            whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.3,
+                            fontStyle: 'italic',
+                          }}>{t.text}</span>
+                        </div>
+                        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                          <ColumnGrid columns={columns} colW={colW} todayLabel={todayLabel} />
+                          {t.startDate && t.dueDate && (
+                            <DraggableBar type="task" id={t.id}
+                              startStr={t.startDate} endStr={t.dueDate}
+                              minD={minD} colW={colW} scale={scale}
+                              barColor={dotColor} opacity={0.3} height={12}
+                              onDragEnd={handleBarDragEnd}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  })()}
                 </div>
               )
             })}
