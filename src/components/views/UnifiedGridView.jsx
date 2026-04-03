@@ -263,7 +263,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
             </div>
 
             {/* Sidebar — DndContext 안에 위치해야 dnd-kit DnD 통신 가능 */}
-            <MsBacklogSidebar projects={displayProjects} milestones={milestones} tasks={tasks} />
+            <MsBacklogSidebar projects={displayProjects} milestones={milestones} tasks={tasks} weekDateStrs={view === 'weekly' ? weekDateStrs : null} />
 
             <DragOverlay dropAnimation={null}>
               {activeItem?.type === 'task' ? (
@@ -355,6 +355,7 @@ function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, edit
    Team Matrix — 행=프로젝트, 열=팀원
    ═══════════════════════════════════════════════════════ */
 function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, activeId, currentTeamId }) {
+  const milestones = useStore(s => s.milestones)
   if (members.length === 0) {
     return <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>팀원 정보를 불러오는 중...</div>
   }
@@ -387,7 +388,7 @@ function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, e
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        <MsGroupedTasks tasks={cellTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                        <MsGroupedTasks tasks={cellTasks} cellMilestones={milestones.filter(m => m.project_id === proj.id && m.owner_id === mem.userId)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
                         <InlineAdd projectId={proj.id} category="today" color={c} extraFields={{ scope: 'assigned', assigneeId: mem.userId }} compact />
                       </>
                     )}
@@ -573,9 +574,9 @@ function ProjectCell({ proj, color, count, isCollapsed, onToggle }) {
 }
 
 /* ─── MS Grouped Tasks — 셀 안에서 할일을 MS별로 그룹핑 ─── */
-function MsGroupedTasks({ tasks: cellTasks, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, project, projectMap }) {
+function MsGroupedTasks({ tasks: cellTasks, cellMilestones, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, project, projectMap }) {
   const getProj = (t) => project || (projectMap && projectMap[t.projectId]) || null
-  const milestones = useStore(s => s.milestones)
+  const allMilestones = useStore(s => s.milestones)
 
   const groups = useMemo(() => {
     const msMap = {}
@@ -590,12 +591,21 @@ function MsGroupedTasks({ tasks: cellTasks, editingId, setEditingId, handleEditF
     })
     const result = []
     Object.entries(msMap).forEach(([msId, msTasks]) => {
-      const ms = milestones.find(m => m.id === msId)
+      const ms = allMilestones.find(m => m.id === msId)
       result.push({ msId, msTitle: ms?.title || '(제목 없음)', tasks: msTasks })
     })
+    // 할일 없는 MS도 표시 (cellMilestones에서 조회)
+    if (cellMilestones) {
+      const msWithTasks = new Set(Object.keys(msMap))
+      cellMilestones.forEach(ms => {
+        if (!msWithTasks.has(ms.id)) {
+          result.push({ msId: ms.id, msTitle: ms.title || '(제목 없음)', tasks: [] })
+        }
+      })
+    }
     result.sort((a, b) => (a.tasks[0]?.sortOrder || 0) - (b.tasks[0]?.sortOrder || 0))
     return { msGroups: result, ungrouped: noMs }
-  }, [cellTasks, milestones])
+  }, [cellTasks, allMilestones, cellMilestones])
 
   if (groups.msGroups.length === 0) {
     return cellTasks.map(t => (
@@ -615,7 +625,7 @@ function MsGroupedTasks({ tasks: cellTasks, editingId, setEditingId, handleEditF
             <span style={{ fontSize: 10, fontWeight: 600, color: COLOR.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
               {g.msTitle}
             </span>
-            <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{g.tasks.length}</span>
+            <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>{g.tasks.length > 0 ? g.tasks.length : ''}</span>
           </div>
           {g.tasks.map(t => (
             <TaskCard key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />

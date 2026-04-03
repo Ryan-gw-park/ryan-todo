@@ -10,10 +10,11 @@ import { computeDepth, getProjectMaxDepth } from '../../utils/milestoneTree'
    팀/개인 매트릭스 공용
    ═══════════════════════════════════════════════════════ */
 
-export default function MsBacklogSidebar({ projects, milestones, tasks }) {
+export default function MsBacklogSidebar({ projects, milestones, tasks, weekDateStrs }) {
   const [blProject, setBlProject] = useState('all')
   const [blAssign, setBlAssign] = useState('unassigned')
   const [contentType, setContentType] = useState('ms') // 'ms' | 'task'
+  const [blTime, setBlTime] = useState('outside') // 'outside' | 'overdue' | 'unscheduled' | 'future'
 
   // Per-project depth map: { projectId: depthLevel }
   const [depthMap, setDepthMap] = useState(() => {
@@ -77,8 +78,23 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
     if (blAssign === 'unassigned') result = result.filter(t => !t.assigneeId)
     else if (blAssign === 'assigned') result = result.filter(t => !!t.assigneeId)
 
+    // Weekly time filter (주간 플래너 모드일 때만 적용)
+    if (weekDateStrs) {
+      const weekStart = weekDateStrs[0]
+      const weekEnd = weekDateStrs[weekDateStrs.length - 1]
+      if (blTime === 'outside') {
+        result = result.filter(t => !t.dueDate || !weekDateStrs.includes(t.dueDate))
+      } else if (blTime === 'overdue') {
+        result = result.filter(t => t.dueDate && t.dueDate < weekStart)
+      } else if (blTime === 'unscheduled') {
+        result = result.filter(t => !t.dueDate)
+      } else if (blTime === 'future') {
+        result = result.filter(t => t.dueDate && t.dueDate > weekEnd)
+      }
+    }
+
     return result.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-  }, [tasks, blProject, blAssign])
+  }, [tasks, blProject, blAssign, weekDateStrs, blTime])
 
   // Group tasks by project
   const tasksByProject = useMemo(() => {
@@ -158,11 +174,21 @@ export default function MsBacklogSidebar({ projects, milestones, tasks }) {
         </div>
 
         {/* Assignment filter */}
-        <div style={{ display: 'flex', gap: 2, background: '#f0efeb', borderRadius: 6, padding: 2, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 2, background: '#f0efeb', borderRadius: 6, padding: 2, marginBottom: weekDateStrs ? 6 : 8 }}>
           {pill(blAssign === 'all', '전체', () => setBlAssign('all'))}
           {pill(blAssign === 'unassigned', '미배정', () => setBlAssign('unassigned'))}
           {pill(blAssign === 'assigned', '배정됨', () => setBlAssign('assigned'))}
         </div>
+
+        {/* Weekly time filter (주간 플래너 모드) */}
+        {weekDateStrs && contentType === 'task' && (
+          <div style={{ display: 'flex', gap: 2, background: '#f0efeb', borderRadius: 6, padding: 2, marginBottom: 8 }}>
+            {pill(blTime === 'outside', '이번 주 외', () => setBlTime('outside'))}
+            {pill(blTime === 'overdue', '지연', () => setBlTime('overdue'))}
+            {pill(blTime === 'unscheduled', '미설정', () => setBlTime('unscheduled'))}
+            {pill(blTime === 'future', '예정', () => setBlTime('future'))}
+          </div>
+        )}
 
         {/* Per-project depth selector — L1/L2/L3 (MS only) */}
         {contentType === 'ms' && multiDepthProjects.length > 0 && (
