@@ -1026,6 +1026,7 @@ const useStore = create((set, get) => ({
         projectId: targetProjectId,
         assigneeId: targetOwnerId,
         category: 'today',
+        keyMilestoneId: task.keyMilestoneId, // R5 차단 — MS-task 연결 보존
       })
     }
   },
