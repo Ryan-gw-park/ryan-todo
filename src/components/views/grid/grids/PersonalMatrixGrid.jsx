@@ -10,10 +10,20 @@ import CellContent from '../cells/CellContent'
 
 /* ═══════════════════════════════════════════════════════
    Personal Matrix — 행=프로젝트, 열=카테고리(지금/다음/나중)
+   #7: today 컬럼에 빈 MS 표시 (owner_id === userId)
    ═══════════════════════════════════════════════════════ */
-export default function PersonalMatrixGrid({ projects, myTasks, collapsed, toggleCollapse, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, activeId }) {
+export default function PersonalMatrixGrid({
+  projects, myTasks, collapsed, toggleCollapse,
+  editingId, setEditingId, handleEditFinish,
+  toggleDone, openDetail, activeId,
+  // ─── MS interactivity (from UnifiedGridView) ───
+  editingMsId, onStartMsEdit, handleMsEditFinish, cancelMsEdit,
+  matrixMsCollapsed, toggleMatrixMsCollapse, handleMsDelete,
+}) {
   const milestones = useStore(s => s.milestones)
+  const addTask = useStore(s => s.addTask)
   const userId = getCachedUserId()
+
   const catCounts = useMemo(() => {
     const c = {}
     CATS.forEach(cat => { c[cat.key] = myTasks.filter(t => t.category === cat.key && !t.done).length })
@@ -22,7 +32,6 @@ export default function PersonalMatrixGrid({ projects, myTasks, collapsed, toggl
 
   return (
     <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
-      {/* Grid container — shared columns */}
       <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${CATS.length}, 1fr)` }}>
         <div style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface }}>프로젝트</div>
         {CATS.map(cat => (
@@ -36,12 +45,24 @@ export default function PersonalMatrixGrid({ projects, myTasks, collapsed, toggl
           const c = getColor(proj.color)
           const projTasks = myTasks.filter(t => t.projectId === proj.id && !t.done)
           const isCol = collapsed[proj.id]
+          // #7: today 컬럼에 빈 MS 표시 — owner_id가 본인인 MS만
+          const projMyMilestones = milestones.filter(m => m.project_id === proj.id && m.owner_id === userId)
           return [
             <ProjectCell key={`p-${proj.id}`} proj={proj} color={c} count={projTasks.length} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />,
             ...CATS.map(cat => {
               const cellTasks = myTasks.filter(t => t.projectId === proj.id && t.category === cat.key && !t.done)
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
               const dropId = `mat:${proj.id}:${cat.key}`
+              const cellMs = cat.key === 'today' ? projMyMilestones : null
+              const handleCellMsAddTask = async (msId) => {
+                const t = await addTask({
+                  text: '',
+                  projectId: proj.id,
+                  keyMilestoneId: msId,
+                  category: cat.key,
+                })
+                if (t) setEditingId(t.id)
+              }
               return (
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                   <div style={{ padding: '6px 8px', minHeight: 36 }}>
@@ -49,7 +70,21 @@ export default function PersonalMatrixGrid({ projects, myTasks, collapsed, toggl
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        <CellContent tasks={cellTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                        <CellContent
+                          tasks={cellTasks}
+                          cellMilestones={cellMs}
+                          editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
+                          toggleDone={toggleDone} openDetail={openDetail}
+                          matrixMsInteractive
+                          editingMsId={editingMsId}
+                          onStartMsEdit={onStartMsEdit}
+                          handleMsEditFinish={handleMsEditFinish}
+                          cancelMsEdit={cancelMsEdit}
+                          matrixMsCollapsed={matrixMsCollapsed}
+                          toggleMatrixMsCollapse={toggleMatrixMsCollapse}
+                          handleMsDelete={handleMsDelete}
+                          onMsAddTask={handleCellMsAddTask}
+                        />
                         <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
                       </>
                     )}

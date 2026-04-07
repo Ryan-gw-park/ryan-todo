@@ -230,6 +230,7 @@ const _defaultCollapseState = {
   allTasks: {},       // projectId → boolean (모바일 모든 할일 뷰)
   matrix: {},         // projectId → boolean
   matrixDone: {},     // projectId → boolean
+  matrixMs: {},       // msId → boolean (true = MS 접힘, 매트릭스 셀 내)
   timeline: {},       // projectId → boolean
   projectExpanded: {},// taskId → boolean (false = collapsed)
   projectSection: {}, // "projectId:catKey" → boolean (true = collapsed)
@@ -527,6 +528,7 @@ const useStore = create((set, get) => ({
     if (error) console.error('[Ryan Todo] addTask:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
     if (!error) get().showToast('추가됐습니다 ✓')
+    return t
   },
 
   updateTask: async (id, patch) => {

@@ -31,7 +31,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const scope = initialScope // 'team' | 'personal' — 사이드바 위치로만 결정, 토글 없음
 
   // ─── Store ───
-  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone } = useStore()
+  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone, deleteMilestone, openConfirmDialog } = useStore()
   const currentTeamId = useStore(s => s.currentTeamId)
   const milestones = useStore(s => s.milestones)
   const userId = getCachedUserId()
@@ -41,6 +41,9 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const collapsed = collapseState[collapseKey] || EMPTY_OBJ
   const toggleCollapse = useStore(s => s.toggleCollapse)
   const toggleProjectCollapse = useCallback((pid) => toggleCollapse(collapseKey, pid), [collapseKey, toggleCollapse])
+  // ─── MS collapse (matrix only) ───
+  const matrixMsCollapsed = collapseState.matrixMs || EMPTY_OBJ
+  const toggleMatrixMsCollapse = useCallback((msId) => toggleCollapse('matrixMs', msId), [toggleCollapse])
 
   // ─── Team members ───
   const [members, setMembers] = useState([])
@@ -79,12 +82,32 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
     return filteredTasks
   }, [scope, tasks, filteredTasks, userId])
 
-  // ─── Inline edit ───
+  // ─── Inline edit (task) ───
   const [editingId, setEditingId] = useState(null)
   const handleEditFinish = useCallback((taskId, newText) => {
     setEditingId(null)
     if (newText && newText.trim()) updateTask(taskId, { text: newText.trim() })
   }, [updateTask])
+
+  // ─── Inline edit (milestone) ───
+  const [editingMsId, setEditingMsId] = useState(null)
+  const onStartMsEdit = useCallback((msId) => {
+    setEditingId(null) // task 편집 종료
+    setEditingMsId(msId)
+  }, [])
+  const cancelMsEdit = useCallback(() => setEditingMsId(null), [])
+  const handleMsEditFinish = useCallback((msId, value) => {
+    setEditingMsId(null)
+    if (value && value.trim()) updateMilestone(msId, { title: value.trim() })
+  }, [updateMilestone])
+  const handleMsDelete = useCallback((msId, msTitle) => {
+    openConfirmDialog({
+      title: '마일스톤 삭제',
+      message: `"${msTitle || '제목 없음'}"을(를) 삭제하시겠습니까?\n하위 마일스톤도 모두 삭제됩니다.`,
+      confirmText: '삭제',
+      onConfirm: () => deleteMilestone(msId),
+    })
+  }, [openConfirmDialog, deleteMilestone])
 
   // ─── DnD ───
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -209,6 +232,13 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                   collapsed={collapsed} toggleCollapse={toggleProjectCollapse}
                   editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
                   toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
+                  editingMsId={editingMsId}
+                  onStartMsEdit={onStartMsEdit}
+                  handleMsEditFinish={handleMsEditFinish}
+                  cancelMsEdit={cancelMsEdit}
+                  matrixMsCollapsed={matrixMsCollapsed}
+                  toggleMatrixMsCollapse={toggleMatrixMsCollapse}
+                  handleMsDelete={handleMsDelete}
                 />
               )}
               {view === 'matrix' && scope === 'team' && (
@@ -218,6 +248,13 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                   editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
                   toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
                   currentTeamId={currentTeamId}
+                  editingMsId={editingMsId}
+                  onStartMsEdit={onStartMsEdit}
+                  handleMsEditFinish={handleMsEditFinish}
+                  cancelMsEdit={cancelMsEdit}
+                  matrixMsCollapsed={matrixMsCollapsed}
+                  toggleMatrixMsCollapse={toggleMatrixMsCollapse}
+                  handleMsDelete={handleMsDelete}
                 />
               )}
               {view === 'weekly' && scope === 'personal' && (

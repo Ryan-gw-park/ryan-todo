@@ -10,15 +10,23 @@ import CellContent from '../cells/CellContent'
 /* ═══════════════════════════════════════════════════════
    Team Matrix — 행=프로젝트, 열=팀원
    ═══════════════════════════════════════════════════════ */
-export default function TeamMatrixGrid({ projects, tasks, members, collapsed, toggleCollapse, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, activeId, currentTeamId }) {
+export default function TeamMatrixGrid({
+  projects, tasks, members, collapsed, toggleCollapse,
+  editingId, setEditingId, handleEditFinish,
+  toggleDone, openDetail, activeId, currentTeamId,
+  // ─── MS interactivity (from UnifiedGridView) ───
+  editingMsId, onStartMsEdit, handleMsEditFinish, cancelMsEdit,
+  matrixMsCollapsed, toggleMatrixMsCollapse, handleMsDelete,
+}) {
   const milestones = useStore(s => s.milestones)
+  const addTask = useStore(s => s.addTask)
+
   if (members.length === 0) {
     return <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>팀원 정보를 불러오는 중...</div>
   }
 
   return (
     <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden' }}>
-      {/* Grid container */}
       <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${members.length}, 1fr)` }}>
         <div style={{ padding: '8px 10px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`, background: COLOR.bgSurface }}>프로젝트</div>
         {members.map(m => (
@@ -37,6 +45,18 @@ export default function TeamMatrixGrid({ projects, tasks, members, collapsed, to
               const cellTasks = projTasks.filter(t => t.assigneeId === mem.userId)
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
               const dropId = `tmat:${proj.id}:${mem.userId}`
+              const cellMs = milestones.filter(m => m.project_id === proj.id && m.owner_id === mem.userId)
+              const handleCellMsAddTask = async (msId) => {
+                const t = await addTask({
+                  text: '',
+                  projectId: proj.id,
+                  keyMilestoneId: msId,
+                  category: 'today',
+                  scope: 'assigned',
+                  assigneeId: mem.userId,
+                })
+                if (t) setEditingId(t.id)
+              }
               return (
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                   <div style={{ padding: '6px 8px', minHeight: 36 }}>
@@ -44,7 +64,21 @@ export default function TeamMatrixGrid({ projects, tasks, members, collapsed, to
                       cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
                     ) : (
                       <>
-                        <CellContent tasks={cellTasks} cellMilestones={milestones.filter(m => m.project_id === proj.id && m.owner_id === mem.userId)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                        <CellContent
+                          tasks={cellTasks}
+                          cellMilestones={cellMs}
+                          editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
+                          toggleDone={toggleDone} openDetail={openDetail}
+                          matrixMsInteractive
+                          editingMsId={editingMsId}
+                          onStartMsEdit={onStartMsEdit}
+                          handleMsEditFinish={handleMsEditFinish}
+                          cancelMsEdit={cancelMsEdit}
+                          matrixMsCollapsed={matrixMsCollapsed}
+                          toggleMatrixMsCollapse={toggleMatrixMsCollapse}
+                          handleMsDelete={handleMsDelete}
+                          onMsAddTask={handleCellMsAddTask}
+                        />
                         <InlineAdd projectId={proj.id} category="today" color={c} extraFields={{ scope: 'assigned', assigneeId: mem.userId }} compact />
                       </>
                     )}
