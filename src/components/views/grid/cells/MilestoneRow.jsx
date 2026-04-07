@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDraggable } from '@dnd-kit/core'
 import { COLOR } from '../../../../styles/designTokens'
 
 /* ─── Milestone Row — 매트릭스 셀 내 MS 헤더 (인터랙티브) ─── */
@@ -23,10 +24,19 @@ export default function MilestoneRow({
 }) {
   const [hover, setHover] = useState(false)
 
+  // 7-D: drag handle — interactive 모드에서만 활성, 편집 중에는 비활성
+  const dragDisabled = !interactive || isEditing
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `cell-ms:${ms.id}`,
+    disabled: dragDisabled,
+  })
+
   const showHoverButtons = interactive && hover && !isEditing
 
   return (
     <div
+      ref={setNodeRef}
+      {...(dragDisabled ? {} : { ...attributes, ...listeners })}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
@@ -35,6 +45,8 @@ export default function MilestoneRow({
         background: hover && interactive ? COLOR.bgHover : 'transparent',
         borderRadius: 3,
         position: 'relative',
+        cursor: dragDisabled ? 'default' : 'grab',
+        opacity: isDragging ? 0.3 : 1,
       }}
     >
       {/* Toggle chevron */}

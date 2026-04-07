@@ -31,7 +31,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const scope = initialScope // 'team' | 'personal' — 사이드바 위치로만 결정, 토글 없음
 
   // ─── Store ───
-  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone, deleteMilestone, openConfirmDialog } = useStore()
+  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone, deleteMilestone, openConfirmDialog, moveMilestoneWithTasks } = useStore()
   const currentTeamId = useStore(s => s.currentTeamId)
   const milestones = useStore(s => s.milestones)
   const userId = getCachedUserId()
@@ -129,6 +129,10 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       const ms = milestones.find(m => m.id === id.slice(6))
       return ms ? { type: 'ms', data: ms } : null
     }
+    if (id.startsWith('cell-ms:')) {
+      const ms = milestones.find(m => m.id === id.slice(8))
+      return ms ? { type: 'ms', data: ms } : null
+    }
     const taskId = id.startsWith('bl-task:') ? id.slice(8) : id
     const task = tasks.find(t => t.id === taskId)
     return task ? { type: 'task', data: task } : null
@@ -149,14 +153,29 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
     if (parts.length < 3) return
     const mode = parts[0]
 
-    // ─── Backlog MS drop → owner 배정 ───
-    if (activeIdStr.startsWith('bl-ms:')) {
-      const msId = activeIdStr.slice(6)
-      if (mode === 'tmat') {
-        const [, , targetMemberId] = parts
-        updateMilestone(msId, { owner_id: targetMemberId })
+    // ─── MS drop (백로그 or 셀 출처 통합) ───
+    // 7-D: 두 prefix 모두 moveMilestoneWithTasks로 cascade 처리
+    if (activeIdStr.startsWith('bl-ms:') || activeIdStr.startsWith('cell-ms:')) {
+      const msId = activeIdStr.startsWith('bl-ms:')
+        ? activeIdStr.slice(6)
+        : activeIdStr.slice(8)
+      let targetProjectId = null
+      let targetOwnerId = null
+      if (mode === 'mat') {
+        // 개인 매트릭스: targetOwner = userId (카테고리는 무시 — MS는 today 컬럼 표시 규칙으로 자동 위치)
+        const [, projId] = parts
+        targetProjectId = projId
+        targetOwnerId = userId
+      } else if (mode === 'tmat') {
+        // 팀 매트릭스: targetOwner = memberId
+        const [, projId, memberId] = parts
+        targetProjectId = projId
+        targetOwnerId = memberId
+      } else {
+        // pw/tw weekly: MS drop 무시
+        return
       }
-      // mat/pw/tw에는 MS 드롭 미적용
+      moveMilestoneWithTasks(msId, { targetProjectId, targetOwnerId })
       return
     }
 
@@ -186,7 +205,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       if (task.assigneeId === targetMemberId && task.dueDate === targetDate) return
       updateTask(taskId, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
     }
-  }, [tasks, moveTaskTo, updateTask, updateMilestone])
+  }, [tasks, moveTaskTo, updateTask, moveMilestoneWithTasks, userId])
 
   // ─── Date strings ───
   const today = new Date()

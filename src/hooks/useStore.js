@@ -917,6 +917,119 @@ const useStore = create((set, get) => ({
     return get().addMilestone(projectId, pkmId, title, parentId, ownerId)
   },
 
+  // 매트릭스 셀 간 MS 이동 + 자식 MS + task cascade
+  // - cascade: root + recursive descendant MS 전체
+  // - cross-project 시 root의 parent_id를 null로 끊음
+  // - cross-project 시 target 프로젝트의 pkm 자동 확보
+  // - 모든 cascade task → category='today' 리셋, assigneeId/projectId 변경
+  // - task scope/assigneeId 정규화는 updateTask normalize에 위임
+  moveMilestoneWithTasks: async (msId, { targetProjectId, targetOwnerId }) => {
+    const d = db()
+    if (!d) return
+    const allMs = get().milestones
+    const sourceMs = allMs.find(m => m.id === msId)
+    if (!sourceMs) return
+
+    const sourceProjectId = sourceMs.project_id
+    const sourceOwnerId = sourceMs.owner_id
+    const isCrossProject = sourceProjectId !== targetProjectId
+
+    // No-op: 같은 위치로 이동
+    if (!isCrossProject && sourceOwnerId === targetOwnerId) return
+
+    // 1. Cascade 수집 — root + recursive children
+    const cascadeIds = new Set()
+    const walk = (id) => {
+      if (cascadeIds.has(id)) return
+      cascadeIds.add(id)
+      allMs.filter(m => m.parent_id === id).forEach(child => walk(child.id))
+    }
+    walk(msId)
+
+    // 2. Cross-project 시 target 프로젝트의 pkm 확보
+    let targetPkmId = sourceMs.pkm_id
+    if (isCrossProject) {
+      // 메모리에서 먼저 추출 시도
+      targetPkmId = allMs.find(m => m.project_id === targetProjectId)?.pkm_id
+      if (!targetPkmId) {
+        // DB 조회
+        const { data: pkm, error: selErr } = await d
+          .from('project_key_milestones')
+          .select('id')
+          .eq('project_id', targetProjectId)
+          .maybeSingle()
+        if (selErr) {
+          console.error('[useStore] moveMilestoneWithTasks select pkm:', selErr)
+          return
+        }
+        if (pkm) {
+          targetPkmId = pkm.id
+        } else {
+          // 없으면 생성
+          const userId = getCachedUserId()
+          const { data: created, error: insErr } = await d
+            .from('project_key_milestones')
+            .insert({ project_id: targetProjectId, created_by: userId })
+            .select('id')
+            .single()
+          if (insErr) {
+            console.error('[useStore] moveMilestoneWithTasks create pkm:', insErr)
+            return
+          }
+          targetPkmId = created?.id
+        }
+      }
+      if (!targetPkmId) {
+        console.error('[useStore] moveMilestoneWithTasks: targetPkmId missing')
+        return
+      }
+    }
+
+    // 3. MS 업데이트 payload 구성
+    const msUpdates = []
+    cascadeIds.forEach(id => {
+      const ms = allMs.find(m => m.id === id)
+      if (!ms) return
+      const patch = {
+        project_id: targetProjectId,
+        pkm_id: targetPkmId,
+        owner_id: targetOwnerId,
+      }
+      // root MS만 cross-project 시 parent_id 끊기 (자식 MS들의 parent_id는 보존)
+      if (id === msId && isCrossProject) {
+        patch.parent_id = null
+      }
+      msUpdates.push({ id, patch })
+    })
+
+    // 4. 로컬 즉시 반영 (MS)
+    set(s => ({
+      milestones: s.milestones.map(m => {
+        const u = msUpdates.find(x => x.id === m.id)
+        return u ? { ...m, ...u.patch } : m
+      })
+    }))
+
+    // 5. DB 업데이트 (MS)
+    for (const { id, patch } of msUpdates) {
+      const { error } = await d.from('key_milestones')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) console.error('[useStore] moveMilestoneWithTasks ms update:', error)
+    }
+
+    // 6. Task cascade — cascade MS에 연결된 모든 task
+    // updateTask를 사용하여 normalize 로직(개인/팀 프로젝트 scope) 자동 적용
+    const tasksToUpdate = get().tasks.filter(t => t.keyMilestoneId && cascadeIds.has(t.keyMilestoneId))
+    for (const task of tasksToUpdate) {
+      await get().updateTask(task.id, {
+        projectId: targetProjectId,
+        assigneeId: targetOwnerId,
+        category: 'today',
+      })
+    }
+  },
+
   updateMilestone: async (id, patch) => {
     const d = db()
     if (!d) return
