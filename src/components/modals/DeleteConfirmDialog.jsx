@@ -1,5 +1,5 @@
 import useStore from '../../hooks/useStore'
-import { getDb } from '../../utils/supabase'
+
 
 export default function DeleteConfirmDialog() {
   const confirmDialog = useStore(s => s.confirmDialog)
@@ -7,6 +7,7 @@ export default function DeleteConfirmDialog() {
   const closeModal = useStore(s => s.closeModal)
   const openModal = useStore(s => s.openModal)
   const deleteProject = useStore(s => s.deleteProject)
+  const deleteMilestone = useStore(s => s.deleteMilestone)
 
   if (!confirmDialog) return null
 
@@ -18,12 +19,7 @@ export default function DeleteConfirmDialog() {
       closeConfirmDialog()
       closeModal()
     } else if (target === 'milestone') {
-      // Delete milestone directly from DB
-      const db = getDb()
-      if (db) {
-        const { error } = await db.from('key_milestones').delete().eq('id', targetId)
-        if (error) console.error('[DeleteConfirm] milestone delete:', error)
-      }
+      await deleteMilestone(targetId)
       closeConfirmDialog()
       if (meta?.returnTo) {
         openModal(meta.returnTo)

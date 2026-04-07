@@ -110,12 +110,11 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   }, [updateMilestone])
   const handleMsDelete = useCallback((msId, msTitle) => {
     openConfirmDialog({
-      title: '마일스톤 삭제',
-      message: `"${msTitle || '제목 없음'}"을(를) 삭제하시겠습니까?\n하위 마일스톤도 모두 삭제됩니다.`,
-      confirmText: '삭제',
-      onConfirm: () => deleteMilestone(msId),
+      target: 'milestone',
+      targetId: msId,
+      targetName: msTitle || '제목 없음',
     })
-  }, [openConfirmDialog, deleteMilestone])
+  }, [openConfirmDialog])
 
   // ─── DnD ───
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
