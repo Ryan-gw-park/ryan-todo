@@ -17,6 +17,8 @@ export default function TeamMatrixGrid({
   // ─── MS interactivity (from UnifiedGridView) ───
   editingMsId, onStartMsEdit, handleMsEditFinish, cancelMsEdit,
   matrixMsCollapsed, toggleMatrixMsCollapse, handleMsDelete,
+  // ─── Done section (from UnifiedGridView) ───
+  matrixDoneCollapsed, toggleMatrixDoneCollapse,
 }) {
   const milestones = useStore(s => s.milestones)
   const addTask = useStore(s => s.addTask)
@@ -37,13 +39,18 @@ export default function TeamMatrixGrid({
         ))}
         {projects.map(proj => {
           const c = getColor(proj.color)
-          const projTasks = tasks.filter(t => t.projectId === proj.id && !t.done && t.teamId === currentTeamId)
+          const projAllTasks = tasks.filter(t => t.projectId === proj.id && t.teamId === currentTeamId)
+          const projActiveCount = projAllTasks.filter(t => !t.done).length
           const isCol = collapsed[proj.id]
+          // 7-B: done section collapse — 프로젝트 단위, 기본 접힘
+          const projDoneCollapsed = matrixDoneCollapsed ? (matrixDoneCollapsed[proj.id] !== false) : true
+          const onToggleProjDone = () => toggleMatrixDoneCollapse && toggleMatrixDoneCollapse(proj.id)
           return [
-            <ProjectCell key={`p-${proj.id}`} proj={proj} color={c} count={projTasks.length} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />,
+            <ProjectCell key={`p-${proj.id}`} proj={proj} color={c} count={projActiveCount} isCollapsed={isCol} onToggle={() => toggleCollapse(proj.id)} />,
             ...members.map(mem => {
-              const cellTasks = projTasks.filter(t => t.assigneeId === mem.userId)
+              const cellTasks = projAllTasks.filter(t => t.assigneeId === mem.userId)
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+              const cellActiveCount = cellTasks.filter(t => !t.done).length
               const dropId = `tmat:${proj.id}:${mem.userId}`
               const cellMs = milestones.filter(m => m.project_id === proj.id && m.owner_id === mem.userId)
               const handleCellMsAddTask = async (msId) => {
@@ -61,7 +68,7 @@ export default function TeamMatrixGrid({
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
                   <div style={{ padding: '6px 8px', minHeight: 36 }}>
                     {isCol ? (
-                      cellTasks.length > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellTasks.length}건</span> : null
+                      cellActiveCount > 0 ? <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{cellActiveCount}건</span> : null
                     ) : (
                       <>
                         <CellContent
@@ -78,6 +85,8 @@ export default function TeamMatrixGrid({
                           toggleMatrixMsCollapse={toggleMatrixMsCollapse}
                           handleMsDelete={handleMsDelete}
                           onMsAddTask={handleCellMsAddTask}
+                          doneCollapsed={projDoneCollapsed}
+                          onToggleDoneCollapse={onToggleProjDone}
                         />
                         <InlineAdd projectId={proj.id} category="today" color={c} extraFields={{ scope: 'assigned', assigneeId: mem.userId }} compact />
                       </>

@@ -44,6 +44,14 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   // ─── MS collapse (matrix only) ───
   const matrixMsCollapsed = collapseState.matrixMs || EMPTY_OBJ
   const toggleMatrixMsCollapse = useCallback((msId) => toggleCollapse('matrixMs', msId), [toggleCollapse])
+  // ─── Done section collapse (matrix only) — projectId → boolean (default true=접힘) ───
+  const matrixDoneCollapsed = collapseState.matrixDone || EMPTY_OBJ
+  const toggleMatrixDoneCollapse = useCallback((pid) => {
+    // 기본이 접힘(true)이므로 첫 클릭 시 false(펼침)로 명시 set
+    const cur = collapseState.matrixDone?.[pid]
+    const next = cur === false ? true : false
+    useStore.getState().setCollapseValue('matrixDone', pid, next)
+  }, [collapseState.matrixDone])
 
   // ─── Team members ───
   const [members, setMembers] = useState([])
@@ -239,6 +247,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                   matrixMsCollapsed={matrixMsCollapsed}
                   toggleMatrixMsCollapse={toggleMatrixMsCollapse}
                   handleMsDelete={handleMsDelete}
+                  matrixDoneCollapsed={matrixDoneCollapsed}
+                  toggleMatrixDoneCollapse={toggleMatrixDoneCollapse}
                 />
               )}
               {view === 'matrix' && scope === 'team' && (
@@ -255,6 +265,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                   matrixMsCollapsed={matrixMsCollapsed}
                   toggleMatrixMsCollapse={toggleMatrixMsCollapse}
                   handleMsDelete={handleMsDelete}
+                  matrixDoneCollapsed={matrixDoneCollapsed}
+                  toggleMatrixDoneCollapse={toggleMatrixDoneCollapse}
                 />
               )}
               {view === 'weekly' && scope === 'personal' && (

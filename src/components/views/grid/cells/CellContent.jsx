@@ -20,6 +20,9 @@ export default function CellContent({
   toggleMatrixMsCollapse, // (msId) => void
   handleMsDelete,       // (msId, msTitle) => void
   onMsAddTask,          // (msId) => void  -- closure with cell context
+  // ─── Done section props (matrix only) ───
+  doneCollapsed = true,    // default 접힘
+  onToggleDoneCollapse,    // () => void
 }) {
   const getProj = (t) => project || (projectMap && projectMap[t.projectId]) || null
   const allMilestones = useStore(s => s.milestones)
@@ -28,7 +31,12 @@ export default function CellContent({
   const groups = useMemo(() => {
     const msMap = {}
     const noMs = []
+    const done = []
     cellTasks.forEach(t => {
+      if (t.done) {
+        done.push(t)
+        return
+      }
       if (t.keyMilestoneId) {
         if (!msMap[t.keyMilestoneId]) msMap[t.keyMilestoneId] = []
         msMap[t.keyMilestoneId].push(t)
@@ -50,13 +58,30 @@ export default function CellContent({
       })
     }
     result.sort((a, b) => (a.tasks[0]?.sortOrder || 0) - (b.tasks[0]?.sortOrder || 0))
-    return { msGroups: result, ungrouped: noMs }
+    done.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+    return { msGroups: result, ungrouped: noMs, done }
   }, [cellTasks, allMilestones, cellMilestones])
 
+  const taskRowProps = {
+    project: undefined, // overridden per task
+    editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject,
+  }
+
   if (groups.msGroups.length === 0) {
-    return cellTasks.map(t => (
-      <TaskRow key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
-    ))
+    return (
+      <>
+        {groups.ungrouped.map(t => (
+          <TaskRow key={t.id} task={t} project={getProj(t)} {...taskRowProps} />
+        ))}
+        <DoneSection
+          doneTasks={groups.done}
+          collapsed={doneCollapsed}
+          onToggle={onToggleDoneCollapse}
+          getProj={getProj}
+          taskRowProps={taskRowProps}
+        />
+      </>
+    )
   }
 
   return (
@@ -97,6 +122,45 @@ export default function CellContent({
           ))}
         </div>
       )}
+      <DoneSection
+        doneTasks={groups.done}
+        collapsed={doneCollapsed}
+        onToggle={onToggleDoneCollapse}
+        getProj={getProj}
+        taskRowProps={{ editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject }}
+      />
     </>
+  )
+}
+
+/* ─── Done Section — 셀 하단의 완료 task 접기 영역 ─── */
+function DoneSection({ doneTasks, collapsed, onToggle, getProj, taskRowProps }) {
+  if (!doneTasks || doneTasks.length === 0) return null
+  return (
+    <div style={{
+      marginTop: 4, paddingTop: 3,
+      borderTop: `0.5px dashed ${COLOR.border}`,
+    }}>
+      <div
+        onClick={e => { e.stopPropagation(); onToggle && onToggle() }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          cursor: onToggle ? 'pointer' : 'default',
+          padding: '2px 4px',
+          fontSize: 10, color: COLOR.textTertiary,
+          userSelect: 'none',
+        }}
+      >
+        <span style={{
+          width: 10, fontSize: 9, textAlign: 'center',
+          transform: collapsed ? 'rotate(-90deg)' : 'rotate(0)',
+          transition: 'transform 0.12s', display: 'inline-block',
+        }}>▾</span>
+        <span>✓ 완료 {doneTasks.length}건</span>
+      </div>
+      {!collapsed && doneTasks.map(t => (
+        <TaskRow key={t.id} task={t} project={getProj(t)} {...taskRowProps} />
+      ))}
+    </div>
   )
 }
