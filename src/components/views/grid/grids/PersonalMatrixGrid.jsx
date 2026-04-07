@@ -7,6 +7,7 @@ import { CATS } from '../constants'
 import ProjectCell from '../shared/ProjectCell'
 import DroppableCell from '../shared/DroppableCell'
 import CellContent from '../cells/CellContent'
+import InlineMsAdd from '../cells/InlineMsAdd'
 
 /* ═══════════════════════════════════════════════════════
    Personal Matrix — 행=프로젝트, 열=카테고리(지금/다음/나중)
@@ -24,6 +25,7 @@ export default function PersonalMatrixGrid({
 }) {
   const milestones = useStore(s => s.milestones)
   const addTask = useStore(s => s.addTask)
+  const addMilestoneInProject = useStore(s => s.addMilestoneInProject)
   const userId = getCachedUserId()
 
   const catCounts = useMemo(() => {
@@ -61,6 +63,11 @@ export default function PersonalMatrixGrid({
               const cellActiveCount = cellTasks.filter(t => !t.done).length
               const dropId = `mat:${proj.id}:${cat.key}`
               const cellMs = cat.key === 'today' ? projMyMilestones : null
+              // 7-C: today 컬럼에서만 MS 추가 가능 (개인 매트릭스의 빈 MS도 today에만 표시되므로 일관성 유지)
+              const handleAddMsForCell = async () => {
+                const newMs = await addMilestoneInProject(proj.id, { ownerId: userId })
+                if (newMs && onStartMsEdit) onStartMsEdit(newMs.id)
+              }
               const handleCellMsAddTask = async (msId) => {
                 const t = await addTask({
                   text: '',
@@ -95,6 +102,7 @@ export default function PersonalMatrixGrid({
                           onToggleDoneCollapse={onToggleProjDone}
                         />
                         <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
+                        {cat.key === 'today' && <InlineMsAdd onClick={handleAddMsForCell} />}
                       </>
                     )}
                   </div>

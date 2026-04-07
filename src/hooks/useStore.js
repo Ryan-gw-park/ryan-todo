@@ -837,7 +837,7 @@ const useStore = create((set, get) => ({
   },
 
   // ─── Milestone CRUD (Loop-37: 계층형 마일스톤) ───
-  addMilestone: async (projectId, pkmId, title, parentId = null) => {
+  addMilestone: async (projectId, pkmId, title, parentId = null, ownerId = null) => {
     const d = db()
     if (!d) return null
     const userId = getCachedUserId()
@@ -868,7 +868,7 @@ const useStore = create((set, get) => ({
         depth,
         sort_order: sortOrder,
         created_by: userId,
-        owner_id: null,
+        owner_id: ownerId,
         status: 'not_started',
       })
       .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by, parent_id, depth')
@@ -876,6 +876,45 @@ const useStore = create((set, get) => ({
     if (error) { console.error('[useStore] addMilestone:', error); return null }
     if (data) set({ milestones: [...get().milestones, data] })
     return data
+  },
+
+  // 매트릭스 셀에서 MS를 추가할 때 사용 — pkm을 자동으로 select-or-insert 후 addMilestone 호출
+  addMilestoneInProject: async (projectId, opts = {}) => {
+    const { ownerId = null, title = '', parentId = null } = opts
+    // 1. pkm 확보 — 먼저 메모리의 milestones에서 추출 시도
+    let pkmId = get().milestones.find(m => m.project_id === projectId)?.pkm_id
+    if (!pkmId) {
+      // 2. DB 조회
+      const d = db()
+      if (!d) return null
+      const { data: pkm, error: selErr } = await d
+        .from('project_key_milestones')
+        .select('id')
+        .eq('project_id', projectId)
+        .maybeSingle()
+      if (selErr) {
+        console.error('[useStore] addMilestoneInProject select pkm:', selErr)
+        return null
+      }
+      if (pkm) {
+        pkmId = pkm.id
+      } else {
+        // 3. 없으면 생성
+        const userId = getCachedUserId()
+        const { data: created, error: insErr } = await d
+          .from('project_key_milestones')
+          .insert({ project_id: projectId, created_by: userId })
+          .select('id')
+          .single()
+        if (insErr) {
+          console.error('[useStore] addMilestoneInProject create pkm:', insErr)
+          return null
+        }
+        pkmId = created?.id
+      }
+    }
+    if (!pkmId) return null
+    return get().addMilestone(projectId, pkmId, title, parentId, ownerId)
   },
 
   updateMilestone: async (id, patch) => {

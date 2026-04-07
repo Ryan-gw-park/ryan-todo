@@ -6,6 +6,7 @@ import ProjectCell from '../shared/ProjectCell'
 import DroppableCell from '../shared/DroppableCell'
 import MiniAvatar from '../shared/MiniAvatar'
 import CellContent from '../cells/CellContent'
+import InlineMsAdd from '../cells/InlineMsAdd'
 
 /* ═══════════════════════════════════════════════════════
    Team Matrix — 행=프로젝트, 열=팀원
@@ -22,6 +23,7 @@ export default function TeamMatrixGrid({
 }) {
   const milestones = useStore(s => s.milestones)
   const addTask = useStore(s => s.addTask)
+  const addMilestoneInProject = useStore(s => s.addMilestoneInProject)
 
   if (members.length === 0) {
     return <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>팀원 정보를 불러오는 중...</div>
@@ -53,6 +55,11 @@ export default function TeamMatrixGrid({
               const cellActiveCount = cellTasks.filter(t => !t.done).length
               const dropId = `tmat:${proj.id}:${mem.userId}`
               const cellMs = milestones.filter(m => m.project_id === proj.id && m.owner_id === mem.userId)
+              // 7-C: 셀 위치(프로젝트 × 멤버)로 owner 자동 set
+              const handleAddMsForCell = async () => {
+                const newMs = await addMilestoneInProject(proj.id, { ownerId: mem.userId })
+                if (newMs && onStartMsEdit) onStartMsEdit(newMs.id)
+              }
               const handleCellMsAddTask = async (msId) => {
                 const t = await addTask({
                   text: '',
@@ -89,6 +96,7 @@ export default function TeamMatrixGrid({
                           onToggleDoneCollapse={onToggleProjDone}
                         />
                         <InlineAdd projectId={proj.id} category="today" color={c} extraFields={{ scope: 'assigned', assigneeId: mem.userId }} compact />
+                        <InlineMsAdd onClick={handleAddMsForCell} />
                       </>
                     )}
                   </div>
