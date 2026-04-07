@@ -50,7 +50,7 @@ function getWeekNumber(d) {
 /* ═══ Main ═══ */
 export default function UnifiedGridView({ initialView = 'matrix', initialScope = 'personal' }) {
   const [view, setView] = useState(initialView) // 'matrix' | 'weekly'
-  const [scope, setScope] = useState(initialScope) // 'team' | 'personal'
+  const scope = initialScope // 'team' | 'personal' — 사이드바 위치로만 결정, 토글 없음
 
   // ─── Store ───
   const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone } = useStore()
@@ -211,7 +211,6 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary }}>{view === 'matrix' ? dateStr : weekRange}</span>
             <div style={{ flex: 1 }} />
-            <Pill items={[{ k: 'team', l: '팀' }, { k: 'personal', l: '개인' }]} active={scope} onChange={setScope} />
             {view === 'weekly' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
                 <button onClick={prevWeek} style={{ border: `1px solid ${COLOR.border}`, background: '#fff', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: FONT.label, color: COLOR.textSecondary, fontFamily: 'inherit' }}>◀</button>

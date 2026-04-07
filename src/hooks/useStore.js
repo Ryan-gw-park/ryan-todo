@@ -245,7 +245,7 @@ const useStore = create((set, get) => ({
   memos: [],
   milestones: [],
   syncStatus: 'ok',
-  currentView: 'today',
+  currentView: 'personal-matrix',
   detailTask: null,
   showProjectMgr: false,
   // Loop-33: 모달 상태
@@ -284,7 +284,10 @@ const useStore = create((set, get) => ({
   },
 
   setView: (v) => {
-    const LEGACY_MAP = { matrix: 'team-matrix', timeline: 'team-timeline', weekly: 'team-weekly', now: 'today' }
+    const LEGACY_MAP = {
+      matrix: 'team-matrix', timeline: 'team-timeline', weekly: 'team-weekly',
+      now: 'personal-matrix', today: 'personal-matrix', allTasks: 'personal-matrix',
+    }
     set({ currentView: LEGACY_MAP[v] || v })
   },
 

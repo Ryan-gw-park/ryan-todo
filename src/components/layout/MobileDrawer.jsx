@@ -3,8 +3,8 @@ import useStore from '../../hooks/useStore'
 import { ViewIcons } from '../shared/Icons'
 
 const TABS = [
-  { id: 'today', label: '지금 할일', icon: ViewIcons.today },
-  { id: 'allTasks', label: '전체 할일', icon: '📋' },
+  { id: 'personal-matrix', label: '매트릭스', icon: ViewIcons.matrix },
+  { id: 'personal-weekly', label: '주간 플래너', icon: '📅' },
   { id: 'project', label: '프로젝트', icon: ViewIcons.project },
   { id: 'memory', label: '노트', icon: ViewIcons.memory },
 ]

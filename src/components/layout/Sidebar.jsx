@@ -29,16 +29,10 @@ const S = {
   fontSection:  10,         // section label font
 }
 
-const GLOBAL_VIEWS = [
-  { key: 'today',    label: '지금 할일',  icon: '📋' },
-  { key: 'allTasks', label: '전체 할일',  icon: '📑' },
-  { key: 'memory',   label: '노트',       icon: '✎' },
-]
-
 const TASK_VIEWS = [
   { key: 'matrix',   label: '매트릭스',   icon: '⊞' },
-  { key: 'timeline', label: '타임라인',   icon: '▤' },
   { key: 'weekly',   label: '주간 플래너', icon: '📅' },
+  { key: 'timeline', label: '타임라인',   icon: '▤' },
 ]
 
 export default function Sidebar() {
@@ -198,42 +192,31 @@ export default function Sidebar() {
 
       {/* ── Scrollable content ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: `${S.dividerMy}px 0` }}>
-        {/* ─── Section 1: 글로벌 뷰 ─── */}
-        {!collapsed && <SectionLabel label="글로벌 뷰" />}
-        {GLOBAL_VIEWS.map(v => (
-          <NavItem key={v.key} icon={v.icon} label={v.label} isActive={currentView === v.key} onClick={() => setView(v.key)} collapsed={collapsed} />
-        ))}
-
-        <Divider />
-
-        {/* ─── Section 2: 할일 ─── */}
-        {!collapsed && <SectionLabel label="할일" />}
-
-        {/* 팀 subsection */}
-        {currentTeamId && !collapsed && (
-          <SubSectionHeader label="팀" collapsed={sectionCollapsed.taskTeam} onClick={() => toggleSection('taskTeam')} />
-        )}
-        {currentTeamId && !sectionCollapsed.taskTeam && TASK_VIEWS.map(v => (
-          <NavItem key={`team-${v.key}`} icon={v.icon} label={v.label}
-            isActive={currentView === `team-${v.key}`}
-            onClick={() => setView(`team-${v.key}`)}
-            collapsed={collapsed}
-            indent={collapsed ? 0 : 1}
-          />
-        ))}
-
-        {/* 개인 subsection */}
-        {!collapsed && (
-          <SubSectionHeader label="개인" collapsed={sectionCollapsed.taskPersonal} onClick={() => toggleSection('taskPersonal')} />
-        )}
-        {!sectionCollapsed.taskPersonal && TASK_VIEWS.map(v => (
+        {/* ─── Section 1: 개인 ─── */}
+        {!collapsed && <SectionLabel label="개인" />}
+        {TASK_VIEWS.map(v => (
           <NavItem key={`personal-${v.key}`} icon={v.icon} label={v.label}
             isActive={currentView === `personal-${v.key}`}
             onClick={() => setView(`personal-${v.key}`)}
             collapsed={collapsed}
-            indent={collapsed ? 0 : 1}
           />
         ))}
+        <NavItem icon="✎" label="노트" isActive={currentView === 'memory'} onClick={() => setView('memory')} collapsed={collapsed} />
+
+        {/* ─── Section 2: 팀 (currentTeamId 있을 때만) ─── */}
+        {currentTeamId && (
+          <>
+            <Divider />
+            {!collapsed && <SectionLabel label="팀" />}
+            {TASK_VIEWS.map(v => (
+              <NavItem key={`team-${v.key}`} icon={v.icon} label={v.label}
+                isActive={currentView === `team-${v.key}`}
+                onClick={() => setView(`team-${v.key}`)}
+                collapsed={collapsed}
+              />
+            ))}
+          </>
+        )}
 
         <Divider />
 

@@ -3,8 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import useStore from './useStore'
 
 const VIEW_TO_PATH = {
-  today:               '/today',
-  allTasks:            '/all-tasks',
   memory:              '/notes',
   'team-matrix':       '/team/matrix',
   'team-timeline':     '/team/timeline',
@@ -14,6 +12,9 @@ const VIEW_TO_PATH = {
   'personal-weekly':   '/personal/weekly',
   project:             '/projects',
 }
+
+// Legacy URL aliases — 북마크 호환 (구 URL → personal-matrix)
+const LEGACY_PATHS = new Set(['/today', '/all-tasks'])
 
 const PATH_TO_VIEW = Object.fromEntries(
   Object.entries(VIEW_TO_PATH).map(([v, p]) => [p, v])
@@ -58,12 +59,13 @@ export default function useViewUrlSync() {
       return
     }
 
+    // Legacy URL (/today, /all-tasks) 또는 알 수 없는 경로 → personal-matrix
     skipUrlUpdate.current = true
-    setView('today')
+    setView('personal-matrix')
     initialized.current = true
-    if (path === '/' || !view) {
+    if (path === '/' || LEGACY_PATHS.has(path) || !view) {
       skipViewUpdate.current = true
-      navigate('/today', { replace: true })
+      navigate('/personal/matrix', { replace: true })
     }
   }, [location.pathname])
 
@@ -78,7 +80,7 @@ export default function useViewUrlSync() {
     if (currentView === 'projectLayer' && selectedProjectId) {
       targetPath = `/project/${selectedProjectId}`
     } else {
-      targetPath = VIEW_TO_PATH[currentView] || '/today'
+      targetPath = VIEW_TO_PATH[currentView] || '/personal/matrix'
     }
 
     if (location.pathname !== targetPath) {

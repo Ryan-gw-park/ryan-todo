@@ -18,9 +18,8 @@ import Sidebar from './components/layout/Sidebar'
 import useViewUrlSync from './hooks/useViewUrlSync'
 
 // React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
-const TodayView = lazy(() => import('./components/views/TodayView'))
-const AllTasksView = lazy(() => import('./components/views/AllTasksView'))
 // MatrixView removed — replaced by UnifiedGridView
+// TodayView, AllTasksView removed — personal-matrix is now the default landing view
 const ProjectView = lazy(() => import('./components/views/ProjectView'))
 const TimelineView = lazy(() => import('./components/views/TimelineView'))
 const InlineTimelineView = lazy(() => import('./components/views/InlineTimelineView'))
@@ -53,15 +52,15 @@ function AppShell({ mobile }) {
   useEffect(() => {
     const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
     idle(() => {
-      import('./components/views/TodayView')
+      import('./components/views/UnifiedGridView')
       import('./components/views/ProjectView')
-      import('./components/views/TimelineView')
+      import('./components/views/InlineTimelineView')
       import('./components/views/MemoryView')
     })
   }, [])
 
   // Keyboard shortcuts
-  const VIEW_ORDER = ['today', 'allTasks', 'team-matrix', 'team-timeline', 'team-weekly', 'personal-matrix', 'personal-timeline', 'personal-weekly', 'memory']
+  const VIEW_ORDER = ['personal-matrix', 'personal-weekly', 'personal-timeline', 'memory', 'team-matrix', 'team-weekly', 'team-timeline']
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') { closeDetail() }
@@ -82,7 +81,7 @@ function AppShell({ mobile }) {
 
   // Loop-39: 3-section sidebar view routing — team views always use team components
   const views = useMemo(() => ({
-    today: TodayView, allTasks: AllTasksView, memory: MemoryView,
+    memory: MemoryView,
     'team-matrix': () => <UnifiedGridView initialView="matrix" initialScope="team" />,
     'team-timeline': InlineTimelineView,
     'team-weekly': () => <UnifiedGridView initialView="weekly" initialScope="team" />,
@@ -91,12 +90,13 @@ function AppShell({ mobile }) {
     'personal-weekly': () => <UnifiedGridView initialView="weekly" initialScope="personal" />,
     project: ProjectView, projectLayer: ProjectLayer,
   }), [])
-  const ViewComponent = views[currentView] || TodayView
+  const ViewComponent = views[currentView] || views['personal-matrix']
 
-  // 모바일에서 team/personal scope 뷰 접근 시 today로 리다이렉트
+  // 모바일에서 team scope 뷰 접근 시 personal-matrix로 리다이렉트
+  // (personal-* 는 모바일에서도 허용 — UnifiedGridView 가로 스크롤)
   useEffect(() => {
-    if (mobile && (currentView.startsWith('team-') || currentView.startsWith('personal-'))) {
-      setView('today')
+    if (mobile && currentView.startsWith('team-')) {
+      setView('personal-matrix')
     }
   }, [currentView, mobile])
 
