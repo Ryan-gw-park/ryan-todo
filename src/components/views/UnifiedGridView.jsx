@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { COLOR, FONT, SPACE, VIEW_WIDTH, CHECKBOX } from '../../styles/designTokens'
-import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, closestCenter } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
@@ -158,14 +158,23 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
 
     // ─── MS drop (백로그 or 셀 출처 통합) ───
     // 7-D: 두 prefix 모두 moveMilestoneWithTasks로 cascade 처리
+    // 7-E1 fix-1: closestCenter 적용 후 over가 cell-task:로 잡힐 수 있음 → over task의 셀 정보 사용
     if (activeIdStr.startsWith('bl-ms:') || activeIdStr.startsWith('cell-ms:')) {
       const msId = activeIdStr.startsWith('bl-ms:')
         ? activeIdStr.slice(6)
         : activeIdStr.slice(8)
       let targetProjectId = null
       let targetOwnerId = null
-      if (mode === 'mat') {
-        // 개인 매트릭스: targetOwner = userId (카테고리는 무시 — MS는 today 컬럼 표시 규칙으로 자동 위치)
+
+      // over가 cell-task:면 그 task의 셀 정보로 cascade 대상 결정
+      if (overId.startsWith('cell-task:')) {
+        const overTaskId = overId.slice(10)
+        const overTask = tasks.find(t => t.id === overTaskId)
+        if (!overTask) return
+        targetProjectId = overTask.projectId
+        targetOwnerId = overTask.assigneeId || userId
+      } else if (mode === 'mat') {
+        // 개인 매트릭스: targetOwner = userId
         const [, projId] = parts
         targetProjectId = projId
         targetOwnerId = userId
@@ -307,7 +316,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
 
         {/* ═══ Grid + Sidebar ═══ */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 0 }}>
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div style={{ flex: 1, overflow: 'auto' }}>
               {view === 'matrix' && scope === 'personal' && (
                 <PersonalMatrixGrid
