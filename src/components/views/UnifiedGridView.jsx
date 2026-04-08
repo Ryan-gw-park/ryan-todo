@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { COLOR, FONT, SPACE, VIEW_WIDTH, CHECKBOX } from '../../styles/designTokens'
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import useProjectFilter from '../../hooks/useProjectFilter'
@@ -132,7 +133,10 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       const ms = milestones.find(m => m.id === id.slice(8))
       return ms ? { type: 'ms', data: ms } : null
     }
-    const taskId = id.startsWith('bl-task:') ? id.slice(8) : id
+    // 7-E1: cell-task: prefix 인식
+    const taskId = id.startsWith('bl-task:') ? id.slice(8)
+      : id.startsWith('cell-task:') ? id.slice(10)
+      : id
     const task = tasks.find(t => t.id === taskId)
     return task ? { type: 'task', data: task } : null
   }, [activeId, tasks, milestones])
@@ -178,11 +182,64 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       return
     }
 
-    // ─── Task drop (그리드 내부 or 백로그) ───
-    const taskId = activeIdStr.startsWith('bl-task:') ? activeIdStr.slice(8) : activeIdStr
+    // ─── Task drop (cell-task / bl-task / raw) ───
+    // 7-E1: cell-task: prefix 추가
+    const taskId = activeIdStr.startsWith('bl-task:') ? activeIdStr.slice(8)
+      : activeIdStr.startsWith('cell-task:') ? activeIdStr.slice(10)
+      : activeIdStr
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
 
+    // 7-E1: over가 cell-task: 면 sortable end (다른 task 위에 drop)
+    if (overId.startsWith('cell-task:')) {
+      const overTaskId = overId.slice(10)
+      if (overTaskId === task.id) return
+      const overTask = tasks.find(t => t.id === overTaskId)
+      if (!overTask) return
+
+      // 같은 셀 판정 — projectId + assigneeId + category 모두 일치
+      const sameCell = (
+        task.projectId === overTask.projectId &&
+        task.assigneeId === overTask.assigneeId &&
+        task.category === overTask.category
+      )
+
+      if (sameCell) {
+        // 같은 셀 sortable end → reorder (필요시 keyMilestoneId 변경)
+        const cellTasks = tasks.filter(t =>
+          t.projectId === task.projectId &&
+          t.assigneeId === task.assigneeId &&
+          t.category === task.category &&
+          !t.done
+        ).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+
+        const oldIndex = cellTasks.findIndex(t => t.id === task.id)
+        const newIndex = cellTasks.findIndex(t => t.id === overTaskId)
+        if (oldIndex === -1 || newIndex === -1) return
+
+        // cross-MS-group within same cell — keyMilestoneId 변경 후 reorder
+        if (task.keyMilestoneId !== overTask.keyMilestoneId) {
+          updateTask(task.id, {
+            keyMilestoneId: overTask.keyMilestoneId,
+            // 다른 필드는 건드리지 않음 — projectId 그대로 → R5 트리거 안 됨
+          })
+        }
+        const reordered = arrayMove(cellTasks, oldIndex, newIndex)
+        reorderTasks(reordered)
+      } else {
+        // 다른 셀 — over task의 위치로 cross-cell move
+        // R5 차단을 위해 keyMilestoneId 명시 보존
+        updateTask(task.id, {
+          projectId: overTask.projectId,
+          assigneeId: overTask.assigneeId,
+          category: overTask.category,
+          keyMilestoneId: task.keyMilestoneId,
+        })
+      }
+      return
+    }
+
+    // ─── over가 droppable cell (mat/tmat/pw/tw) ───
     if (mode === 'mat') {
       // Personal matrix: project + category
       const [, targetProjId, targetCat] = parts
@@ -204,7 +261,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       if (task.assigneeId === targetMemberId && task.dueDate === targetDate) return
       updateTask(taskId, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
     }
-  }, [tasks, moveTaskTo, updateTask, moveMilestoneWithTasks, userId])
+  }, [tasks, moveTaskTo, updateTask, moveMilestoneWithTasks, userId, reorderTasks])
 
   // ─── Date strings ───
   const today = new Date()

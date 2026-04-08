@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { COLOR } from '../../../../styles/designTokens'
 import useStore from '../../../../hooks/useStore'
 import { getMsPath } from '../../../../utils/milestoneTree'
@@ -23,6 +24,8 @@ export default function CellContent({
   // ─── Done section props (matrix only) ───
   doneCollapsed = true,    // default 접힘
   onToggleDoneCollapse,    // () => void
+  // ─── Sortable props (matrix only, 7-E1) ───
+  cellSortableId,
 }) {
   const getProj = (t) => project || (projectMap && projectMap[t.projectId]) || null
   const allMilestones = useStore(s => s.milestones)
@@ -62,17 +65,32 @@ export default function CellContent({
     return { msGroups: result, ungrouped: noMs, done }
   }, [cellTasks, allMilestones, cellMilestones])
 
+  // 7-E1: 셀 내 모든 active task id 수집 (MS 그룹 + ungrouped, done 제외)
+  const allTaskIds = useMemo(() => {
+    const ids = []
+    groups.msGroups.forEach(g => g.tasks.forEach(t => ids.push(`cell-task:${t.id}`)))
+    groups.ungrouped.forEach(t => ids.push(`cell-task:${t.id}`))
+    return ids
+  }, [groups])
+
   const taskRowProps = {
     project: undefined, // overridden per task
     editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject,
   }
 
   if (groups.msGroups.length === 0) {
+    const ungroupedRows = groups.ungrouped.map(t => (
+      <TaskRow key={t.id} task={t} project={getProj(t)} {...taskRowProps} />
+    ))
     return (
       <>
-        {groups.ungrouped.map(t => (
-          <TaskRow key={t.id} task={t} project={getProj(t)} {...taskRowProps} />
-        ))}
+        {cellSortableId ? (
+          <SortableContext items={allTaskIds} id={cellSortableId} strategy={verticalListSortingStrategy}>
+            {ungroupedRows}
+          </SortableContext>
+        ) : (
+          ungroupedRows
+        )}
         <DoneSection
           doneTasks={groups.done}
           collapsed={doneCollapsed}
@@ -84,7 +102,7 @@ export default function CellContent({
     )
   }
 
-  return (
+  const groupedContent = (
     <>
       {groups.msGroups.map(g => {
         const msCollapsed = matrixMsCollapsed ? !!matrixMsCollapsed[g.msId] : false
@@ -121,6 +139,18 @@ export default function CellContent({
             <TaskRow key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
           ))}
         </div>
+      )}
+    </>
+  )
+
+  return (
+    <>
+      {cellSortableId ? (
+        <SortableContext items={allTaskIds} id={cellSortableId} strategy={verticalListSortingStrategy}>
+          {groupedContent}
+        </SortableContext>
+      ) : (
+        groupedContent
       )}
       <DoneSection
         doneTasks={groups.done}

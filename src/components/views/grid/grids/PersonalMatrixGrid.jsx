@@ -100,6 +100,7 @@ export default function PersonalMatrixGrid({
                           onMsAddTask={handleCellMsAddTask}
                           doneCollapsed={projDoneCollapsed}
                           onToggleDoneCollapse={onToggleProjDone}
+                          cellSortableId={dropId}
                         />
                         <InlineAdd projectId={proj.id} category={cat.key} color={c} compact />
                         {cat.key === 'today' && <InlineMsAdd onClick={handleAddMsForCell} />}

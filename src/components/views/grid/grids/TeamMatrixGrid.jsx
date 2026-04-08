@@ -94,6 +94,7 @@ export default function TeamMatrixGrid({
                           onMsAddTask={handleCellMsAddTask}
                           doneCollapsed={projDoneCollapsed}
                           onToggleDoneCollapse={onToggleProjDone}
+                          cellSortableId={dropId}
                         />
                         <InlineAdd projectId={proj.id} category="today" color={c} extraFields={{ scope: 'assigned', assigneeId: mem.userId }} compact />
                         <InlineMsAdd onClick={handleAddMsForCell} />

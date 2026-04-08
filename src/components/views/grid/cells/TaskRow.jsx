@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { useDraggable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { COLOR, FONT, CHECKBOX } from '../../../../styles/designTokens'
 import { getColor } from '../../../../utils/colors'
 import useStore from '../../../../hooks/useStore'
@@ -7,7 +8,9 @@ import useStore from '../../../../hooks/useStore'
 /* ─── Task Card (draggable, click-to-edit) ─── */
 export default function TaskRow({ task, project, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, showMs }) {
   const milestones = useStore(s => s.milestones)
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `cell-task:${task.id}`,
+  })
   const [hover, setHover] = useState(false)
   const isEditing = editingId === task.id
 
@@ -17,6 +20,11 @@ export default function TaskRow({ task, project, editingId, setEditingId, handle
     return milestones.find(m => m.id === task.keyMilestoneId)?.title
   }, [showMs, task.keyMilestoneId, milestones])
 
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -24,8 +32,9 @@ export default function TaskRow({ task, project, editingId, setEditingId, handle
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
+        ...sortableStyle,
         display: 'flex', alignItems: 'flex-start', gap: 5, padding: '3px 4px', marginBottom: 1,
-        borderRadius: 4, cursor: isEditing ? 'text' : 'grab', transition: 'background 0.08s',
+        borderRadius: 4, cursor: isEditing ? 'text' : 'grab', transition: sortableStyle.transition || 'background 0.08s',
         background: hover && !isEditing ? COLOR.bgHover : 'transparent',
         opacity: isDragging ? 0.3 : 1,
       }}
