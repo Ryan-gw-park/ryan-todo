@@ -150,63 +150,39 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
     const activeIdStr = String(active.id)
     const overId = String(over.id)
 
-    // Parse drop zone ID → extract patch
-    // Format: "mat:projId:category" | "tmat:projId:memberId" | "pw:projId:dateStr" | "tw:memberId:dateStr"
-    const parts = overId.split(':')
-    if (parts.length < 3) return
-    const mode = parts[0]
+    // ── source 식별 ──
+    const isMs = activeIdStr.startsWith('bl-ms:') || activeIdStr.startsWith('cell-ms:')
+    const msId = isMs
+      ? (activeIdStr.startsWith('bl-ms:') ? activeIdStr.slice(6) : activeIdStr.slice(8))
+      : null
 
-    // ─── MS drop (백로그 or 셀 출처 통합) ───
-    // 7-D: 두 prefix 모두 moveMilestoneWithTasks로 cascade 처리
-    // 7-E1 fix-1: closestCenter 적용 후 over가 cell-task:로 잡힐 수 있음 → over task의 셀 정보 사용
-    if (activeIdStr.startsWith('bl-ms:') || activeIdStr.startsWith('cell-ms:')) {
-      const msId = activeIdStr.startsWith('bl-ms:')
-        ? activeIdStr.slice(6)
-        : activeIdStr.slice(8)
-      let targetProjectId = null
-      let targetOwnerId = null
+    const taskId = !isMs
+      ? (activeIdStr.startsWith('bl-task:') ? activeIdStr.slice(8)
+        : activeIdStr.startsWith('cell-task:') ? activeIdStr.slice(10)
+        : activeIdStr)
+      : null
+    const task = !isMs ? tasks.find(t => t.id === taskId) : null
 
-      // over가 cell-task:면 그 task의 셀 정보로 cascade 대상 결정
-      if (overId.startsWith('cell-task:')) {
-        const overTaskId = overId.slice(10)
-        const overTask = tasks.find(t => t.id === overTaskId)
-        if (!overTask) return
-        targetProjectId = overTask.projectId
-        targetOwnerId = overTask.assigneeId || userId
-      } else if (mode === 'mat') {
-        // 개인 매트릭스: targetOwner = userId
-        const [, projId] = parts
-        targetProjectId = projId
-        targetOwnerId = userId
-      } else if (mode === 'tmat') {
-        // 팀 매트릭스: targetOwner = memberId
-        const [, projId, memberId] = parts
-        targetProjectId = projId
-        targetOwnerId = memberId
-      } else {
-        // pw/tw weekly: MS drop 무시
-        return
-      }
-      moveMilestoneWithTasks(msId, { targetProjectId, targetOwnerId })
-      return
-    }
-
-    // ─── Task drop (cell-task / bl-task / raw) ───
-    // 7-E1: cell-task: prefix 추가
-    const taskId = activeIdStr.startsWith('bl-task:') ? activeIdStr.slice(8)
-      : activeIdStr.startsWith('cell-task:') ? activeIdStr.slice(10)
-      : activeIdStr
-    const task = tasks.find(t => t.id === taskId)
-    if (!task) return
-
-    // 7-E1: over가 cell-task: 면 sortable end (다른 task 위에 drop)
+    // ═══ 1) over가 cell-task: (sortable item 위에 drop) ═══
+    // 7-E1 fix-2: parts.length 체크 앞에 위치 — 'cell-task:xxx' 는 split 결과 length 2이므로
+    //             이전에는 parts.length<3 차단으로 도달 불가했음
     if (overId.startsWith('cell-task:')) {
       const overTaskId = overId.slice(10)
-      if (overTaskId === task.id) return
       const overTask = tasks.find(t => t.id === overTaskId)
       if (!overTask) return
 
-      // 같은 셀 판정 — projectId + assigneeId + category 모두 일치
+      // MS source — over task의 셀로 cascade
+      if (isMs) {
+        moveMilestoneWithTasks(msId, {
+          targetProjectId: overTask.projectId,
+          targetOwnerId: overTask.assigneeId || userId,
+        })
+        return
+      }
+
+      // Task source — sortable end
+      if (!task || overTaskId === task.id) return
+
       const sameCell = (
         task.projectId === overTask.projectId &&
         task.assigneeId === overTask.assigneeId &&
@@ -226,11 +202,10 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
         const newIndex = cellTasks.findIndex(t => t.id === overTaskId)
         if (oldIndex === -1 || newIndex === -1) return
 
-        // cross-MS-group within same cell — keyMilestoneId 변경 후 reorder
+        // cross-MS-group within same cell — keyMilestoneId 변경
         if (task.keyMilestoneId !== overTask.keyMilestoneId) {
           updateTask(task.id, {
             keyMilestoneId: overTask.keyMilestoneId,
-            // 다른 필드는 건드리지 않음 — projectId 그대로 → R5 트리거 안 됨
           })
         }
         const reordered = arrayMove(cellTasks, oldIndex, newIndex)
@@ -248,24 +223,47 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       return
     }
 
-    // ─── over가 droppable cell (mat/tmat/pw/tw) ───
+    // ═══ 2) over가 droppable cell zone (mat/tmat/pw/tw) ═══
+    const parts = overId.split(':')
+    if (parts.length < 3) return
+    const mode = parts[0]
+
+    // MS source → cell drop
+    if (isMs) {
+      let targetProjectId = null
+      let targetOwnerId = null
+      if (mode === 'mat') {
+        const [, projId] = parts
+        targetProjectId = projId
+        targetOwnerId = userId
+      } else if (mode === 'tmat') {
+        const [, projId, memberId] = parts
+        targetProjectId = projId
+        targetOwnerId = memberId
+      } else {
+        // pw/tw weekly: MS drop 무시
+        return
+      }
+      moveMilestoneWithTasks(msId, { targetProjectId, targetOwnerId })
+      return
+    }
+
+    // Task source → cell drop
+    if (!task) return
+
     if (mode === 'mat') {
-      // Personal matrix: project + category
       const [, targetProjId, targetCat] = parts
       if (task.projectId === targetProjId && task.category === targetCat) return
       moveTaskTo(taskId, targetProjId, targetCat)
     } else if (mode === 'tmat') {
-      // Team matrix: project + assignee
       const [, targetProjId, targetMemberId] = parts
       if (task.projectId === targetProjId && task.assigneeId === targetMemberId) return
       updateTask(taskId, { projectId: targetProjId, assigneeId: targetMemberId, scope: 'assigned' })
     } else if (mode === 'pw') {
-      // Personal weekly: project + date
       const [, , targetDate] = parts
       if (task.dueDate === targetDate) return
       updateTask(taskId, { dueDate: targetDate })
     } else if (mode === 'tw') {
-      // Team weekly: member + date
       const [, targetMemberId, targetDate] = parts
       if (task.assigneeId === targetMemberId && task.dueDate === targetDate) return
       updateTask(taskId, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
