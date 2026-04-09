@@ -10,6 +10,7 @@ import { useKeyLinks } from '../../hooks/useKeyLinks'
 import { useKeyPolicies } from '../../hooks/useKeyPolicies'
 import CompactMilestoneRow from './CompactMilestoneRow'
 import MilestoneTaskChip from './MilestoneTaskChip'
+import BacklogPanel from './BacklogPanel'
 
 const DEFAULT_TASK_W = 400
 const TASK_COL_W_KEY = 'milestoneTaskColW'
@@ -39,7 +40,25 @@ export default function CompactMilestoneTab({ projectId }) {
   const openDetail = useStore(s => s.openDetail)
   const openModal = useStore(s => s.openModal)
 
+  const [wideEnough, setWideEnough] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true)
+  useEffect(() => {
+    const handler = () => setWideEnough(window.innerWidth >= 1024)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   const [expandedMs, setExpandedMs] = useState(new Set())
+
+  // __backlog__가 expandedMs에 잔류할 수 있으므로 제거
+  useEffect(() => {
+    setExpandedMs(prev => {
+      if (!prev.has('__backlog__')) return prev
+      const n = new Set(prev)
+      n.delete('__backlog__')
+      return n
+    })
+  }, [])
+
   const [activeTask, setActiveTask] = useState(null)
   const [activeMilestone, setActiveMilestone] = useState(null)
   const containerRef = useRef(null)
@@ -79,7 +98,7 @@ export default function CompactMilestoneTab({ projectId }) {
   )
 
   // Expand/collapse
-  const allMsIds = useMemo(() => [...milestones.map(m => m.id), '__backlog__'], [milestones])
+  const allMsIds = useMemo(() => milestones.map(m => m.id), [milestones])
   const allExpanded = expandedMs.size >= allMsIds.length
 
   const toggleExpandAll = useCallback(() => {
@@ -137,8 +156,8 @@ export default function CompactMilestoneTab({ projectId }) {
       }
 
       if (targetMsId !== undefined) {
-        const newKeyMilestoneId = (targetMsId === '__backlog__' || targetMsId === null) ? null : targetMsId
-        const currentMsId = activeData.sourceMsId === '__backlog__' ? null : activeData.sourceMsId
+        const newKeyMilestoneId = targetMsId || null
+        const currentMsId = activeData.sourceMsId || null
         if (currentMsId !== newKeyMilestoneId) {
           updateTask(activeData.taskId, { keyMilestoneId: newKeyMilestoneId })
         }
@@ -151,7 +170,7 @@ export default function CompactMilestoneTab({ projectId }) {
 
   // Add task to milestone
   const handleAddTask = useCallback((msId, text) => {
-    const keyMilestoneId = (msId === '__backlog__' || msId === null) ? null : msId
+    const keyMilestoneId = msId || null
     addTask({ text, projectId, category: 'today', keyMilestoneId })
   }, [addTask, projectId])
 
@@ -199,10 +218,9 @@ export default function CompactMilestoneTab({ projectId }) {
     return <div style={{ padding: 40, textAlign: 'center', color: '#b4b2a9', fontSize: 13 }}>로딩 중...</div>
   }
 
-  const BACKLOG_MS = { id: '__backlog__', title: '백로그' }
-
   return (
-    <div ref={containerRef}>
+    <div style={{ display: 'flex', height: '100%' }}>
+    <div ref={containerRef} style={{ flex: 1, overflow: 'auto' }}>
     <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
@@ -284,24 +302,6 @@ export default function CompactMilestoneTab({ projectId }) {
         + 마일스톤 추가
       </div>
 
-      {/* Backlog */}
-      <div style={{ borderTop: '1.5px dashed #e8e6df' }}>
-        <CompactMilestoneRow
-          milestone={BACKLOG_MS}
-          tasks={backlogTasks}
-          expanded={expandedMs.has('__backlog__')}
-          onToggleExpand={toggleExpand}
-          onTaskToggle={toggleDone}
-          onAddTask={handleAddTask}
-          onTaskClick={openDetail}
-          isBacklog={true}
-          deliverables={[]}
-          taskColW={taskColW}
-          onResizeStart={handleResizeStart}
-          onUpdateMilestone={handleUpdateMilestone}
-        />
-      </div>
-
       {/* Footer sections */}
       <FooterSection icon="📎" label="참조 문서" count={links.length}>
         {links.map(l => (
@@ -325,6 +325,17 @@ export default function CompactMilestoneTab({ projectId }) {
         {activeMilestone ? <MilestoneOverlay milestone={activeMilestone} /> : null}
       </DragOverlay>
     </DndContext>
+    </div>
+
+    {/* BacklogPanel */}
+    <BacklogPanel
+      projectId={projectId}
+      projectTasks={projectTasks}
+      members={members}
+      currentTeamId={currentTeamId}
+      color={{ dot: '#888', text: '#888' }}
+      hidden={!wideEnough}
+    />
     </div>
   )
 }

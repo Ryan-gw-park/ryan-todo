@@ -1,0 +1,113 @@
+import { useState, useRef, useEffect } from 'react'
+import MiniAvatar from '../views/grid/shared/MiniAvatar'
+
+export default function TaskAssigneeChip({
+  taskId,
+  assigneeId,
+  members,
+  onChangeAssignee,
+  size = 14,
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  // click-outside
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const memberName = (userId) => {
+    const m = members.find(mem => mem.userId === userId)
+    return m ? (m.displayName || '?') : '?'
+  }
+
+  // 아바타 렌더
+  const renderAvatar = () => {
+    if (assigneeId) {
+      return <MiniAvatar name={memberName(assigneeId)} size={size} />
+    }
+    // ghost
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%',
+        border: '1px dashed #B4B2A9', background: 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.5, color: '#B4B2A9', flexShrink: 0,
+      }}>+</div>
+    )
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      {/* Trigger */}
+      <div
+        onClick={(e) => { e.stopPropagation(); setOpen(prev => !prev) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.stopPropagation(); setOpen(prev => !prev) }
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+        role="button"
+        tabIndex={0}
+        aria-label={assigneeId ? `담당자: ${memberName(assigneeId)}, 클릭하여 변경` : '담당자 미배정, 클릭하여 지정'}
+      >
+        {renderAvatar()}
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: size + 4, right: 0, zIndex: 100,
+            width: 180, background: '#fff', border: '1px solid #e8e6df',
+            borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.12)',
+            padding: '6px 0', fontSize: 12,
+          }}
+        >
+          {/* Header */}
+          <div style={{ padding: '4px 12px 6px', fontSize: 11, color: '#a09f99', fontWeight: 500 }}>담당자 변경</div>
+
+          {/* 미배정 옵션 */}
+          <div
+            onClick={() => { onChangeAssignee(null); setOpen(false) }}
+            style={{
+              padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+              background: !assigneeId ? '#f5f4f0' : 'transparent',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f5f4f0'}
+            onMouseLeave={e => { if (assigneeId) e.currentTarget.style.background = 'transparent' }}
+          >
+            <span style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid #ccc', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#ccc' }}>○</span>
+            <span style={{ color: '#888780' }}>미배정</span>
+          </div>
+
+          {/* 멤버 목록 */}
+          {members.map(m => {
+            const isSelected = assigneeId === m.userId
+            return (
+              <div
+                key={m.userId}
+                onClick={() => { onChangeAssignee(m.userId); setOpen(false) }}
+                style={{
+                  padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                  background: isSelected ? '#f5f4f0' : 'transparent',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f5f4f0'}
+                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+              >
+                <MiniAvatar name={m.displayName || '?'} size={14} />
+                <span style={{ color: isSelected ? '#2C2C2A' : '#6b6a66', fontWeight: isSelected ? 500 : 400 }}>
+                  {m.displayName || '?'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

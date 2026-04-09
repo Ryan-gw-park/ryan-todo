@@ -5,6 +5,8 @@ import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
 import { buildTree } from '../../utils/milestoneTree'
 import MsTaskTreeMode from './MsTaskTreeMode'
+import BacklogPanel from './BacklogPanel'
+import useTeamMembers from '../../hooks/useTeamMembers'
 import {
   getTimelineRange, getColumns, getColWidth, getTodayLabel,
   ScalePill, Toast, TimelineMsRow,
@@ -55,6 +57,21 @@ export default function UnifiedProjectView({ projectId }) {
   const color = project ? getColor(project.color) : null
   const pkmId = pkm?.id || null
   const dotColor = color?.dot || '#888'
+
+  const currentTeamId = useStore(s => s.currentTeamId)
+
+  const [blMembers, setBlMembers] = useState([])
+  useEffect(() => {
+    if (!currentTeamId) { setBlMembers([]); return }
+    useTeamMembers.getMembers(currentTeamId).then(setBlMembers)
+  }, [currentTeamId])
+
+  const [wideEnough, setWideEnough] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true)
+  useEffect(() => {
+    const handler = () => setWideEnough(window.innerWidth >= 1024)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const [rightMode, setRightMode] = useState('전체 할일')
   const [scale, setScale] = useState('week')
@@ -224,73 +241,86 @@ export default function UnifiedProjectView({ projectId }) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {rightMode === '전체 할일' && (
-          <MsTaskTreeMode
-            tree={tree}
-            projectTasks={projectTasks}
-            backlogTasks={backlogTasks}
-            projectId={projectId}
-            pkmId={pkmId}
-            color={color}
-            toggleDone={toggleDone}
-            openDetail={openDetail}
-            addMilestone={addMilestone}
-            updateMilestone={updateMilestone}
-            deleteMilestone={deleteMilestone}
-            openConfirmDialog={openConfirmDialog}
-            externalCollapsed={collapsed}
-            onToggleNode={toggleNode}
-            onExpandAll={expandAll}
-            onCollapseAll={collapseAll}
-          />
-        )}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        {/* 메인 콘텐츠 */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {rightMode === '전체 할일' && (
+            <MsTaskTreeMode
+              tree={tree}
+              projectTasks={projectTasks}
+              backlogTasks={backlogTasks}
+              projectId={projectId}
+              pkmId={pkmId}
+              color={color}
+              toggleDone={toggleDone}
+              openDetail={openDetail}
+              addMilestone={addMilestone}
+              updateMilestone={updateMilestone}
+              deleteMilestone={deleteMilestone}
+              openConfirmDialog={openConfirmDialog}
+              externalCollapsed={collapsed}
+              onToggleNode={toggleNode}
+              onExpandAll={expandAll}
+              onCollapseAll={collapseAll}
+            />
+          )}
 
-        {rightMode === '타임라인' && (
-          <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }} onDragEnd={() => setDragState(null)}>
-            <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden', display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
-              {/* Column header */}
-              <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 2 }}>
-                <div style={{ width: TREE_W, flexShrink: 0, padding: '6px 8px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>
-                  마일스톤 / 할일
+          {rightMode === '타임라인' && (
+            <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }} onDragEnd={() => setDragState(null)}>
+              <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden', display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
+                {/* Column header */}
+                <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 2 }}>
+                  <div style={{ width: TREE_W, flexShrink: 0, padding: '6px 8px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>
+                    마일스톤 / 할일
+                  </div>
+                  <div style={{ display: 'flex' }}>
+                    {columns.map((col, i) => {
+                      const isToday = col.label === todayLabel
+                      return (
+                        <div key={i} style={{
+                          width: colW, flexShrink: 0, padding: '6px 4px', fontSize: FONT.tiny, fontWeight: isToday ? 700 : 500,
+                          color: isToday ? '#E53E3E' : COLOR.textTertiary, textAlign: 'center',
+                          borderRight: `1px solid ${isToday ? '#E53E3E' : COLOR.border}`,
+                          background: isToday ? 'rgba(229,62,62,0.04)' : 'transparent',
+                        }}>{col.label}</div>
+                      )
+                    })}
+                  </div>
                 </div>
-                <div style={{ display: 'flex' }}>
-                  {columns.map((col, i) => {
-                    const isToday = col.label === todayLabel
-                    return (
-                      <div key={i} style={{
-                        width: colW, flexShrink: 0, padding: '6px 4px', fontSize: FONT.tiny, fontWeight: isToday ? 700 : 500,
-                        color: isToday ? '#E53E3E' : COLOR.textTertiary, textAlign: 'center',
-                        borderRight: `1px solid ${isToday ? '#E53E3E' : COLOR.border}`,
-                        background: isToday ? 'rgba(229,62,62,0.04)' : 'transparent',
-                      }}>{col.label}</div>
-                    )
-                  })}
-                </div>
+
+                {/* Tree rows */}
+                {tree.length === 0 && (
+                  <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>마일스톤이 없습니다</div>
+                )}
+                {tree.map(node => (
+                  <TimelineMsRow
+                    key={node.id} node={node} depth={0} dotColor={dotColor}
+                    treeW={TREE_W}
+                    collapsed={collapsed} toggleNode={toggleNode}
+                    timelineCtx={timelineCtx}
+                    projectTasks={projectTasks}
+                    toggleDone={toggleDone}
+                    dragState={dragState} setDragState={setDragState}
+                    onTaskDrop={handleTimelineTaskDrop}
+                    onMsDropChild={handleTimelineMsDropChild}
+                    onMsReorder={handleTimelineMsReorder}
+                    onBarDragEnd={handleBarDragEnd}
+                  />
+                ))}
               </div>
-
-              {/* Tree rows */}
-              {tree.length === 0 && (
-                <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>마일스톤이 없습니다</div>
-              )}
-              {tree.map(node => (
-                <TimelineMsRow
-                  key={node.id} node={node} depth={0} dotColor={dotColor}
-                  treeW={TREE_W}
-                  collapsed={collapsed} toggleNode={toggleNode}
-                  timelineCtx={timelineCtx}
-                  projectTasks={projectTasks}
-                  toggleDone={toggleDone}
-                  dragState={dragState} setDragState={setDragState}
-                  onTaskDrop={handleTimelineTaskDrop}
-                  onMsDropChild={handleTimelineMsDropChild}
-                  onMsReorder={handleTimelineMsReorder}
-                  onBarDragEnd={handleBarDragEnd}
-                />
-              ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* BacklogPanel */}
+        <BacklogPanel
+          projectId={projectId}
+          projectTasks={projectTasks}
+          members={blMembers}
+          currentTeamId={currentTeamId}
+          color={color}
+          hidden={!wideEnough}
+        />
       </div>
 
       {/* Toast */}
