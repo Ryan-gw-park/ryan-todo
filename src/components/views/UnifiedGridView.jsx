@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { COLOR, FONT, SPACE, VIEW_WIDTH, CHECKBOX } from '../../styles/designTokens'
-import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, closestCenter } from '@dnd-kit/core'
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, pointerWithin } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
@@ -377,7 +377,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
 
         {/* ═══ Grid + Sidebar ═══ */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 0 }}>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div style={{ flex: 1, overflow: 'auto' }}>
               {view === 'matrix' && scope === 'personal' && (
                 <PersonalMatrixGrid
