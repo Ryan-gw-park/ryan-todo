@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { COLOR, FONT, CHECKBOX } from '../../../../styles/designTokens'
 import { getColor } from '../../../../utils/colors'
 import useStore from '../../../../hooks/useStore'
+import DatePopover from './DatePopover'
 
 /* ─── Span Bar (middle/end segment — no sortable to avoid id collision) ─── */
 export function SpanBar({ task, project, spanPosition }) {
@@ -23,7 +24,9 @@ export default function TaskRow({ task, project, editingId, setEditingId, handle
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `cell-task:${task.id}`,
   })
+  const updateTask = useStore(s => s.updateTask)
   const [hover, setHover] = useState(false)
+  const [showDatePopover, setShowDatePopover] = useState(false)
   const isEditing = editingId === task.id
 
   // Find MS title for this task
@@ -109,6 +112,20 @@ export default function TaskRow({ task, project, editingId, setEditingId, handle
       {/* Due date badge */}
       {task.dueDate && !showProject && (
         <span style={{ fontSize: FONT.ganttMs, color: COLOR.textTertiary, flexShrink: 0 }}>{task.dueDate.slice(5)}</span>
+      )}
+
+      {/* Date edit icon (weekly span) */}
+      {hover && !isEditing && effectiveSpan && (
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div onClick={e => { e.stopPropagation(); e.preventDefault(); setShowDatePopover(prev => !prev) }} style={{
+            width: 16, height: 16, borderRadius: 3,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', opacity: 0.4, fontSize: 10,
+          }}>📅</div>
+          {showDatePopover && (
+            <DatePopover task={task} onUpdate={updateTask} onClose={() => setShowDatePopover(false)} />
+          )}
+        </div>
       )}
 
       {/* Detail arrow */}
