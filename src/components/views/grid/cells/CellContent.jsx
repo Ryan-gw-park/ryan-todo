@@ -60,7 +60,7 @@ export default function CellContent({
         }
       })
     }
-    result.sort((a, b) => (a.tasks[0]?.sortOrder || 0) - (b.tasks[0]?.sortOrder || 0))
+    result.sort((a, b) => (a.ms.sort_order ?? 0) - (b.ms.sort_order ?? 0))
     done.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
     return { msGroups: result, ungrouped: noMs, done }
   }, [cellTasks, allMilestones, cellMilestones])
