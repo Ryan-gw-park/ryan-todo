@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { COLOR } from '../../../../styles/designTokens'
+import { getColor } from '../../../../utils/colors'
 import useStore from '../../../../hooks/useStore'
 import { getMsPath } from '../../../../utils/milestoneTree'
+import { computeMilestoneCount } from '../../../../utils/milestoneProgress'
 import TaskRow from './TaskRow'
 import MilestoneRow from './MilestoneRow'
 
@@ -29,6 +31,7 @@ export default function CellContent({
 }) {
   const getProj = (t) => project || (projectMap && projectMap[t.projectId]) || null
   const allMilestones = useStore(s => s.milestones)
+  const allTasks = useStore(s => s.tasks)
   const openModal = useStore(s => s.openModal)
 
   const groups = useMemo(() => {
@@ -60,10 +63,16 @@ export default function CellContent({
         }
       })
     }
-    result.sort((a, b) => (a.ms.sort_order ?? 0) - (b.ms.sort_order ?? 0))
+    // 카운트를 한 번에 계산하여 저장 (alive/total — 셀 컨텍스트 무관, 전체 프로젝트 기준)
+    result.forEach(g => {
+      const cnt = computeMilestoneCount(g.msId, allTasks)
+      g.aliveCount = cnt.alive
+      g.totalCount = cnt.total
+    })
+    result.sort((a, b) => (a.ms.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.ms.sort_order ?? Number.MAX_SAFE_INTEGER))
     done.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
     return { msGroups: result, ungrouped: noMs, done }
-  }, [cellTasks, allMilestones, cellMilestones])
+  }, [cellTasks, allMilestones, cellMilestones, allTasks])
 
   // 7-E1/7-E2: 셀 내 모든 sortable item id 수집 (MS 헤더 + task, done 제외)
   const allItemIds = useMemo(() => {
@@ -115,6 +124,13 @@ export default function CellContent({
             <MilestoneRow
               ms={g.ms}
               taskCount={g.tasks.length}
+              aliveCount={g.aliveCount}
+              totalCount={g.totalCount}
+              accentColor={(() => {
+                const p = g.tasks.length > 0 ? getProj(g.tasks[0]) : project
+                return p?.color ? getColor(p.color).dot : null
+              })()}
+              isEmpty={g.tasks.length === 0}
               collapsed={msCollapsed}
               onToggleCollapse={toggleMatrixMsCollapse ? () => toggleMatrixMsCollapse(g.msId) : null}
               isEditing={matrixMsInteractive && editingMsId === g.msId}
@@ -128,7 +144,9 @@ export default function CellContent({
               interactive={matrixMsInteractive}
             />
             {!msCollapsed && g.tasks.map(t => (
-              <TaskRow key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
+              <div key={t.id} style={{ paddingLeft: 22 }}>
+                <TaskRow task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />
+              </div>
             ))}
           </div>
         )
@@ -136,7 +154,10 @@ export default function CellContent({
       {groups.ungrouped.length > 0 && (
         <div style={{ marginTop: groups.msGroups.length > 0 ? 2 : 0 }}>
           {groups.msGroups.length > 0 && (
-            <div style={{ height: '0.5px', background: COLOR.border, margin: '3px 0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 2px', padding: '0 2px' }}>
+              <span style={{ fontSize: 9, color: COLOR.textTertiary, fontWeight: 500, textTransform: 'uppercase' }}>기타</span>
+              <div style={{ flex: 1, height: 0.5, background: COLOR.border }} />
+            </div>
           )}
           {groups.ungrouped.map(t => (
             <TaskRow key={t.id} task={t} project={getProj(t)} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject={showProject} />

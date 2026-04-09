@@ -114,9 +114,9 @@ export default function CompactMilestoneRow({
     data: { type: 'milestone-drop', milestoneId: isBacklog ? null : milestone.id },
   })
 
-  const doneCnt = tasks.filter(t => t.done).length
+  const aliveCnt = tasks.filter(t => !t.done).length
   const totalCnt = tasks.length
-  const pct = totalCnt > 0 ? Math.round((doneCnt / totalCnt) * 100) : 0
+  const pct = totalCnt > 0 ? Math.round(((totalCnt - aliveCnt) / totalCnt) * 100) : 0
 
   // Always show all tasks — flex-wrap handles layout based on available width
 
@@ -209,7 +209,7 @@ export default function CompactMilestoneRow({
               <div style={{ width: 32, height: 3, background: '#eeeee6', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: '#1D9E75', borderRadius: 2, transition: 'width .3s' }} />
               </div>
-              <span style={{ fontSize: 9.5, color: '#888780', fontVariantNumeric: 'tabular-nums' }}>{doneCnt}/{totalCnt}</span>
+              <span style={{ fontSize: 9.5, color: '#888780', fontVariantNumeric: 'tabular-nums' }}>{aliveCnt}/{totalCnt}</span>
             </div>
           )}
           {/* MS Owner Avatar */}

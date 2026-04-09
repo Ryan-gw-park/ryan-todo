@@ -5,12 +5,17 @@ import { COLOR } from '../../../../styles/designTokens'
 
 /* ─── Milestone Row — 매트릭스 셀 내 MS 헤더 (인터랙티브) ─── */
 /*
+ * 10a: 배경색 + accent bar + alive/total 카운트 + 들여쓰기 기반 그룹 헤더
  * 비-인터랙티브 모드 (interactive=false): 토글 + 제목 + count + › 만 노출 (주간 플래너용)
  * 인터랙티브 모드 (interactive=true): + ⋮ 추가, 제목 인라인 편집 가능
  */
 export default function MilestoneRow({
   ms,
   taskCount,
+  aliveCount,
+  totalCount,
+  accentColor,
+  isEmpty,
   collapsed,
   onToggleCollapse,
   isEditing,
@@ -48,28 +53,31 @@ export default function MilestoneRow({
       style={{
         ...sortableStyle,
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '3px 2px 2px', marginBottom: 1,
-        background: hover && interactive ? COLOR.bgHover : 'transparent',
-        borderRadius: 3,
+        padding: '5px 8px 5px 5px',
+        marginBottom: 2,
+        background: hover && interactive ? '#E8E6DD' : '#F1EFE8',
+        borderRadius: 4,
         position: 'relative',
         cursor: dragDisabled ? 'default' : 'grab',
-        opacity: isDragging ? 0.3 : 1,
+        opacity: isDragging ? 0.3 : (isEmpty && !hover ? 0.5 : 1),
       }}
     >
+      {/* Accent bar */}
+      {accentColor && (
+        <div style={{ width: 3, height: 14, borderRadius: 1, background: accentColor, flexShrink: 0 }} />
+      )}
+
       {/* Toggle chevron */}
       <span
-        onClick={e => { e.stopPropagation(); onToggleCollapse && onToggleCollapse() }}
+        onClick={e => { e.stopPropagation(); !isEditing && onToggleCollapse && onToggleCollapse() }}
         style={{
-          fontSize: 9, color: COLOR.textTertiary, width: 10,
-          cursor: onToggleCollapse ? 'pointer' : 'default',
+          fontSize: 10, color: COLOR.textSecondary, width: 10,
+          cursor: (!isEditing && onToggleCollapse) ? 'pointer' : 'default',
           display: 'inline-block', textAlign: 'center',
           transform: collapsed ? 'rotate(-90deg)' : 'rotate(0)',
           transition: 'transform 0.12s', flexShrink: 0,
         }}
       >▾</span>
-
-      {/* Bullet */}
-      <div style={{ width: 5, height: 5, borderRadius: '50%', background: COLOR.textTertiary, flexShrink: 0 }} />
 
       {/* Title area (breadcrumb + title) */}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -89,7 +97,7 @@ export default function MilestoneRow({
             }}
             onMouseDown={e => e.stopPropagation()}
             style={{
-              fontSize: 11, fontWeight: 600,
+              fontSize: 12, fontWeight: 500,
               border: `1px solid ${COLOR.border}`, borderRadius: 3,
               outline: 'none', background: '#fff',
               color: COLOR.textPrimary, fontFamily: 'inherit',
@@ -104,7 +112,7 @@ export default function MilestoneRow({
               onStartEdit && onStartEdit()
             }}
             style={{
-              fontSize: 11, fontWeight: 600, color: COLOR.textSecondary,
+              fontSize: 12, fontWeight: 500, color: COLOR.textPrimary,
               cursor: interactive ? 'text' : 'default',
               whiteSpace: 'normal', wordBreak: 'break-word',
             }}
@@ -112,11 +120,17 @@ export default function MilestoneRow({
         )}
       </div>
 
-      {/* Task count */}
-      {!isEditing && (
-        <span style={{ fontSize: 9, color: COLOR.textTertiary, flexShrink: 0 }}>
-          {taskCount > 0 ? taskCount : ''}
-        </span>
+      {/* Alive/Total count badge */}
+      {!isEditing && totalCount > 0 && (
+        <span style={{
+          fontSize: 10, fontWeight: 500, color: '#888780',
+          background: '#E8E6DD', borderRadius: 8, padding: '0 5px',
+          flexShrink: 0,
+        }}>{aliveCount}/{totalCount}</span>
+      )}
+      {/* Fallback: taskCount only (for non-count callers) */}
+      {!isEditing && !totalCount && taskCount > 0 && (
+        <span style={{ fontSize: 10, color: COLOR.textTertiary, flexShrink: 0 }}>{taskCount}</span>
       )}
 
       {/* Hover-only action buttons (interactive only) */}
@@ -145,8 +159,8 @@ export default function MilestoneRow({
         >⋮</span>
       )}
 
-      {/* Detail arrow (always visible) */}
-      {!isEditing && onOpenDetail && (
+      {/* Detail arrow (hover only, disabled during edit) */}
+      {!isEditing && onOpenDetail && hover && (
         <span
           onClick={e => { e.stopPropagation(); onOpenDetail() }}
           style={{

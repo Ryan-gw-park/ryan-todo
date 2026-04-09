@@ -145,7 +145,7 @@ export default function MsTaskListMode({
                 <div style={{ width: 32, height: 3, borderRadius: 2, background: '#e8e6df' }}>
                   <div style={{ width: `${taskCount.done / taskCount.total * 100}%`, height: 3, borderRadius: 2, background: color?.dot || '#888', transition: 'width 0.2s' }} />
                 </div>
-                <span style={{ fontSize: 10, color: COLOR.textTertiary, fontWeight: 500 }}>{taskCount.done}/{taskCount.total}</span>
+                <span style={{ fontSize: 10, color: COLOR.textTertiary, fontWeight: 500 }}>{taskCount.total - taskCount.done}/{taskCount.total}</span>
               </div>
             )}
 

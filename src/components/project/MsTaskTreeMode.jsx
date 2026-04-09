@@ -5,6 +5,7 @@ import useStore from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import MilestoneOwnerSelector from './MilestoneOwnerSelector'
 import { computeOwnerDisplay } from '../../utils/milestoneOwnerAggregate'
+import { computeMilestoneCountRecursive } from '../../utils/milestoneProgress'
 
 
 /* ═══════════════════════════════════════════════════════
@@ -220,12 +221,10 @@ export default function MsTaskTreeMode({
     showToast(`"${ms?.title || '?'}" 순서 변경`)
   }, [milestones, moveMilestone, reorderMilestones, pushUndo])
 
-  // ─── Count ───
+  // ─── Count (alive/total) ───
   const countAll = useCallback((n) => {
-    let c = projectTasks.filter(t => t.keyMilestoneId === n.id && !t.done && !t.deletedAt).length
-    ;(n.children || []).forEach(ch => { c += countAll(ch) })
-    return c
-  }, [projectTasks])
+    return computeMilestoneCountRecursive(n.id, milestones, projectTasks)
+  }, [milestones, projectTasks])
 
   return (
     <div style={{ flex: 1, overflow: 'auto' }}>
@@ -307,7 +306,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
   const allTasks = projectTasks.filter(t => t.keyMilestoneId === node.id && !t.deletedAt)
   const activeTasks = allTasks.filter(t => !t.done).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
   const doneTasks = allTasks.filter(t => t.done)
-  const total = countAll(node)
+  const msCount = countAll(node)
 
   const [expandedDone, setExpandedDone] = useState(false)
 
@@ -377,7 +376,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
             }}>{node.title || '(제목 없음)'}</span>
           )}
 
-          {total > 0 && <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, flexShrink: 0 }}>{total}</span>}
+          {msCount.total > 0 && <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, flexShrink: 0 }}>{msCount.alive}/{msCount.total}</span>}
 
           {/* MS Owner Avatar */}
           {currentTeamId ? (

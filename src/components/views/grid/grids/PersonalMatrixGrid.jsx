@@ -62,8 +62,8 @@ export default function PersonalMatrixGrid({
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
               const cellActiveCount = cellTasks.filter(t => !t.done).length
               const dropId = `mat:${proj.id}:${cat.key}`
-              const cellMs = cat.key === 'today' ? projMyMilestones : null
-              // 7-C: today 컬럼에서만 MS 추가 가능 (개인 매트릭스의 빈 MS도 today에만 표시되므로 일관성 유지)
+              const cellMs = projMyMilestones
+              // 10a: 모든 컬럼에서 MS 표시. InlineMsAdd는 today만 유지
               const handleAddMsForCell = async () => {
                 const newMs = await addMilestoneInProject(proj.id, { ownerId: userId })
                 if (newMs && onStartMsEdit) onStartMsEdit(newMs.id)
