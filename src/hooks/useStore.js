@@ -1042,6 +1042,72 @@ const useStore = create((set, get) => ({
     if (error) console.error('[useStore] updateMilestone:', error)
   },
 
+  cascadeMilestoneOwner: async (msId, ownerId, { overwrite = false } = {}) => {
+    const { milestones } = get()
+    const d = db()
+    if (!d) return { prevStates: [] }
+
+    // inline descendant 수집 (외부 import 회피 — TDZ 방지)
+    const getDesc = (parentId, visited = new Set()) => {
+      if (visited.has(parentId)) return []
+      visited.add(parentId)
+      const children = milestones.filter(m => m.parent_id === parentId)
+      const ids = []
+      for (const c of children) {
+        ids.push(c.id)
+        ids.push(...getDesc(c.id, visited))
+      }
+      return ids
+    }
+
+    const descendantIds = getDesc(msId)
+
+    // overwrite=false면 owner_id가 null인 것만 대상
+    const targetIds = overwrite
+      ? descendantIds
+      : descendantIds.filter(id => {
+          const m = milestones.find(ms => ms.id === id)
+          return m && !m.owner_id
+        })
+
+    if (targetIds.length === 0) return { prevStates: [] }
+
+    // 롤백용 이전 상태 보관
+    const prevStates = targetIds.map(id => {
+      const m = milestones.find(ms => ms.id === id)
+      return { id, owner_id: m?.owner_id || null }
+    })
+
+    // 로컬 즉시 반영 (단일 set)
+    set(s => ({
+      milestones: s.milestones.map(m =>
+        targetIds.includes(m.id) ? { ...m, owner_id: ownerId } : m
+      )
+    }))
+
+    // DB 순차 update (moveMilestoneWithTasks 패턴)
+    let hasError = false
+    for (const id of targetIds) {
+      const { error } = await d.from('key_milestones')
+        .update({ owner_id: ownerId, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) { console.error('[useStore] cascadeMilestoneOwner:', error); hasError = true }
+    }
+
+    // 실패 시 롤백
+    if (hasError) {
+      set(s => ({
+        milestones: s.milestones.map(m => {
+          const prev = prevStates.find(p => p.id === m.id)
+          return prev ? { ...m, owner_id: prev.owner_id } : m
+        })
+      }))
+      return { prevStates: [], error: true }
+    }
+
+    return { prevStates } // Undo용 반환
+  },
+
   deleteMilestone: async (id) => {
     const d = db()
     if (!d) return

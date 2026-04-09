@@ -3,6 +3,9 @@ import { useSortable } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import MilestoneTaskChip from './MilestoneTaskChip'
+import MilestoneOwnerSelector from './MilestoneOwnerSelector'
+import { computeOwnerDisplay } from '../../utils/milestoneOwnerAggregate'
+import { computeDepth } from '../../utils/milestoneTree'
 
 const fmt = (d) => {
   if (!d) return ''
@@ -92,6 +95,7 @@ export default function CompactMilestoneRow({
   milestone, tasks, expanded, onToggleExpand, onTaskToggle,
   onAddTask, onTaskClick, isBacklog, deliverables,
   taskColW, onResizeStart, onUpdateMilestone, onOpenMilestoneDetail,
+  members, allMilestones, currentTeamId, onCascadeOwner,
 }) {
   const [hover, setHover] = useState(false)
 
@@ -208,6 +212,30 @@ export default function CompactMilestoneRow({
               <span style={{ fontSize: 9.5, color: '#888780', fontVariantNumeric: 'tabular-nums' }}>{doneCnt}/{totalCnt}</span>
             </div>
           )}
+          {/* MS Owner Avatar */}
+          {!isBacklog && (() => {
+            const avatarSize = (() => {
+              if (!allMilestones) return 20
+              const d = computeDepth(milestone, allMilestones)
+              return d === 0 ? 20 : d === 1 ? 18 : 16
+            })()
+            return currentTeamId ? (
+              <MilestoneOwnerSelector
+                milestoneId={milestone.id}
+                ownerId={milestone.owner_id}
+                ownerDisplay={computeOwnerDisplay(milestone, allMilestones || [])}
+                members={members || []}
+                hasChildren={allMilestones?.some(m => m.parent_id === milestone.id)}
+                onChangeOwner={(userId) => onUpdateMilestone(milestone.id, { owner_id: userId })}
+                onCascade={(userId, opts) => onCascadeOwner?.(milestone.id, userId, opts)}
+                size={avatarSize}
+                currentTeamId={currentTeamId}
+              />
+            ) : (
+              <div style={{ width: avatarSize, visibility: 'hidden', flexShrink: 0 }} />
+            )
+          })()}
+
           {/* Detail button */}
           {!isBacklog && onOpenMilestoneDetail && (
             <button

@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { DndContext, DragOverlay, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import useStore from '../../hooks/useStore'
+import useTeamMembers from '../../hooks/useTeamMembers'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { useKeyMilestones } from '../../hooks/useKeyMilestones'
 import { useKeyDeliverables } from '../../hooks/useKeyDeliverables'
@@ -20,6 +21,16 @@ export default function CompactMilestoneTab({ projectId }) {
   const { deliverables, getByMilestone } = useKeyDeliverables(pkm?.id, projectId)
   const { items: links } = useKeyLinks(pkm?.id, projectId)
   const { items: policies } = useKeyPolicies(pkm?.id, projectId)
+
+  const currentTeamId = useStore(s => s.currentTeamId)
+  const storeMilestones = useStore(s => s.milestones)
+  const cascadeMilestoneOwner = useStore(s => s.cascadeMilestoneOwner)
+
+  const [members, setMembers] = useState([])
+  useEffect(() => {
+    if (!currentTeamId) { setMembers([]); return }
+    useTeamMembers.getMembers(currentTeamId).then(setMembers)
+  }, [currentTeamId])
 
   const tasks = useStore(s => s.tasks)
   const addTask = useStore(s => s.addTask)
@@ -248,6 +259,12 @@ export default function CompactMilestoneTab({ projectId }) {
             onResizeStart={handleResizeStart}
             onUpdateMilestone={handleUpdateMilestone}
             onOpenMilestoneDetail={(milestoneId) => openModal({ type: 'milestoneDetail', milestoneId, returnTo: null })}
+            members={members}
+            allMilestones={storeMilestones}
+            currentTeamId={currentTeamId}
+            onCascadeOwner={async (msId, ownerId, opts) => {
+              await cascadeMilestoneOwner(msId, ownerId, opts)
+            }}
           />
         ))}
       </SortableContext>

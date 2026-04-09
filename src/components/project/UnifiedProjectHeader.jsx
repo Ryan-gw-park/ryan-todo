@@ -28,7 +28,7 @@ export default function UnifiedProjectHeader({ project }) {
         {project.teamId ? 'SCD팀' : '개인'}
         {currentTeamId && (
           <>
-            {' · 오너 : '}
+            {' · 프로젝트 오너 : '}
             {project.teamId ? (
               <OwnerDropdown
                 projectId={project.id}

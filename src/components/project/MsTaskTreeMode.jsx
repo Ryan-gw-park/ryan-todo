@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
+import MilestoneOwnerSelector from './MilestoneOwnerSelector'
+import { computeOwnerDisplay } from '../../utils/milestoneOwnerAggregate'
 
 
 /* ═══════════════════════════════════════════════════════
@@ -24,14 +26,17 @@ export default function MsTaskTreeMode({
   const reorderMilestones = useStore(s => s.reorderMilestones)
   const milestones = useStore(s => s.milestones)
   const currentTeamId = useStore(s => s.currentTeamId)
+  const cascadeMilestoneOwner = useStore(s => s.cascadeMilestoneOwner)
 
-  // ─── Member map (assigneeId → displayName) ───
+  // ─── Member map + members array ───
   const [memberMap, setMemberMap] = useState({})
+  const [members, setMembers] = useState([])
   useEffect(() => {
-    if (!currentTeamId) return
-    useTeamMembers.getMembers(currentTeamId).then(members => {
+    if (!currentTeamId) { setMembers([]); return }
+    useTeamMembers.getMembers(currentTeamId).then(mems => {
+      setMembers(mems)
       const map = {}
-      members.forEach(m => { map[m.userId] = m.displayName || m.name || '?' })
+      mems.forEach(m => { map[m.userId] = m.displayName || m.name || '?' })
       setMemberMap(map)
     })
   }, [currentTeamId])
@@ -73,6 +78,23 @@ export default function MsTaskTreeMode({
     setToast({ msg, canUndo: true })
     setTimeout(() => setToast(null), 4000)
   }
+
+  // ─── Cascade owner ───
+  const handleCascadeOwner = useCallback(async (msId, ownerId, { overwrite } = {}) => {
+    const { prevStates, error } = await cascadeMilestoneOwner(msId, ownerId, { overwrite })
+    if (!error && prevStates.length > 0) {
+      undoStack.current.push({
+        label: `하위 MS ${prevStates.length}개 오너 일괄 변경`,
+        undo: () => {
+          for (const { id, owner_id } of prevStates) {
+            updateMilestone(id, { owner_id })
+          }
+        }
+      })
+      setToast({ msg: `하위 MS ${prevStates.length}개 오너 변경`, canUndo: true })
+      setTimeout(() => setToast(null), 4000)
+    }
+  }, [cascadeMilestoneOwner, updateMilestone])
 
   // ─── Collapse/Expand ───
   const toggleNode = useCallback((id) => {
@@ -250,6 +272,12 @@ export default function MsTaskTreeMode({
               projectTasks={projectTasks} countAll={countAll}
               dragState={dragState} setDragState={setDragState}
               onTaskDrop={handleTaskDrop} onMsDropChild={handleMsDropChild} onMsReorder={handleMsReorder}
+              memberMap={memberMap}
+              members={members}
+              allMilestones={milestones}
+              currentTeamId={currentTeamId}
+              onUpdateMilestone={updateMilestone}
+              onCascadeOwner={handleCascadeOwner}
             />
           ))}
 
@@ -277,7 +305,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
   onTaskEditFinish, onAddTaskSubmit,
   toggleDone, openDetail, projectTasks, countAll,
   dragState, setDragState, onTaskDrop, onMsDropChild, onMsReorder,
-  memberMap,
+  memberMap, members, allMilestones, currentTeamId, onUpdateMilestone, onCascadeOwner,
 }) {
   const hasChildren = (node.children || []).length > 0
   const isCollapsed = collapsed.has(node.id)
@@ -375,6 +403,23 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
           )}
 
           {total > 0 && <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, flexShrink: 0 }}>{total}</span>}
+
+          {/* MS Owner Avatar */}
+          {currentTeamId ? (
+            <MilestoneOwnerSelector
+              milestoneId={node.id}
+              ownerId={node.owner_id}
+              ownerDisplay={computeOwnerDisplay(node, allMilestones || [])}
+              members={members || []}
+              hasChildren={(node.children || []).length > 0}
+              onChangeOwner={(userId) => onUpdateMilestone(node.id, { owner_id: userId })}
+              onCascade={(userId, opts) => onCascadeOwner(node.id, userId, opts)}
+              size={depth === 0 ? 20 : depth === 1 ? 18 : 16}
+              currentTeamId={currentTeamId}
+            />
+          ) : (
+            <div style={{ width: depth === 0 ? 20 : depth === 1 ? 18 : 16, visibility: 'hidden', flexShrink: 0 }} />
+          )}
 
           {isHover && !isEditing && !dragState && (
             <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
@@ -482,6 +527,11 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               dragState={dragState} setDragState={setDragState}
               onTaskDrop={onTaskDrop} onMsDropChild={onMsDropChild} onMsReorder={onMsReorder}
               memberMap={memberMap}
+              members={members}
+              allMilestones={allMilestones}
+              currentTeamId={currentTeamId}
+              onUpdateMilestone={onUpdateMilestone}
+              onCascadeOwner={onCascadeOwner}
             />
           ))}
           {/* + 마일스톤 추가 (hover only) */}
