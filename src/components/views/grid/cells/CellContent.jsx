@@ -65,10 +65,13 @@ export default function CellContent({
     return { msGroups: result, ungrouped: noMs, done }
   }, [cellTasks, allMilestones, cellMilestones])
 
-  // 7-E1: 셀 내 모든 active task id 수집 (MS 그룹 + ungrouped, done 제외)
-  const allTaskIds = useMemo(() => {
+  // 7-E1/7-E2: 셀 내 모든 sortable item id 수집 (MS 헤더 + task, done 제외)
+  const allItemIds = useMemo(() => {
     const ids = []
-    groups.msGroups.forEach(g => g.tasks.forEach(t => ids.push(`cell-task:${t.id}`)))
+    groups.msGroups.forEach(g => {
+      ids.push(`cell-ms:${g.msId}`)
+      g.tasks.forEach(t => ids.push(`cell-task:${t.id}`))
+    })
     groups.ungrouped.forEach(t => ids.push(`cell-task:${t.id}`))
     return ids
   }, [groups])
@@ -85,7 +88,7 @@ export default function CellContent({
     return (
       <>
         {cellSortableId ? (
-          <SortableContext items={allTaskIds} id={cellSortableId} strategy={verticalListSortingStrategy}>
+          <SortableContext items={allItemIds} id={cellSortableId} strategy={verticalListSortingStrategy}>
             {ungroupedRows}
           </SortableContext>
         ) : (
@@ -146,7 +149,7 @@ export default function CellContent({
   return (
     <>
       {cellSortableId ? (
-        <SortableContext items={allTaskIds} id={cellSortableId} strategy={verticalListSortingStrategy}>
+        <SortableContext items={allItemIds} id={cellSortableId} strategy={verticalListSortingStrategy}>
           {groupedContent}
         </SortableContext>
       ) : (

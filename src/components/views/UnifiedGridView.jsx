@@ -32,7 +32,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const scope = initialScope // 'team' | 'personal' — 사이드바 위치로만 결정, 토글 없음
 
   // ─── Store ───
-  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone, deleteMilestone, openConfirmDialog, moveMilestoneWithTasks } = useStore()
+  const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone, deleteMilestone, openConfirmDialog, moveMilestoneWithTasks, reorderMilestones } = useStore()
   const currentTeamId = useStore(s => s.currentTeamId)
   const milestones = useStore(s => s.milestones)
   const userId = getCachedUserId()
@@ -223,6 +223,69 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       return
     }
 
+    // ═══ 1.5) over가 cell-ms: (MS 헤더 위에 drop) — 7-E2 ═══
+    if (overId.startsWith('cell-ms:')) {
+      const overMsId = overId.slice(8)
+      const overMs = milestones.find(m => m.id === overMsId)
+      if (!overMs) return
+
+      // MS source — MS sortable end (same cell) or cascade (cross cell)
+      if (isMs) {
+        if (msId === overMsId) return
+        const activeMs = milestones.find(m => m.id === msId)
+        if (!activeMs) return
+
+        const sameCell = (
+          activeMs.project_id === overMs.project_id &&
+          activeMs.owner_id === overMs.owner_id
+        )
+
+        if (sameCell) {
+          // 같은 셀 내 MS 순서 변경
+          const cellMs = milestones.filter(m =>
+            m.project_id === activeMs.project_id &&
+            m.owner_id === activeMs.owner_id
+          ).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+          const oldIndex = cellMs.findIndex(m => m.id === msId)
+          const newIndex = cellMs.findIndex(m => m.id === overMsId)
+          if (oldIndex === -1 || newIndex === -1) return
+
+          const reordered = arrayMove(cellMs, oldIndex, newIndex)
+          reorderMilestones(reordered)
+        } else {
+          // 다른 셀 — over MS의 cell로 cascade
+          moveMilestoneWithTasks(msId, {
+            targetProjectId: overMs.project_id,
+            targetOwnerId: overMs.owner_id,
+          })
+        }
+        return
+      }
+
+      // Task source — task를 MS 헤더 위로 drop = keyMilestoneId 변경
+      if (!task) return
+      const sameCell = (
+        task.projectId === overMs.project_id &&
+        task.assigneeId === overMs.owner_id
+      )
+
+      if (sameCell) {
+        // 같은 셀 — keyMilestoneId만 변경
+        if (task.keyMilestoneId === overMsId) return
+        updateTask(task.id, { keyMilestoneId: overMsId })
+      } else {
+        // 다른 셀 — cross-cell + keyMilestoneId 새 MS로 set
+        updateTask(task.id, {
+          projectId: overMs.project_id,
+          assigneeId: overMs.owner_id,
+          category: 'today',
+          keyMilestoneId: overMsId,
+        })
+      }
+      return
+    }
+
     // ═══ 2) over가 droppable cell zone (mat/tmat/pw/tw) ═══
     const parts = overId.split(':')
     if (parts.length < 3) return
@@ -268,7 +331,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       if (task.assigneeId === targetMemberId && task.dueDate === targetDate) return
       updateTask(taskId, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
     }
-  }, [tasks, moveTaskTo, updateTask, moveMilestoneWithTasks, userId, reorderTasks])
+  }, [tasks, milestones, moveTaskTo, updateTask, moveMilestoneWithTasks, userId, reorderTasks, reorderMilestones])
 
   // ─── Date strings ───
   const today = new Date()

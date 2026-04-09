@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useDraggable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { COLOR } from '../../../../styles/designTokens'
 
 /* ─── Milestone Row — 매트릭스 셀 내 MS 헤더 (인터랙티브) ─── */
@@ -24,12 +25,17 @@ export default function MilestoneRow({
 }) {
   const [hover, setHover] = useState(false)
 
-  // 7-D: drag handle — interactive 모드에서만 활성, 편집 중에는 비활성
+  // 7-D/7-E2: sortable handle — interactive 모드에서만 활성, 편집 중에는 비활성
   const dragDisabled = !interactive || isEditing
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `cell-ms:${ms.id}`,
     disabled: dragDisabled,
   })
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
 
   const showHoverButtons = interactive && hover && !isEditing
 
@@ -40,6 +46,7 @@ export default function MilestoneRow({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
+        ...sortableStyle,
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '3px 2px 2px', marginBottom: 1,
         background: hover && interactive ? COLOR.bgHover : 'transparent',
