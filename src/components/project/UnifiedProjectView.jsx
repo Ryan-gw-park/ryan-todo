@@ -4,6 +4,7 @@ import useStore from '../../hooks/useStore'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
 import { buildTree } from '../../utils/milestoneTree'
+import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import MsTaskTreeMode from './MsTaskTreeMode'
 import BacklogPanel from './BacklogPanel'
 import useTeamMembers from '../../hooks/useTeamMembers'
@@ -73,9 +74,22 @@ export default function UnifiedProjectView({ projectId }) {
     return () => window.removeEventListener('resize', handler)
   }, [])
 
+  // ─── dnd-kit sensors ───
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  const dndSensors = useSensors(pointerSensor, touchSensor)
+  const [dndActiveTask, setDndActiveTask] = useState(null)
+  const [dndActiveMs, setDndActiveMs] = useState(null)
+  const lastPointerY = useRef(0)
+  useEffect(() => {
+    const handler = (e) => { lastPointerY.current = e.clientY }
+    window.addEventListener('pointermove', handler)
+    return () => window.removeEventListener('pointermove', handler)
+  }, [])
+
   const [rightMode, setRightMode] = useState('전체 할일')
   const [scale, setScale] = useState('week')
-  const [dragState, setDragState] = useState(null) // { type: 'task'|'ms', id }
+  const [dragState, setDragState] = useState(null) // { type: 'task'|'ms', id } — Timeline용 유지
 
   const [toast, setToast] = useState(null)
 
@@ -98,6 +112,103 @@ export default function UnifiedProjectView({ projectId }) {
     return () => window.removeEventListener('keydown', handler)
   }, [undo])
   function showToast(msg) { setToast({ msg, canUndo: true }); setTimeout(() => setToast(null), 4000) }
+
+  // ─── dnd-kit handlers ───
+  const handleDndStart = useCallback((event) => {
+    const data = event.active.data.current
+    if (data?.type === 'task') {
+      const task = tasks.find(t => t.id === data.taskId)
+      if (task) setDndActiveTask(task)
+    } else if (data?.type === 'ms') {
+      const ms = milestones.find(m => m.id === data.msId)
+      if (ms) setDndActiveMs(ms)
+    }
+  }, [tasks, milestones])
+
+  const handleDndEnd = useCallback((event) => {
+    setDndActiveTask(null)
+    setDndActiveMs(null)
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    const activeData = active.data.current
+
+    // Case 1: Task (tree or backlog) → MS task-zone
+    if (activeData?.type === 'task' && overId.startsWith('tree-drop:')) {
+      const toMsId = overId.slice(10)
+      const taskId = activeData.taskId
+      const fromMsId = activeData.fromMsId || null
+
+      if (fromMsId !== toMsId) {
+        const fromMs = milestones.find(m => m.id === fromMsId)
+        const toMs = milestones.find(m => m.id === toMsId)
+        pushUndo({ label: '할일 이동', undo: () => updateTask(taskId, { keyMilestoneId: fromMsId }) })
+        updateTask(taskId, { keyMilestoneId: toMsId })
+        if (fromMs) {
+          showToast(`할일을 "${fromMs?.title || '?'}" → "${toMs?.title || '?'}"로 이동`)
+        } else {
+          showToast(`백로그에서 "${toMs?.title || '?'}"로 이동`)
+        }
+      }
+      return
+    }
+
+    // Case 2: MS → MS zone (3-zone clientY 후처리)
+    if (activeData?.type === 'ms' && overId.startsWith('tree-ms-zone:')) {
+      const targetId = overId.slice(13)
+      const msId = activeData.msId
+      if (msId === targetId) return
+
+      const overRect = over.rect
+      if (overRect) {
+        const clientY = lastPointerY.current
+        const relY = clientY - overRect.top
+        const zone = relY < overRect.height * 0.25 ? 'above' : relY > overRect.height * 0.75 ? 'below' : 'child'
+
+        const ms = milestones.find(m => m.id === msId)
+        if (zone === 'child') {
+          const oldParentId = ms?.parent_id || null
+          pushUndo({ label: 'MS 하위 이동', undo: () => moveMilestone(msId, oldParentId) })
+          moveMilestone(msId, targetId)
+          const target = milestones.find(m => m.id === targetId)
+          showToast(`"${ms?.title || '?'}"을 "${target?.title || '?'}" 하위로 이동`)
+          if (collapsed.has(targetId)) toggleNode(targetId)
+        } else {
+          const target = milestones.find(m => m.id === targetId)
+          if (!ms || !target) return
+          const oldParentId = ms.parent_id || null
+          const targetParentId = target.parent_id || null
+          if (oldParentId !== targetParentId) {
+            pushUndo({ label: 'MS 이동+순서', undo: () => moveMilestone(msId, oldParentId) })
+            moveMilestone(msId, targetParentId)
+          }
+          setTimeout(() => {
+            const siblings = milestones
+              .filter(m => m.project_id === ms.project_id && (m.parent_id || null) === targetParentId && m.id !== msId)
+              .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+            const idx = siblings.findIndex(s => s.id === targetId)
+            if (idx === -1) return
+            const insertIdx = zone === 'above' ? idx : idx + 1
+            const reordered = [...siblings]
+            reordered.splice(insertIdx, 0, milestones.find(m => m.id === msId))
+            reorderMilestones(reordered)
+            if (oldParentId === targetParentId) {
+              pushUndo({ label: 'MS 순서 변경', undo: () => {
+                const original = milestones
+                  .filter(m => m.project_id === ms.project_id && (m.parent_id || null) === targetParentId)
+                  .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                reorderMilestones(original)
+              }})
+            }
+          }, 100)
+          showToast(`"${ms?.title || '?'}" 순서 변경`)
+        }
+      }
+      return
+    }
+  }, [tasks, milestones, pushUndo, updateTask, moveMilestone, reorderMilestones, collapsed, toggleNode])
 
   // ─── Project tasks (must be before timelineDates/handlers that reference them) ───
   const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
@@ -241,6 +352,12 @@ export default function UnifiedProjectView({ projectId }) {
       </div>
 
       {/* Content */}
+      <DndContext
+        sensors={rightMode === '전체 할일' ? dndSensors : undefined}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDndStart}
+        onDragEnd={handleDndEnd}
+      >
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
         {/* 메인 콘텐츠 */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -322,6 +439,19 @@ export default function UnifiedProjectView({ projectId }) {
           hidden={!wideEnough}
         />
       </div>
+      <DragOverlay dropAnimation={null}>
+        {dndActiveTask && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: '#e8f5e9', borderRadius: 5, fontSize: 12, border: '1px dashed #1D9E75', boxShadow: '0 2px 8px rgba(0,0,0,.12)', cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#2C2C2A' }}>{dndActiveTask.text}</span>
+          </div>
+        )}
+        {dndActiveMs && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 500, border: '1px solid #e0ddd6', boxShadow: '0 4px 12px rgba(0,0,0,.12)', cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#2C2C2A' }}>{dndActiveMs.title || '(제목 없음)'}</span>
+          </div>
+        )}
+      </DragOverlay>
+      </DndContext>
 
       {/* Toast */}
       {toast && <Toast msg={toast.msg} canUndo={toast.canUndo} onUndo={undo} onClose={() => setToast(null)} />}

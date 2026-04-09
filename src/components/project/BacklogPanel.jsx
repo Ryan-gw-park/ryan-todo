@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useDraggable } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
 import { isBacklogTask } from '../../utils/backlogFilter'
 import TaskAssigneeChip from './TaskAssigneeChip'
@@ -23,6 +24,10 @@ function SectionHeader({ label, count }) {
 
 function BacklogTaskRow({ task, members, currentTeamId, onToggle, onOpen, onChangeAssignee, sortMode }) {
   const [hover, setHover] = useState(false)
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `bl-task:${task.id}`,
+    data: { type: 'task', taskId: task.id, fromMsId: null },
+  })
 
   // dueDate D-3 판정
   const isDueSoon = (() => {
@@ -40,13 +45,17 @@ function BacklogTaskRow({ task, members, currentTeamId, onToggle, onOpen, onChan
 
   return (
     <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      onClick={() => onOpen(task)}
+      onClick={() => { if (!isDragging) onOpen(task) }}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 8px', minHeight: 28, cursor: 'pointer',
+        padding: '6px 8px', minHeight: 28, cursor: 'grab',
         background: hover ? '#f5f4f0' : 'transparent',
         borderBottom: '0.5px solid #f0efe8',
+        opacity: isDragging ? 0.4 : 1,
       }}
     >
       {isStale && <span style={{ fontSize: 10, flexShrink: 0 }}>🕒</span>}

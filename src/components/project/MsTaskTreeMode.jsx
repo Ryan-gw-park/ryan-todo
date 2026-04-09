@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
@@ -47,7 +48,6 @@ export default function MsTaskTreeMode({
   const [editingMsId, setEditingMsId] = useState(null)
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [addingTaskMsId, setAddingTaskMsId] = useState(null)
-  const [dragState, setDragState] = useState(null) // { type: 'task'|'ms', id }
   const [toast, setToast] = useState(null)
   const dotColor = color?.dot || '#888'
 
@@ -122,7 +122,7 @@ export default function MsTaskTreeMode({
     if (data) {
       setEditingMsId(data.id)
       // 부모 펼치기
-      if (parentId) setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
+      if (parentId && collapsed.has(parentId)) onToggleNode ? onToggleNode(parentId) : setInternalCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
     }
   }, [pkmId, projectId, addMilestone])
 
@@ -155,7 +155,6 @@ export default function MsTaskTreeMode({
 
   // ─── DnD: Task → MS ───
   const handleTaskDrop = useCallback((taskId, fromMsId, toMsId) => {
-    setDragState(null)
     if (fromMsId === toMsId) return
     const fromMs = milestones.find(m => m.id === fromMsId)
     const toMs = milestones.find(m => m.id === toMsId)
@@ -166,7 +165,6 @@ export default function MsTaskTreeMode({
 
   // ─── DnD: MS → 하위 이동 ───
   const handleMsDropChild = useCallback((msId, targetId) => {
-    setDragState(null)
     if (msId === targetId) return
     const ms = milestones.find(m => m.id === msId)
     const oldParentId = ms?.parent_id || null
@@ -175,12 +173,13 @@ export default function MsTaskTreeMode({
     const target = milestones.find(m => m.id === targetId)
     showToast(`"${ms?.title || '?'}"을 "${target?.title || '?'}" 하위로 이동`)
     // 대상 펼치기
-    setCollapsed(prev => { const n = new Set(prev); n.delete(targetId); return n })
-  }, [milestones, moveMilestone, pushUndo])
+    if (collapsed.has(targetId)) {
+      onToggleNode ? onToggleNode(targetId) : setInternalCollapsed(prev => { const n = new Set(prev); n.delete(targetId); return n })
+    }
+  }, [milestones, moveMilestone, pushUndo, collapsed, onToggleNode])
 
   // ─── DnD: MS → 순서 변경 ───
   const handleMsReorder = useCallback((msId, targetId, position) => {
-    setDragState(null)
     if (msId === targetId) return
     const ms = milestones.find(m => m.id === msId)
     const target = milestones.find(m => m.id === targetId)
@@ -221,8 +220,6 @@ export default function MsTaskTreeMode({
     showToast(`"${ms?.title || '?'}" 순서 변경`)
   }, [milestones, moveMilestone, reorderMilestones, pushUndo])
 
-  const handleDragEnd = useCallback(() => setDragState(null), [])
-
   // ─── Count ───
   const countAll = useCallback((n) => {
     let c = projectTasks.filter(t => t.keyMilestoneId === n.id && !t.done && !t.deletedAt).length
@@ -231,7 +228,7 @@ export default function MsTaskTreeMode({
   }, [projectTasks])
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }} onDragEnd={handleDragEnd}>
+    <div style={{ flex: 1, overflow: 'auto' }}>
       <div style={{ padding: '0 20px' }}>
 
         {/* Toolbar */}
@@ -270,7 +267,6 @@ export default function MsTaskTreeMode({
               onTaskEditFinish={handleTaskEditFinish} onAddTaskSubmit={handleAddTaskSubmit}
               toggleDone={toggleDone} openDetail={openDetail}
               projectTasks={projectTasks} countAll={countAll}
-              dragState={dragState} setDragState={setDragState}
               onTaskDrop={handleTaskDrop} onMsDropChild={handleMsDropChild} onMsReorder={handleMsReorder}
               memberMap={memberMap}
               members={members}
@@ -285,10 +281,6 @@ export default function MsTaskTreeMode({
           <HoverAdd onClick={() => handleAddChildMs(null)} indent={8 + 12 + 5} />
         </div>
 
-        {/* Backlog */}
-        {backlogTasks.length > 0 && (
-          <BacklogSection tasks={backlogTasks} onToggle={toggleDone} onOpen={openDetail} />
-        )}
       </div>
 
       {/* Toast */}
@@ -304,7 +296,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
   onMsEditFinish, onAddChildMs, onDeleteMs,
   onTaskEditFinish, onAddTaskSubmit,
   toggleDone, openDetail, projectTasks, countAll,
-  dragState, setDragState, onTaskDrop, onMsDropChild, onMsReorder,
+  onTaskDrop, onMsDropChild, onMsReorder,
   memberMap, members, allMilestones, currentTeamId, onUpdateMilestone, onCascadeOwner,
 }) {
   const hasChildren = (node.children || []).length > 0
@@ -317,68 +309,51 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
   const doneTasks = allTasks.filter(t => t.done)
   const total = countAll(node)
 
-  const [dropTarget, setDropTarget] = useState(null) // 'task-zone' | 'ms-child' | 'ms-above' | 'ms-below'
   const [expandedDone, setExpandedDone] = useState(false)
 
-  const handleDragOver = (e, zone) => { e.preventDefault(); e.stopPropagation(); setDropTarget(zone) }
-  const handleDragLeave = () => setDropTarget(null)
+  // dnd-kit: task drop zone
+  const { setNodeRef: taskDropRef, isOver: isTaskOver } = useDroppable({
+    id: `tree-drop:${node.id}`,
+    data: { type: 'task-zone', msId: node.id },
+  })
 
-  const handleDrop = (e, zone) => {
-    e.preventDefault(); e.stopPropagation(); setDropTarget(null)
-    const type = e.dataTransfer.getData('type')
-    if (type === 'task' && zone === 'task-zone') {
-      const taskId = e.dataTransfer.getData('taskId')
-      const fromMsId = e.dataTransfer.getData('fromMsId')
-      if (fromMsId !== node.id) onTaskDrop(taskId, fromMsId, node.id)
-    }
-    if (type === 'ms') {
-      const msId = e.dataTransfer.getData('msId')
-      if (msId === node.id) return
-      if (zone === 'ms-child') onMsDropChild(msId, node.id)
-      if (zone === 'ms-above') onMsReorder(msId, node.id, 'above')
-      if (zone === 'ms-below') onMsReorder(msId, node.id, 'below')
-    }
-  }
+  // dnd-kit: MS header — draggable + droppable
+  const { attributes: msAttr, listeners: msListeners, setNodeRef: msDragRef, isDragging: msDragging } = useDraggable({
+    id: `tree-ms:${node.id}`,
+    data: { type: 'ms', msId: node.id },
+    disabled: isEditing,
+  })
+  const { setNodeRef: msDropRef, isOver: isMsOver } = useDroppable({
+    id: `tree-ms-zone:${node.id}`,
+    data: { type: 'ms-zone', msId: node.id },
+  })
+  const msRef = useCallback((el) => { msDragRef(el); msDropRef(el) }, [msDragRef, msDropRef])
 
   const hasContent = activeTasks.length > 0 || doneTasks.length > 0
 
   return (
     <>
-      {dropTarget === 'ms-above' && <div style={{ height: 2, background: '#3182CE', margin: '0 10px', borderRadius: 1 }} />}
-
       <div
         onMouseEnter={() => setHoverId(node.id)}
         onMouseLeave={() => setHoverId(null)}
         style={{
           display: 'flex', alignItems: 'stretch',
           borderBottom: `1px solid ${COLOR.border}`,
-          background: dropTarget === 'ms-child' ? 'rgba(49,130,206,0.08)' : 'transparent',
-          outline: dropTarget === 'ms-child' ? '2px dashed #3182CE' : 'none',
+          outline: isMsOver ? '2px solid #3182CE' : 'none',
           outlineOffset: -2,
         }}
       >
         {/* Left: MS name */}
         <div
-          draggable
-          onDragStart={e => {
-            e.dataTransfer.setData('type', 'ms')
-            e.dataTransfer.setData('msId', node.id)
-            setDragState({ type: 'ms', id: node.id })
-          }}
-          onDragOver={e => {
-            if (dragState?.type === 'ms') {
-              const rect = e.currentTarget.getBoundingClientRect()
-              const y = e.clientY - rect.top
-              const zone = y < rect.height * 0.25 ? 'ms-above' : y > rect.height * 0.75 ? 'ms-below' : 'ms-child'
-              handleDragOver(e, zone)
-            }
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={e => { if (dragState?.type === 'ms') handleDrop(e, dropTarget || 'ms-child') }}
+          ref={msRef}
+          {...msAttr}
+          {...(isEditing ? {} : msListeners)}
           style={{
             width: TREE_W, flexShrink: 0, padding: '5px 8px', paddingLeft: 8 + depth * 22,
             display: 'flex', alignItems: 'center', gap: 5,
-            borderRight: `1px solid ${COLOR.border}`, cursor: 'grab',
+            borderRight: `1px solid ${COLOR.border}`,
+            cursor: isEditing ? 'default' : 'grab',
+            opacity: msDragging ? 0.4 : 1,
           }}
         >
           {hasChildren ? (
@@ -421,7 +396,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
             <div style={{ width: depth === 0 ? 20 : depth === 1 ? 18 : 16, visibility: 'hidden', flexShrink: 0 }} />
           )}
 
-          {isHover && !isEditing && !dragState && (
+          {isHover && !isEditing && (
             <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
               <span onClick={e => { e.stopPropagation(); onAddChildMs(node.id) }}
                 style={{ fontSize: 9, color: COLOR.textTertiary, cursor: 'pointer', padding: '0 3px' }}>+하위</span>
@@ -433,14 +408,12 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
 
         {/* Right: tasks (drop zone) */}
         <div
-          onDragOver={e => { if (dragState?.type === 'task') handleDragOver(e, 'task-zone') }}
-          onDragLeave={handleDragLeave}
-          onDrop={e => handleDrop(e, 'task-zone')}
+          ref={taskDropRef}
           style={{
             flex: 1, padding: hasContent ? '3px 8px' : '5px 8px',
             display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            background: dropTarget === 'task-zone' ? 'rgba(49,130,206,0.08)' : 'transparent',
-            outline: dropTarget === 'task-zone' ? '2px dashed #3182CE' : 'none',
+            background: isTaskOver ? 'rgba(49,130,206,0.05)' : 'transparent',
+            outline: isTaskOver ? '2px solid #3182CE' : 'none',
             outlineOffset: -2,
           }}
         >
@@ -465,7 +438,6 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               onFinishEdit={(val) => onTaskEditFinish(t.id, val)}
               onToggle={() => toggleDone(t.id)}
               onDetail={() => openDetail(t)}
-              setDragState={setDragState}
               isLast={i === activeTasks.length - 1}
               showAddOnLast={isHover}
               onAddClick={() => setAddingTaskMsId(node.id)}
@@ -507,8 +479,6 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
         </div>
       </div>
 
-      {dropTarget === 'ms-below' && <div style={{ height: 2, background: '#3182CE', margin: '0 10px', borderRadius: 1 }} />}
-
       {/* Children (recursive) */}
       {hasChildren && !isCollapsed && (
         <>
@@ -524,7 +494,6 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               onTaskEditFinish={onTaskEditFinish} onAddTaskSubmit={onAddTaskSubmit}
               toggleDone={toggleDone} openDetail={openDetail}
               projectTasks={projectTasks} countAll={countAll}
-              dragState={dragState} setDragState={setDragState}
               onTaskDrop={onTaskDrop} onMsDropChild={onMsDropChild} onMsReorder={onMsReorder}
               memberMap={memberMap}
               members={members}
@@ -543,23 +512,25 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
 }
 
 /* ═══ DragTask ═══ */
-function DragTask({ task, msId, isEditing, onStartEdit, onFinishEdit, onToggle, onDetail, setDragState, isLast, showAddOnLast, onAddClick, memberMap }) {
+function DragTask({ task, msId, isEditing, onStartEdit, onFinishEdit, onToggle, onDetail, isLast, showAddOnLast, onAddClick, memberMap }) {
   const [hover, setHover] = useState(false)
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `tree-task:${task.id}`,
+    data: { type: 'task', taskId: task.id, fromMsId: msId },
+    disabled: isEditing,
+  })
   return (
     <div
-      draggable={!isEditing}
-      onDragStart={e => {
-        e.dataTransfer.setData('type', 'task')
-        e.dataTransfer.setData('taskId', task.id)
-        e.dataTransfer.setData('fromMsId', msId)
-        setDragState({ type: 'task', id: task.id })
-      }}
+      ref={setNodeRef}
+      {...attributes}
+      {...(isEditing ? {} : listeners)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 5, padding: '2px 4px',
         borderRadius: 4, cursor: isEditing ? 'text' : 'grab', transition: 'background 0.08s',
         background: hover ? COLOR.bgHover : 'transparent',
+        opacity: isDragging ? 0.4 : 1,
       }}
     >
       {/* Checkbox */}
@@ -646,33 +617,6 @@ function HoverAdd({ onClick, indent }) {
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ padding: '4px 8px', paddingLeft: indent, minHeight: hover ? 22 : 6, transition: 'min-height 0.15s', borderBottom: hover ? `1px solid ${COLOR.border}` : 'none' }}>
       {hover && <span onClick={onClick} style={{ fontSize: FONT.tiny, color: COLOR.textTertiary, cursor: 'pointer' }}>+ 마일스톤 추가</span>}
-    </div>
-  )
-}
-
-/* ═══ BacklogSection ═══ */
-function BacklogSection({ tasks, onToggle, onOpen }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div style={{ borderTop: `1.5px dashed ${COLOR.border}`, marginTop: 8 }}>
-      <div onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', cursor: 'pointer' }}>
-        <span style={{ fontSize: FONT.label, color: COLOR.textTertiary }}>⊙</span>
-        <span style={{ fontSize: FONT.label, fontWeight: 500, color: COLOR.textTertiary }}>백로그</span>
-        <span style={{ fontSize: FONT.caption, color: COLOR.textTertiary }}>{tasks.length}건</span>
-        <span style={{ fontSize: 9, color: COLOR.textTertiary, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
-      </div>
-      {open && tasks.map(t => (
-        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 40px', borderBottom: `1px solid ${COLOR.border}`, cursor: 'pointer' }} onClick={() => onOpen(t)}>
-          <div onClick={e => { e.stopPropagation(); onToggle(t.id) }} style={{
-            width: CHECKBOX.size, height: CHECKBOX.size, borderRadius: CHECKBOX.radius, flexShrink: 0, cursor: 'pointer',
-            border: t.done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`, background: t.done ? CHECKBOX.checkedBg : '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {t.done && <svg width={8} height={8} viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-          </div>
-          <span style={{ flex: 1, fontSize: FONT.body, color: t.done ? COLOR.textTertiary : COLOR.textPrimary, textDecoration: t.done ? 'line-through' : 'none', whiteSpace: 'normal', wordBreak: 'break-word' }}>{t.text}</span>
-        </div>
-      ))}
     </div>
   )
 }

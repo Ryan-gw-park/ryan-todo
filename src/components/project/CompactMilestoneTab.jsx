@@ -143,6 +143,17 @@ export default function CompactMilestoneTab({ projectId }) {
       return
     }
 
+    // Case 1.5: Backlog task → milestone
+    if (String(active.id).startsWith('bl-task:') && activeData?.type === 'task') {
+      let targetMsId = null
+      if (overData?.type === 'milestone-drop') targetMsId = overData.milestoneId
+      else if (overData?.type === 'milestone') targetMsId = over.id
+      if (targetMsId) {
+        updateTask(activeData.taskId, { keyMilestoneId: targetMsId })
+      }
+      return
+    }
+
     // Case 2: task moved to different milestone
     if (activeData?.type === 'task') {
       let targetMsId = null
@@ -219,8 +230,6 @@ export default function CompactMilestoneTab({ projectId }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-    <div ref={containerRef} style={{ flex: 1, overflow: 'auto' }}>
     <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
@@ -228,6 +237,8 @@ export default function CompactMilestoneTab({ projectId }) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
+    <div style={{ display: 'flex', height: '100%' }}>
+    <div ref={containerRef} style={{ flex: 1, overflow: 'auto' }}>
       {/* Column header */}
       <div style={{
         display: 'flex', alignItems: 'center', height: 30, padding: '0 12px',
@@ -319,12 +330,6 @@ export default function CompactMilestoneTab({ projectId }) {
         ))}
       </FooterSection>
 
-      {/* Drag overlay */}
-      <DragOverlay dropAnimation={null}>
-        {activeTask ? <TaskChipOverlay task={activeTask} /> : null}
-        {activeMilestone ? <MilestoneOverlay milestone={activeMilestone} /> : null}
-      </DragOverlay>
-    </DndContext>
     </div>
 
     {/* BacklogPanel */}
@@ -337,6 +342,12 @@ export default function CompactMilestoneTab({ projectId }) {
       hidden={!wideEnough}
     />
     </div>
+    {/* Drag overlay */}
+    <DragOverlay dropAnimation={null}>
+      {activeTask ? <TaskChipOverlay task={activeTask} /> : null}
+      {activeMilestone ? <MilestoneOverlay milestone={activeMilestone} /> : null}
+    </DragOverlay>
+    </DndContext>
   )
 }
 
