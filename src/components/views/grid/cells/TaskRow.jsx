@@ -5,8 +5,20 @@ import { COLOR, FONT, CHECKBOX } from '../../../../styles/designTokens'
 import { getColor } from '../../../../utils/colors'
 import useStore from '../../../../hooks/useStore'
 
+/* ─── Span Bar (middle/end segment — no sortable to avoid id collision) ─── */
+export function SpanBar({ task, project, spanPosition }) {
+  const barColor = project ? getColor(project.color).dot : '#888'
+  return (
+    <div style={{
+      height: 24, marginBottom: 1,
+      background: `${barColor}1F`,
+      borderRadius: spanPosition === 'end' ? '0 4px 4px 0' : 0,
+    }} />
+  )
+}
+
 /* ─── Task Card (draggable, click-to-edit) ─── */
-export default function TaskRow({ task, project, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, showMs }) {
+export default function TaskRow({ task, project, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, showProject, showMs, spanPosition }) {
   const milestones = useStore(s => s.milestones)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `cell-task:${task.id}`,
@@ -19,6 +31,11 @@ export default function TaskRow({ task, project, editingId, setEditingId, handle
     if (!showMs || !task.keyMilestoneId) return null
     return milestones.find(m => m.id === task.keyMilestoneId)?.title
   }, [showMs, task.keyMilestoneId, milestones])
+
+  const effectiveSpan = spanPosition || task._spanPosition
+  const isSpanStart = effectiveSpan === 'start'
+  const isSpanActive = effectiveSpan && effectiveSpan !== 'single'
+  const barColor = project ? getColor(project.color).dot : '#888'
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
@@ -34,8 +51,10 @@ export default function TaskRow({ task, project, editingId, setEditingId, handle
       style={{
         ...sortableStyle,
         display: 'flex', alignItems: 'flex-start', gap: 5, padding: '3px 4px', marginBottom: 1,
-        borderRadius: 4, cursor: isEditing ? 'text' : 'grab', transition: sortableStyle.transition || 'background 0.08s',
-        background: hover && !isEditing ? COLOR.bgHover : 'transparent',
+        borderRadius: isSpanStart ? '4px 0 0 4px' : 4,
+        cursor: isEditing ? 'text' : 'grab',
+        transition: sortableStyle.transition || 'background 0.08s',
+        background: hover && !isEditing ? COLOR.bgHover : (isSpanActive ? `${barColor}1F` : 'transparent'),
         opacity: isDragging ? 0.3 : 1,
       }}
     >

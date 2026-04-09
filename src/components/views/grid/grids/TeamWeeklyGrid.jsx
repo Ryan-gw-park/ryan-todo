@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
 import { COLOR, FONT } from '../../../../styles/designTokens'
 import { DAY_LABELS, fmtDate } from '../constants'
+import { getSpanTasksForDay } from '../../../../utils/weeklySpan'
 import DroppableCell from '../shared/DroppableCell'
 import MiniAvatar from '../shared/MiniAvatar'
 import CellContent from '../cells/CellContent'
+import { SpanBar } from '../cells/TaskRow'
 
 /* ═══════════════════════════════════════════════════════
    Team Weekly — 행=팀원, 열=요일
@@ -45,12 +47,11 @@ export default function TeamWeeklyGrid({ projects, tasks, members, weekDays, wee
           ...weekDays.map((d, di) => {
             const ds = fmtDate(d)
             const isToday = ds === todayStr
-            const dayTasks = tasks.filter(t => {
-              if (t.done || t.assigneeId !== mem.userId || t.teamId !== currentTeamId) return false
-              if (t.dueDate === ds) return true
-              if (!t.dueDate && t.category === 'today' && ds === todayStr) return true
-              return false
-            }).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+            const spanItems = getSpanTasksForDay(tasks, ds, weekDateStrs, todayStr,
+              t => t.assigneeId === mem.userId && t.teamId === currentTeamId
+            )
+            const normalTasks = spanItems.filter(s => s.spanPosition === 'single' || s.spanPosition === 'start').map(s => ({ ...s.task, _spanPosition: s.spanPosition }))
+            const spanBars = spanItems.filter(s => s.spanPosition === 'middle' || s.spanPosition === 'end')
             const dropId = `tw:${mem.userId}:${ds}`
             return (
               <DroppableCell key={dropId} id={dropId} activeId={activeId}>
@@ -58,8 +59,9 @@ export default function TeamWeeklyGrid({ projects, tasks, members, weekDays, wee
                   padding: '5px 6px', minHeight: 48,
                   background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                 }}>
-                  <CellContent tasks={dayTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject projectMap={projectMap} />
-                  {dayTasks.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
+                  {spanBars.map(s => <SpanBar key={`${s.task.id}:${ds}`} task={s.task} project={projectMap[s.task.projectId]} spanPosition={s.spanPosition} />)}
+                  <CellContent tasks={normalTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} showProject projectMap={projectMap} />
+                  {spanItems.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
                 </div>
               </DroppableCell>
             )

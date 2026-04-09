@@ -3,8 +3,10 @@ import { COLOR, FONT } from '../../../../styles/designTokens'
 import useStore from '../../../../hooks/useStore'
 import { getColor } from '../../../../utils/colors'
 import { DAY_LABELS, fmtDate } from '../constants'
+import { getSpanTasksForDay } from '../../../../utils/weeklySpan'
 import DroppableCell from '../shared/DroppableCell'
 import CellContent from '../cells/CellContent'
+import { SpanBar } from '../cells/TaskRow'
 
 /* ═══════════════════════════════════════════════════════
    Personal Weekly — 행=프로젝트, 열=요일
@@ -15,8 +17,11 @@ export default function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDa
   const weekTasks = useMemo(() =>
     myTasks.filter(t => {
       if (t.done) return false
+      const wStart = weekDateStrs[0], wEnd = weekDateStrs[weekDateStrs.length - 1]
+      if (t.startDate && t.dueDate) return t.startDate <= wEnd && t.dueDate >= wStart
+      if (t.startDate && !t.dueDate && weekDateStrs.includes(t.startDate)) return true
       if (t.dueDate && weekDateStrs.includes(t.dueDate)) return true
-      if (!t.dueDate && t.category === 'today' && weekDateStrs.includes(todayStr)) return true
+      if (!t.dueDate && !t.startDate && t.category === 'today' && weekDateStrs.includes(todayStr)) return true
       return false
     }),
     [myTasks, weekDateStrs, todayStr]
@@ -57,12 +62,9 @@ export default function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDa
             ...weekDays.map((d, di) => {
               const ds = fmtDate(d)
               const isToday = ds === todayStr
-              const dayTasks = weekTasks.filter(t => {
-                if (t.projectId !== proj.id) return false
-                if (t.dueDate === ds) return true
-                if (!t.dueDate && t.category === 'today' && ds === todayStr) return true
-                return false
-              })
+              const spanItems = getSpanTasksForDay(weekTasks, ds, weekDateStrs, todayStr, t => t.projectId === proj.id)
+              const normalTasks = spanItems.filter(s => s.spanPosition === 'single' || s.spanPosition === 'start').map(s => ({ ...s.task, _spanPosition: s.spanPosition }))
+              const spanBars = spanItems.filter(s => s.spanPosition === 'middle' || s.spanPosition === 'end')
               const dropId = `pw:${proj.id}:${ds}`
               return (
                 <DroppableCell key={dropId} id={dropId} activeId={activeId}>
@@ -70,8 +72,9 @@ export default function PersonalWeeklyGrid({ projects, myTasks, weekDays, weekDa
                     padding: '5px 6px', minHeight: 40,
                     background: isToday ? 'rgba(229,62,62,0.02)' : 'transparent',
                   }}>
-                    <CellContent tasks={dayTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
-                    {dayTasks.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
+                    {spanBars.map(s => <SpanBar key={`${s.task.id}:${ds}`} task={s.task} project={proj} spanPosition={s.spanPosition} />)}
+                    <CellContent tasks={normalTasks} editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish} toggleDone={toggleDone} openDetail={openDetail} />
+                    {spanItems.length === 0 && <span style={{ fontSize: FONT.tiny, color: '#e0e0e0', display: 'block', textAlign: 'center', padding: '8px 0' }}>—</span>}
                   </div>
                 </DroppableCell>
               )
