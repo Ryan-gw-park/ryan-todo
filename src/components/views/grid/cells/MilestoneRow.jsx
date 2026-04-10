@@ -63,7 +63,7 @@ export default function MilestoneRow({
         padding: '2px 6px 2px 4px',
         marginBottom: 1,
         background: accentColor
-          ? (hover && interactive ? hexToRgba(accentColor, 0.15) : hexToRgba(accentColor, 0.08))
+          ? (hover && interactive ? hexToRgba(accentColor, 0.22) : hexToRgba(accentColor, 0.13))
           : (hover && interactive ? '#E8E6DD' : '#F1EFE8'),
         borderRadius: 4,
         position: 'relative',
