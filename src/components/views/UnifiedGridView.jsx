@@ -6,6 +6,7 @@ import useStore, { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import MsBacklogSidebar from '../common/MsBacklogSidebar'
+import { getColor } from '../../utils/colors'
 
 import { EMPTY_OBJ, getMonday, fmtDate, getWeekNumber } from './grid/constants'
 import Pill from './grid/shared/Pill'
@@ -140,6 +141,12 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const activeItem = useMemo(() => {
     if (!activeId) return null
     const id = String(activeId)
+    // 12b: project-lane 분기
+    if (id.startsWith('project-lane:')) {
+      const proj = projects.find(p => p.id === id.slice(13))
+      if (!proj) return null
+      return { type: 'project-lane', data: proj }
+    }
     if (id.startsWith('bl-ms:')) {
       const ms = milestones.find(m => m.id === id.slice(6))
       return ms ? { type: 'ms', data: ms } : null
@@ -154,7 +161,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       : id
     const task = tasks.find(t => t.id === taskId)
     return task ? { type: 'task', data: task } : null
-  }, [activeId, tasks, milestones])
+  }, [activeId, tasks, milestones, projects])
 
   const handleDragStart = (e) => setActiveId(e.active.id)
 
@@ -164,6 +171,34 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
     if (!over) return
     const activeIdStr = String(active.id)
     const overId = String(over.id)
+
+    // 12b: project-lane DnD (다른 분기보다 먼저)
+    if (activeIdStr.startsWith('project-lane:')) {
+      if (!overId.startsWith('project-lane:')) return
+      if (activeIdStr === overId) return
+      const activeSection = active.data.current?.section
+      const overSection = over.data.current?.section
+      if (activeSection && overSection && activeSection !== overSection) return
+
+      const activePid = active.data.current?.projectId
+      const overPid = over.data.current?.projectId
+      if (!activePid || !overPid) return
+
+      const { projects: allProj } = useStore.getState()
+      const sortProjectsLocallyFn = useStore.getState().sortProjectsLocally
+      let sectionList
+      if (activeSection === 'team') {
+        sectionList = sortProjectsLocallyFn(allProj.filter(p => p.teamId === currentTeamId && !p.archivedAt))
+      } else {
+        sectionList = sortProjectsLocallyFn(allProj.filter(p => !p.teamId && !p.archivedAt))
+      }
+      const oldIdx = sectionList.findIndex(p => p.id === activePid)
+      const newIdx = sectionList.findIndex(p => p.id === overPid)
+      if (oldIdx === -1 || newIdx === -1) return
+      const reordered = arrayMove(sectionList, oldIdx, newIdx)
+      useStore.getState().reorderProjects(reordered)
+      return
+    }
 
     // ── source 식별 ──
     const isMs = activeIdStr.startsWith('bl-ms:') || activeIdStr.startsWith('cell-ms:')
@@ -480,7 +515,16 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
             <MsBacklogSidebar projects={displayProjects} milestones={milestones} tasks={tasks} weekDateStrs={view === 'weekly' ? weekDateStrs : null} />
 
             <DragOverlay dropAnimation={null}>
-              {activeItem?.type === 'task' ? (
+              {activeItem?.type === 'project-lane' ? (
+                <div style={{
+                  background: '#fff', border: '1px solid #e8e6df', borderRadius: 10,
+                  padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'grabbing',
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: getColor(activeItem.data.color).dot, flexShrink: 0 }} />
+                  <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textPrimary }}>{activeItem.data.name}</span>
+                </div>
+              ) : activeItem?.type === 'task' ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
                   background: '#fff', borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',

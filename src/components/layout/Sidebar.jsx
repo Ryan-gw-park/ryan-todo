@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../hooks/useStore'
 import { getColor, COLOR_OPTIONS } from '../../utils/colors'
 import TeamSwitcher from '../team/TeamSwitcher'
@@ -75,6 +78,27 @@ export default function Sidebar() {
   const personalProjects = sortProjectsLocally(projects.filter(p => !p.teamId && !p.archivedAt))
   const archivedTeamProjects = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId && currentTeamId && p.archivedAt))
   const archivedPersonalProjects = sortProjectsLocally(projects.filter(p => !p.teamId && p.archivedAt))
+
+  // 12b: 프로젝트 순서 DnD
+  const reorderProjects = useStore(s => s.reorderProjects)
+  const sidebarSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const allSortableProjects = useMemo(() => [...teamProjects, ...personalProjects], [teamProjects, personalProjects])
+  const handleSidebarDragEnd = useCallback((event) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const activeSection = active.data.current?.section
+    const overSection = over.data.current?.section
+    if (activeSection !== overSection) return  // 섹션 경계 금지
+    const activePid = active.data.current?.projectId
+    const overPid = over.data.current?.projectId
+    if (!activePid || !overPid) return
+    const sectionList = activeSection === 'team' ? teamProjects : personalProjects
+    const oldIdx = sectionList.findIndex(p => p.id === activePid)
+    const newIdx = sectionList.findIndex(p => p.id === overPid)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordered = arrayMove(sectionList, oldIdx, newIdx)
+    reorderProjects(reordered)
+  }, [teamProjects, personalProjects, reorderProjects])
 
   // 알림 뱃지
   const refreshTrigger = useStore(s => s.notificationRefreshTrigger)
@@ -223,31 +247,42 @@ export default function Sidebar() {
         {/* ─── Section 3: 프로젝트 ─── */}
         {!collapsed && <SectionLabel label="프로젝트" />}
 
-        {/* 팀 프로젝트 */}
-        {currentTeamId && (
-          <>
-            {!collapsed && <SubSectionHeader label="팀 프로젝트" collapsed={sectionCollapsed.projTeam} onClick={() => toggleSection('projTeam')} onAdd={() => { setAddProjectScope('team'); setShowAddProject(true) }} />}
-            {!sectionCollapsed.projTeam && teamProjects.map(p => (
-              <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
-            ))}
-          </>
-        )}
+        <DndContext
+          sensors={sidebarSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleSidebarDragEnd}
+        >
+          <SortableContext
+            items={allSortableProjects.map(p => `project-sidebar:${p.id}`)}
+            strategy={verticalListSortingStrategy}
+          >
+            {/* 팀 프로젝트 */}
+            {currentTeamId && (
+              <>
+                {!collapsed && <SubSectionHeader label="팀 프로젝트" collapsed={sectionCollapsed.projTeam} onClick={() => toggleSection('projTeam')} onAdd={() => { setAddProjectScope('team'); setShowAddProject(true) }} />}
+                {!sectionCollapsed.projTeam && teamProjects.map(p => (
+                  <SortableProjectItem key={p.id} project={p} section="team" isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
+                ))}
+              </>
+            )}
 
-        {/* 팀 아카이브 */}
-        {currentTeamId && archivedTeamProjects.length > 0 && !collapsed && (
-          <>
-            <SubSectionHeader label="팀 아카이브" collapsed={sectionCollapsed.archiveTeam !== false} onClick={() => toggleSection('archiveTeam')} />
-            {sectionCollapsed.archiveTeam === false && archivedTeamProjects.map(p => (
-              <ArchiveProjectItem key={p.id} project={p} onRestore={() => unarchiveProject(p.id)} collapsed={collapsed} />
-            ))}
-          </>
-        )}
+            {/* 팀 아카이브 */}
+            {currentTeamId && archivedTeamProjects.length > 0 && !collapsed && (
+              <>
+                <SubSectionHeader label="팀 아카이브" collapsed={sectionCollapsed.archiveTeam !== false} onClick={() => toggleSection('archiveTeam')} />
+                {sectionCollapsed.archiveTeam === false && archivedTeamProjects.map(p => (
+                  <ArchiveProjectItem key={p.id} project={p} onRestore={() => unarchiveProject(p.id)} collapsed={collapsed} />
+                ))}
+              </>
+            )}
 
-        {/* 개인 프로젝트 */}
-        {!collapsed && <SubSectionHeader label="개인 프로젝트" collapsed={sectionCollapsed.projPersonal} onClick={() => toggleSection('projPersonal')} onAdd={() => { setAddProjectScope('personal'); setShowAddProject(true) }} />}
-        {!sectionCollapsed.projPersonal && personalProjects.map(p => (
-          <ProjectItem key={p.id} project={p} isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
-        ))}
+            {/* 개인 프로젝트 */}
+            {!collapsed && <SubSectionHeader label="개인 프로젝트" collapsed={sectionCollapsed.projPersonal} onClick={() => toggleSection('projPersonal')} onAdd={() => { setAddProjectScope('personal'); setShowAddProject(true) }} />}
+            {!sectionCollapsed.projPersonal && personalProjects.map(p => (
+              <SortableProjectItem key={p.id} project={p} section="personal" isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {/* 개인 아카이브 */}
         {archivedPersonalProjects.length > 0 && !collapsed && (
@@ -402,6 +437,50 @@ function NavItem({ icon, label, isActive, onClick, collapsed, indent = 0 }) {
         opacity: isActive ? 0.85 : 0.55,
       }}>{icon}</span>
       {!collapsed && label}
+    </div>
+  )
+}
+
+// 12b: Sortable wrapper (ProjectItem은 수정하지 않고 감싸기만)
+function SortableProjectItem({ project, section, isActive, onClick, collapsed, indent, archiveFn }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `project-sidebar:${project.id}`,
+    data: { section, projectId: project.id },
+  })
+  const [hover, setHover] = useState(false)
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: 'relative',
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      {hover && !collapsed && (
+        <div
+          {...attributes}
+          {...listeners}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+            cursor: 'grab', color: '#b4b2a9', fontSize: 11, fontWeight: 700,
+            padding: '4px 2px', lineHeight: 1, zIndex: 2, userSelect: 'none',
+          }}
+        >≡</div>
+      )}
+      <ProjectItem
+        project={project}
+        isActive={isActive}
+        onClick={onClick}
+        collapsed={collapsed}
+        indent={indent}
+        archiveFn={archiveFn}
+      />
     </div>
   )
 }

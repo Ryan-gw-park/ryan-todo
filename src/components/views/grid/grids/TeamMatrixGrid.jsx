@@ -1,3 +1,5 @@
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { COLOR, FONT } from '../../../../styles/designTokens'
 import useStore from '../../../../hooks/useStore'
 import { getColor } from '../../../../utils/colors'
@@ -6,6 +8,24 @@ import DroppableCell from '../shared/DroppableCell'
 import MiniAvatar from '../shared/MiniAvatar'
 import CellContent from '../cells/CellContent'
 import InlineMsAdd from '../cells/InlineMsAdd'
+
+// 12b: Sortable Lane wrapper (팀 매트릭스)
+function SortableLaneCard({ projId, section, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `project-lane:${projId}`,
+    data: { section, projectId: projId, type: 'project-lane' },
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      {typeof children === 'function' ? children({ attributes, listeners }) : children}
+    </div>
+  )
+}
 
 /* ═══════════════════════════════════════════════════════
    Team Matrix — Lane 카드 (프로젝트별 독립)
@@ -49,6 +69,10 @@ export default function TeamMatrixGrid({
       </div>
 
       {/* Lane 카드 리스트 */}
+      <SortableContext
+        items={projects.map(p => `project-lane:${p.id}`)}
+        strategy={verticalListSortingStrategy}
+      >
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0, alignItems: 'start' }}>
         {projects.map(proj => {
           const c = getColor(proj.color)
@@ -57,18 +81,23 @@ export default function TeamMatrixGrid({
           const isCol = collapsed[proj.id]
           const projDoneCollapsed = matrixDoneCollapsed ? (matrixDoneCollapsed[proj.id] !== false) : true
           const onToggleProjDone = () => toggleMatrixDoneCollapse && toggleMatrixDoneCollapse(proj.id)
+          const section = proj.teamId ? 'team' : 'personal'
 
           return (
-            <div key={proj.id} style={{
+            <SortableLaneCard key={proj.id} projId={proj.id} section={section}>
+              {({ attributes, listeners }) => (
+            <div style={{
               background: '#fff', border: `1px solid ${COLOR.border}`, borderRadius: 10,
               marginBottom: 12, overflow: 'hidden',
             }}>
-              {/* Lane 헤더 */}
+              {/* Lane 헤더 (drag handle) */}
               <div
+                {...attributes}
+                {...listeners}
                 onClick={() => toggleCollapse(proj.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '10px 14px', cursor: 'pointer',
+                  padding: '10px 14px', cursor: 'grab',
                   background: COLOR.bgSurface,
                   borderBottom: isCol ? 'none' : `1px solid ${COLOR.border}`,
                 }}
@@ -138,9 +167,12 @@ export default function TeamMatrixGrid({
                 </div>
               )}
             </div>
+              )}
+            </SortableLaneCard>
           )
         })}
       </div>
+      </SortableContext>
 
       {projects.length === 0 && (
         <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>표시할 프로젝트가 없습니다</div>

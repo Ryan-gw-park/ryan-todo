@@ -13,6 +13,8 @@ const SNAPSHOT_MAX_AGE = 24 * 60 * 60 * 1000 // 24시간
 
 // ─── Loop-35J: loadAll 중복 실행 방지 플래그 ───
 let _loadAllRunning = false
+// ─── 12b: 프로젝트 순서 최초 1회만 로드 ───
+let _projectOrderLoaded = false
 
 /**
  * @typedef {Object} TaskAlarm
@@ -483,6 +485,11 @@ const useStore = create((set, get) => ({
       if (!isArrayEqual(current.memos, memos)) patch.memos = memos
       set(patch)
 
+      // 12b: 사용자별 프로젝트 순서 로드 (최초 1회만, 내부에서 flag 체크)
+      if (!_projectOrderLoaded) {
+        try { await get().loadUserProjectOrder() } catch (e) { console.error('[loadAll] loadUserProjectOrder:', e) }
+      }
+
       // 스냅샷 저장 (PWA 로딩 속도 개선)
       try {
         const snapshot = { tasks, projects, memos, teamId, timestamp: Date.now(), collapseState: get().collapseState, userTaskSettings: get().userTaskSettings }
@@ -730,6 +737,11 @@ const useStore = create((set, get) => ({
     if (d) {
       const { error } = await d.from('projects').delete().eq('id', id)
       if (error) console.error('[Ryan Todo] deleteProject:', error)
+      // 12b: 본인의 user_project_order row 삭제 (타 팀원 row는 RLS로 불가)
+      const uid = _cachedUserId
+      if (uid) {
+        await d.from('user_project_order').delete().eq('project_id', id).eq('user_id', uid)
+      }
     }
     get().showToast('프로젝트가 삭제됐습니다')
   },
@@ -791,13 +803,40 @@ const useStore = create((set, get) => ({
   },
 
   reorderProjects: async (newList) => {
-    // 로컬 순서 저장 (DB 업데이트 안 함 → 개인별 적용)
-    const orderMap = {}
-    newList.forEach((p, i) => { orderMap[p.id] = i })
-    const { localProjectOrder } = get()
-    const merged = { ...localProjectOrder, ...orderMap }
-    set({ localProjectOrder: merged })
-    localStorage.setItem('localProjectOrder', JSON.stringify(merged))
+    // 12b: 전역 sort_order 재계산 후 DB batch upsert
+    // newList = 특정 섹션에서 arrayMove된 결과
+    const { projects, localProjectOrder } = get()
+    const partialMap = {}
+    newList.forEach((p, i) => { partialMap[p.id] = i })
+
+    // 전체 프로젝트를 새 partialMap + 기존 localProjectOrder 기준으로 정렬
+    const sorted = [...projects].sort((a, b) => {
+      const oA = partialMap[a.id] !== undefined ? partialMap[a.id] : (localProjectOrder[a.id] ?? a.sortOrder ?? 0)
+      const oB = partialMap[b.id] !== undefined ? partialMap[b.id] : (localProjectOrder[b.id] ?? b.sortOrder ?? 0)
+      return oA - oB
+    })
+
+    // 전역 index 재부여
+    const newOrderMap = {}
+    sorted.forEach((p, i) => { newOrderMap[p.id] = i })
+
+    // 로컬 즉시 반영
+    set({ localProjectOrder: newOrderMap })
+    try { localStorage.setItem('localProjectOrder', JSON.stringify(newOrderMap)) } catch {}
+
+    // DB batch upsert
+    const d = db()
+    if (!d) return
+    const userId = _cachedUserId || (await d.auth.getUser()).data?.user?.id
+    if (!userId) return
+    const rows = Object.entries(newOrderMap).map(([pid, order]) => ({
+      user_id: userId,
+      project_id: pid,
+      sort_order: order,
+      updated_at: new Date().toISOString(),
+    }))
+    const { error } = await d.from('user_project_order').upsert(rows)
+    if (error) console.error('[useStore] reorderProjects DB:', error)
   },
 
   // ─── Memo CRUD ───
@@ -1217,6 +1256,44 @@ const useStore = create((set, get) => ({
   setLocalProjectOrder: (orderMap) => {
     set({ localProjectOrder: orderMap })
     localStorage.setItem('localProjectOrder', JSON.stringify(orderMap))
+  },
+
+  // 12b: 사용자별 프로젝트 순서 DB에서 로드 (최초 1회)
+  loadUserProjectOrder: async () => {
+    if (_projectOrderLoaded) return
+    const d = db()
+    if (!d) return
+    const userId = _cachedUserId || (await d.auth.getUser()).data?.user?.id
+    if (!userId) return
+    const { data, error } = await d.from('user_project_order').select('project_id, sort_order')
+    if (error) { console.error('[useStore] loadUserProjectOrder:', error); return }
+
+    // 초기 마이그레이션: DB 비어있고 localStorage에 있으면 업로드
+    if (!data || data.length === 0) {
+      const local = JSON.parse(localStorage.getItem('localProjectOrder') || '{}')
+      const keys = Object.keys(local)
+      if (keys.length > 0) {
+        const rows = keys.map(pid => ({
+          user_id: userId,
+          project_id: pid,
+          sort_order: local[pid],
+          updated_at: new Date().toISOString(),
+        }))
+        const { error: upErr } = await d.from('user_project_order').upsert(rows)
+        if (upErr) console.error('[useStore] loadUserProjectOrder migration:', upErr)
+        set({ localProjectOrder: local })
+      } else {
+        set({ localProjectOrder: {} })
+      }
+      _projectOrderLoaded = true
+      return
+    }
+
+    const orderMap = {}
+    data.forEach(r => { orderMap[r.project_id] = r.sort_order })
+    set({ localProjectOrder: orderMap })
+    try { localStorage.setItem('localProjectOrder', JSON.stringify(orderMap)) } catch {}
+    _projectOrderLoaded = true
   },
 
   // 로컬 순서 적용된 프로젝트 정렬
