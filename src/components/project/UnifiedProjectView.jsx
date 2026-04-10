@@ -113,7 +113,24 @@ export default function UnifiedProjectView({ projectId }) {
   }, [undo])
   function showToast(msg) { setToast({ msg, canUndo: true }); setTimeout(() => setToast(null), 4000) }
 
-  // ─── dnd-kit handlers ───
+  // ─── Project tasks (must be before timelineDates/handlers that reference them) ───
+  const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
+  const backlogTasks = useMemo(() => projectTasks.filter(t => !t.keyMilestoneId), [projectTasks])
+
+  // ─── Shared collapsed state ───
+  const [collapsed, setCollapsed] = useState(new Set())
+  const toggleNode = useCallback((id) => {
+    setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }, [])
+  const expandAll = useCallback(() => setCollapsed(new Set()), [])
+  const collapseAll = useCallback(() => {
+    const ids = new Set()
+    const walk = (nodes) => nodes.forEach(n => { if ((n.children || []).length > 0) { ids.add(n.id); walk(n.children) } })
+    walk(tree)
+    setCollapsed(ids)
+  }, [tree])
+
+  // ─── dnd-kit handlers (must be after collapsed/toggleNode declaration) ───
   const handleDndStart = useCallback((event) => {
     const data = event.active.data.current
     if (data?.type === 'task') {
@@ -209,23 +226,6 @@ export default function UnifiedProjectView({ projectId }) {
       return
     }
   }, [tasks, milestones, pushUndo, updateTask, moveMilestone, reorderMilestones, collapsed, toggleNode])
-
-  // ─── Project tasks (must be before timelineDates/handlers that reference them) ───
-  const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
-  const backlogTasks = useMemo(() => projectTasks.filter(t => !t.keyMilestoneId), [projectTasks])
-
-  // ─── Shared collapsed state ───
-  const [collapsed, setCollapsed] = useState(new Set())
-  const toggleNode = useCallback((id) => {
-    setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  }, [])
-  const expandAll = useCallback(() => setCollapsed(new Set()), [])
-  const collapseAll = useCallback(() => {
-    const ids = new Set()
-    const walk = (nodes) => nodes.forEach(n => { if ((n.children || []).length > 0) { ids.add(n.id); walk(n.children) } })
-    walk(tree)
-    setCollapsed(ids)
-  }, [tree])
 
   // ─── Timeline context ───
   const timelineDates = useMemo(() => {
