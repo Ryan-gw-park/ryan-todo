@@ -3,6 +3,13 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { COLOR } from '../../../../styles/designTokens'
 
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 /* ─── Milestone Row — 매트릭스 셀 내 MS 헤더 (인터랙티브) ─── */
 /*
  * 10a: 배경색 + accent bar + alive/total 카운트 + 들여쓰기 기반 그룹 헤더
@@ -53,10 +60,10 @@ export default function MilestoneRow({
       style={{
         ...sortableStyle,
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '3px 6px 3px 4px',
-        marginBottom: 2,
+        padding: '2px 6px 2px 4px',
+        marginBottom: 1,
         background: accentColor
-          ? (hover && interactive ? `${accentColor}26` : `${accentColor}14`)
+          ? (hover && interactive ? hexToRgba(accentColor, 0.15) : hexToRgba(accentColor, 0.08))
           : (hover && interactive ? '#E8E6DD' : '#F1EFE8'),
         borderRadius: 4,
         position: 'relative',
