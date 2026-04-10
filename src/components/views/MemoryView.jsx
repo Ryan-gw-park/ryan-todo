@@ -104,7 +104,7 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* 헤더 */}
-      <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #f0efe8', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      <div style={{ padding: '16px 40px 12px', borderBottom: '1px solid #f0efe8', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         {isMobile && (
           <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 18, padding: '2px 6px', borderRadius: 6 }}>←</button>
         )}
@@ -146,7 +146,8 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
       </div>
 
       {/* 본문 */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 40px' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ background: colorObj.card, borderRadius: 10, padding: '16px 20px', border: '1px solid rgba(0,0,0,0.04)', minHeight: 300 }}>
           <OutlinerEditor
             ref={editorRef}
@@ -159,6 +160,7 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
         <div style={{ marginTop: 12, fontSize: 12, color: '#a09f99', textAlign: 'right' }}>
           {formatDate(memo.updatedAt || memo.createdAt)}
         </div>
+        </div>
       </div>
     </div>
   )
@@ -166,9 +168,12 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
 
 /* ─── 메인 뷰 ─── */
 export default function MemoryView() {
-  const { memos, addMemo, deleteMemo } = useStore()
+  const { memos: rawMemos, addMemo, deleteMemo } = useStore()
   const isMobile = window.innerWidth < 768
   const [selectedId, setSelectedId] = useState(null)
+
+  // 최신순 정렬 (updatedAt DESC)
+  const memos = [...rawMemos].sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''))
   const selectedMemo = selectedId ? memos.find(m => m.id === selectedId) : null
 
   // 선택된 메모가 삭제되면 해제
