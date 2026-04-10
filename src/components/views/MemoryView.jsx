@@ -104,7 +104,7 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* 헤더 */}
-      <div style={{ padding: '16px 40px 12px', borderBottom: '1px solid #f0efe8', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #f0efe8', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         {isMobile && (
           <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 18, padding: '2px 6px', borderRadius: 6 }}>←</button>
         )}
@@ -146,8 +146,7 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
       </div>
 
       {/* 본문 */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 40px' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
         <div style={{ background: colorObj.card, borderRadius: 10, padding: '16px 20px', border: '1px solid rgba(0,0,0,0.04)', minHeight: 300 }}>
           <OutlinerEditor
             ref={editorRef}
@@ -159,7 +158,6 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
         {/* 타임스탬프 */}
         <div style={{ marginTop: 12, fontSize: 12, color: '#a09f99', textAlign: 'right' }}>
           {formatDate(memo.updatedAt || memo.createdAt)}
-        </div>
         </div>
       </div>
     </div>
@@ -236,7 +234,7 @@ export default function MemoryView() {
   }
 
   return (
-    <div data-view="memory" style={{ height: '100%', display: 'flex' }}>
+    <div data-view="memory" style={{ height: '100%', display: 'flex', padding: '0 24px' }}>
       {/* 좌측 리스트 */}
       <div style={{
         width: isMobile ? '100%' : 300, flexShrink: 0,
