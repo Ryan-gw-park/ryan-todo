@@ -81,6 +81,7 @@ export default function TeamMatrixGrid({
                         <CellContent
                           tasks={cellTasks}
                           cellMilestones={cellMs}
+                          project={proj}
                           editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
                           toggleDone={toggleDone} openDetail={openDetail}
                           matrixMsInteractive
