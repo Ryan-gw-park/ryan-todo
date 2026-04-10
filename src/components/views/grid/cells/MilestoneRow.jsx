@@ -53,9 +53,11 @@ export default function MilestoneRow({
       style={{
         ...sortableStyle,
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '5px 8px 5px 5px',
+        padding: '3px 6px 3px 4px',
         marginBottom: 2,
-        background: hover && interactive ? '#E8E6DD' : '#F1EFE8',
+        background: accentColor
+          ? (hover && interactive ? `${accentColor}26` : `${accentColor}14`)
+          : (hover && interactive ? '#E8E6DD' : '#F1EFE8'),
         borderRadius: 4,
         position: 'relative',
         cursor: dragDisabled ? 'default' : 'grab',
