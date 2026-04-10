@@ -35,40 +35,42 @@ export default function PersonalMatrixGrid({
   const displayCats = focusMode ? CATS.filter(c => c.key === 'today') : CATS
   const cardGridCols = focusMode ? '1fr' : `repeat(${CATS.length}, 1fr)`
   const outerCols = focusMode ? 'repeat(2, 1fr)' : '1fr'
-  const headerCols = focusMode ? '1fr 48px' : `repeat(${CATS.length}, 1fr) 48px`
 
   return (
     <div>
-      {/* Sticky 카테고리 헤더 */}
+      {/* Summary pill bar (sticky 아님, 일반 flow) */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: '#fff',
-        border: `1px solid ${COLOR.border}`, borderRadius: 10,
+        display: 'flex', alignItems: 'center', gap: 12,
         padding: '8px 14px', marginBottom: 12,
-        display: 'grid', gridTemplateColumns: headerCols,
-        alignItems: 'center', gap: 8,
       }}>
-        {displayCats.map(cat => (
-          <div key={cat.key} style={{
-            fontSize: FONT.caption,
-            fontWeight: cat.key === 'today' ? 700 : 600,
-            color: cat.key === 'today' ? COLOR.danger : COLOR.textTertiary,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: cat.color }} />
-            {cat.label}
-            <span style={{ fontWeight: 400, color: COLOR.textTertiary, fontSize: FONT.tiny }}>{catCounts[cat.key]}</span>
-          </div>
-        ))}
+        {displayCats.map(cat => {
+          const isToday = cat.key === 'today'
+          return (
+            <div key={cat.key} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 999,
+              background: isToday ? 'rgba(229, 62, 62, 0.08)' : 'transparent',
+              color: isToday ? '#991B1B' : COLOR.textSecondary,
+              fontSize: FONT.caption, fontWeight: isToday ? 500 : 400,
+            }}>
+              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: cat.color }} />
+              {cat.label}
+              <span style={{ fontSize: FONT.tiny, opacity: 0.8 }}>{catCounts[cat.key]}</span>
+            </div>
+          )
+        })}
+        <div style={{ flex: 1 }} />
         <button
           onClick={onToggleFocusMode}
           title={focusMode ? '집중 모드 해제' : '집중 모드'}
           style={{
+            width: 28, height: 28, borderRadius: '50%',
             border: 'none',
             background: focusMode ? COLOR.danger : 'transparent',
             color: focusMode ? '#fff' : COLOR.textTertiary,
-            borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
-            fontSize: 14, justifySelf: 'end', fontFamily: 'inherit',
+            cursor: 'pointer', fontSize: 14, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
           }}
         >◎</button>
       </div>
