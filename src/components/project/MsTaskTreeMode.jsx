@@ -23,6 +23,7 @@ export default function MsTaskTreeMode({
 }) {
   const addTask = useStore(s => s.addTask)
   const updateTask = useStore(s => s.updateTask)
+  const openModal = useStore(s => s.openModal)
   const reorderTasks = useStore(s => s.reorderTasks)
   const moveMilestone = useStore(s => s.moveMilestone)
   const reorderMilestones = useStore(s => s.reorderMilestones)
@@ -273,6 +274,7 @@ export default function MsTaskTreeMode({
               currentTeamId={currentTeamId}
               onUpdateMilestone={updateMilestone}
               onCascadeOwner={handleCascadeOwner}
+              onOpenMsDetail={(msId) => openModal({ type: 'milestoneDetail', milestoneId: msId, returnTo: null })}
             />
           ))}
 
@@ -296,7 +298,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
   onTaskEditFinish, onAddTaskSubmit,
   toggleDone, openDetail, projectTasks, countAll,
   onTaskDrop, onMsDropChild, onMsReorder,
-  memberMap, members, allMilestones, currentTeamId, onUpdateMilestone, onCascadeOwner,
+  memberMap, members, allMilestones, currentTeamId, onUpdateMilestone, onCascadeOwner, onOpenMsDetail,
 }) {
   const hasChildren = (node.children || []).length > 0
   const isCollapsed = collapsed.has(node.id)
@@ -397,6 +399,12 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
 
           {isHover && !isEditing && (
             <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+              {onOpenMsDetail && (
+                <span onClick={e => { e.stopPropagation(); onOpenMsDetail(node.id) }}
+                  style={{ fontSize: 10, color: COLOR.textTertiary, cursor: 'pointer', padding: '0 3px' }}
+                  onMouseEnter={e => e.currentTarget.style.color = COLOR.textPrimary}
+                  onMouseLeave={e => e.currentTarget.style.color = COLOR.textTertiary}>›</span>
+              )}
               <span onClick={e => { e.stopPropagation(); onAddChildMs(node.id) }}
                 style={{ fontSize: 9, color: COLOR.textTertiary, cursor: 'pointer', padding: '0 3px' }}>+하위</span>
               <span onClick={e => { e.stopPropagation(); onDeleteMs(node.id, node.title) }}
@@ -500,6 +508,7 @@ function MsNode({ node, depth, dotColor, collapsed, toggleNode, hoverId, setHove
               currentTeamId={currentTeamId}
               onUpdateMilestone={onUpdateMilestone}
               onCascadeOwner={onCascadeOwner}
+              onOpenMsDetail={onOpenMsDetail}
             />
           ))}
           {/* + 마일스톤 추가 (hover only) */}
