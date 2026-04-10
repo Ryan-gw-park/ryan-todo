@@ -34,7 +34,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 22, minHeight: 30,
+        display: 'flex', alignItems: 'flex-start', gap: 0, paddingLeft: node.level * 17, minHeight: 26,
         background: selected ? 'rgba(55, 53, 47, 0.06)' : 'transparent',
         borderRadius: selected ? 3 : 0,
         ...(selected ? { userSelect: 'none', WebkitUserSelect: 'none' } : {}),
@@ -43,7 +43,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
     >
       <div
         onClick={hasChildren ? onToggleCollapse : undefined}
-        style={{ width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, height: 28, cursor: hasChildren ? 'pointer' : 'default' }}
+        style={{ width: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, height: 24, cursor: hasChildren ? 'pointer' : 'default' }}
       >
         {hasChildren ? (
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
@@ -65,9 +65,9 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
         onPaste={e => onPaste?.(e, idx)}
         onFocus={e => autoResize(e.target)}
         placeholder={showPlaceholder ? '노트를 입력하세요...' : ''}
-        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize, lineHeight: isMobile ? '20px' : '22px', padding: '3px 4px', fontFamily: 'inherit', color: '#37352f', boxSizing: 'border-box', resize: 'none', overflow: 'hidden', display: 'block', fontWeight: 400 }}
+        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize, lineHeight: isMobile ? '19px' : '20px', padding: '2px 4px', fontFamily: 'inherit', color: '#37352f', boxSizing: 'border-box', resize: 'none', overflow: 'hidden', display: 'block', fontWeight: 400 }}
       />
-      <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0, height: 28, alignItems: 'center' }} className="bullet-actions">
+      <div style={{ display: 'flex', gap: 1, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0, height: 24, alignItems: 'center' }} className="bullet-actions">
         {node.level > 0 && (
           <button onClick={() => onChangeLevel(idx, -1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', padding: 2, display: 'flex' }}>
             <OutdentIcon />

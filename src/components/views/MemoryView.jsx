@@ -102,63 +102,65 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#fff' }}>
       {/* 헤더 */}
-      <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #f0efe8', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        {isMobile && (
-          <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 18, padding: '2px 6px', borderRadius: 6 }}>←</button>
-        )}
-        {/* Color dot (clickable) */}
-        <div style={{ position: 'relative' }} ref={colorPickerRef}>
-          <div
-            onClick={() => setShowColorPicker(p => !p)}
-            style={{ width: 12, height: 12, borderRadius: 3, background: colorObj.dot, cursor: 'pointer', flexShrink: 0 }}
-          />
-          {showColorPicker && (
-            <div style={{ position: 'absolute', left: 0, top: 20, background: 'white', border: '1px solid #e8e8e8', borderRadius: 8, padding: 8, display: 'flex', gap: 4, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-              {COLOR_OPTIONS.map(c => (
-                <div
-                  key={c.id}
-                  onClick={() => { updateMemo(memo.id, { color: c.id }); setShowColorPicker(false) }}
-                  style={{ width: 20, height: 20, borderRadius: 4, background: c.dot, cursor: 'pointer', border: memo.color === c.id ? '2px solid #37352f' : '2px solid transparent' }}
-                />
-              ))}
-            </div>
+      <div style={{ padding: '14px 18px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isMobile && (
+            <button onClick={onBack} style={{ width: 28, background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 18, padding: '2px 6px', borderRadius: 6 }}>←</button>
           )}
+          {/* Color dot (clickable) */}
+          <div style={{ position: 'relative' }} ref={colorPickerRef}>
+            <div
+              onClick={() => setShowColorPicker(p => !p)}
+              style={{ width: 12, height: 12, borderRadius: 3, background: colorObj.dot, cursor: 'pointer', flexShrink: 0 }}
+            />
+            {showColorPicker && (
+              <div style={{ position: 'absolute', left: 0, top: 20, background: 'white', border: '1px solid #e8e8e8', borderRadius: 8, padding: 8, display: 'flex', gap: 4, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                {COLOR_OPTIONS.map(c => (
+                  <div
+                    key={c.id}
+                    onClick={() => { updateMemo(memo.id, { color: c.id }); setShowColorPicker(false) }}
+                    style={{ width: 20, height: 20, borderRadius: 4, background: c.dot, cursor: 'pointer', border: memo.color === c.id ? '2px solid #37352f' : '2px solid transparent' }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Title */}
+          <input
+            ref={titleRef}
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={handleTitleKeyDown}
+            placeholder="노트 제목..."
+            style={{ flex: 1, fontSize: 18, fontWeight: 700, border: 'none', outline: 'none', background: 'transparent', color: '#37352f', fontFamily: 'inherit', padding: 0, minWidth: 0 }}
+          />
+          {/* Delete */}
+          <button onClick={handleDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 4, display: 'flex', flexShrink: 0 }}
+            onMouseEnter={e => e.currentTarget.style.color = '#e57373'}
+            onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
+          >
+            <TrashIcon />
+          </button>
         </div>
-        {/* Title */}
-        <input
-          ref={titleRef}
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onBlur={saveTitle}
-          onKeyDown={handleTitleKeyDown}
-          placeholder="노트 제목..."
-          style={{ flex: 1, fontSize: 18, fontWeight: 700, border: 'none', outline: 'none', background: 'transparent', color: '#37352f', fontFamily: 'inherit', padding: 0, minWidth: 0 }}
-        />
-        {/* Delete */}
-        <button onClick={handleDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: 4, display: 'flex', flexShrink: 0 }}
-          onMouseEnter={e => e.currentTarget.style.color = '#e57373'}
-          onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
-        >
-          <TrashIcon />
-        </button>
+        {/* 날짜 (제목 아래) */}
+        <div style={{ fontSize: 11, color: '#a09f99', marginTop: 2, paddingLeft: isMobile ? 60 : 22 }}>
+          {formatDate(memo.updatedAt || memo.createdAt)}
+        </div>
+        {/* Hairline */}
+        <div style={{ height: '0.5px', background: '#f0efe8', marginTop: 10 }} />
       </div>
 
       {/* 본문 */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
-        <div style={{ background: colorObj.card, borderRadius: 10, padding: '16px 20px', border: '1px solid rgba(0,0,0,0.04)', minHeight: 300 }}>
-          <OutlinerEditor
-            ref={editorRef}
-            notes={memo.notes}
-            onChange={(newNotes) => updateMemo(memo.id, { notes: newNotes })}
-            accentColor={colorObj.dot}
-          />
-        </div>
-        {/* 타임스탬프 */}
-        <div style={{ marginTop: 12, fontSize: 12, color: '#a09f99', textAlign: 'right' }}>
-          {formatDate(memo.updatedAt || memo.createdAt)}
-        </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '14px 18px' }}>
+        <OutlinerEditor
+          ref={editorRef}
+          notes={memo.notes}
+          onChange={(newNotes) => updateMemo(memo.id, { notes: newNotes })}
+          accentColor={colorObj.dot}
+        />
       </div>
     </div>
   )
