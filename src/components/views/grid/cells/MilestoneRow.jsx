@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { COLOR } from '../../../../styles/designTokens'
+import StackedAvatar from '../../../shared/StackedAvatar'
 
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -34,6 +35,7 @@ export default function MilestoneRow({
   onOpenDetail,
   breadcrumb,
   interactive = false,
+  ownerInfo,           // 12d: { primary: { name, color }, secondary: { name, color } | null } | null
 }) {
   const [hover, setHover] = useState(false)
 
@@ -140,6 +142,16 @@ export default function MilestoneRow({
       {/* Fallback: taskCount only (for non-count callers) */}
       {!isEditing && !totalCount && taskCount > 0 && (
         <span style={{ fontSize: 10, color: COLOR.textTertiary, flexShrink: 0 }}>{taskCount}</span>
+      )}
+
+      {/* Owner badge (12d) */}
+      {ownerInfo?.primary && (
+        <StackedAvatar
+          primary={ownerInfo.primary}
+          secondary={ownerInfo.secondary}
+          size={14}
+          showLabel={false}
+        />
       )}
 
       {/* Hover-only action buttons (interactive only) */}

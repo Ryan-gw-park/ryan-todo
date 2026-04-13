@@ -122,6 +122,7 @@ function taskToRow(t) {
     team_id: t.teamId || null,
     scope: t.scope || 'private',
     assignee_id: t.assigneeId || null,
+    secondary_assignee_id: t.secondaryAssigneeId || null,
     created_by: t.createdBy || null,
     highlight_color: t.highlightColor || null,
     updated_at: new Date().toISOString(),
@@ -177,6 +178,7 @@ function mapTask(r) {
     teamId: r.team_id || null,
     scope: r.scope || 'private',
     assigneeId: r.assignee_id || null,
+    secondaryAssigneeId: r.secondary_assignee_id || null,
     createdBy: r.created_by || null,
     highlightColor: r.highlight_color || null,
     updatedAt: r.updated_at || null,
@@ -234,6 +236,7 @@ const _defaultCollapseState = {
   matrixDone: {},     // projectId → boolean
   matrixMs: {},       // msId → boolean (true = MS 접힘, 개인 매트릭스 셀 내)
   teamMatrixMs: {},   // msId → boolean (팀 매트릭스 전용, 개인과 분리)
+  membersView: {},    // 'memberId:projectId' 복합키 → boolean (멤버 뷰 프로젝트 접기)
   timeline: {},       // projectId → boolean
   projectExpanded: {},// taskId → boolean (false = collapsed)
   projectSection: {}, // "projectId:catKey" → boolean (true = collapsed)
@@ -466,7 +469,7 @@ const useStore = create((set, get) => ({
       if (projectIdsList.length > 0) {
         try {
           const msResult = await d.from('key_milestones')
-            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by, parent_id, depth')
+            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, secondary_owner_id, status, start_date, end_date, created_by, parent_id, depth')
             .in('project_id', projectIdsList)
             .order('sort_order')
           milestones = msResult.data || []
@@ -1082,70 +1085,97 @@ const useStore = create((set, get) => ({
     if (error) console.error('[useStore] updateMilestone:', error)
   },
 
-  cascadeMilestoneOwner: async (msId, ownerId, { overwrite = false } = {}) => {
-    const { milestones } = get()
+  // 12d: 정/부 대칭 cascade — ownerType: 'primary' | 'secondary'
+  cascadeMilestoneOwner: async (msId, ownerId, { overwrite = false, ownerType = 'primary' } = {}) => {
+    const { milestones, tasks } = get()
     const d = db()
     if (!d) return { prevStates: [] }
 
-    // inline descendant 수집 (외부 import 회피 — TDZ 방지)
+    // 필드 분기
+    const msField = ownerType === 'secondary' ? 'secondary_owner_id' : 'owner_id'
+    const taskField = ownerType === 'secondary' ? 'secondaryAssigneeId' : 'assigneeId'
+    const taskDbField = ownerType === 'secondary' ? 'secondary_assignee_id' : 'assignee_id'
+
+    // 중복 방지: 정==부 동일인 거부
+    const rootMs = milestones.find(m => m.id === msId)
+    if (ownerType === 'secondary' && rootMs && rootMs.owner_id === ownerId) {
+      return { prevStates: [], error: 'duplicate' }
+    }
+    if (ownerType === 'primary' && rootMs && rootMs.secondary_owner_id === ownerId && ownerId) {
+      // 부담당을 자동 NULL로 설정
+      set(s => ({ milestones: s.milestones.map(m => m.id === msId ? { ...m, secondary_owner_id: null } : m) }))
+      await d.from('key_milestones').update({ secondary_owner_id: null, updated_at: new Date().toISOString() }).eq('id', msId)
+    }
+
+    // inline descendant 수집
     const getDesc = (parentId, visited = new Set()) => {
       if (visited.has(parentId)) return []
       visited.add(parentId)
       const children = milestones.filter(m => m.parent_id === parentId)
       const ids = []
-      for (const c of children) {
-        ids.push(c.id)
-        ids.push(...getDesc(c.id, visited))
-      }
+      for (const c of children) { ids.push(c.id); ids.push(...getDesc(c.id, visited)) }
       return ids
     }
-
     const descendantIds = getDesc(msId)
 
-    // overwrite=false면 owner_id가 null인 것만 대상
+    // overwrite=false면 해당 필드가 null인 것만 대상
     const targetIds = overwrite
       ? descendantIds
-      : descendantIds.filter(id => {
-          const m = milestones.find(ms => ms.id === id)
-          return m && !m.owner_id
-        })
+      : descendantIds.filter(id => { const m = milestones.find(ms => ms.id === id); return m && !m[msField] })
 
     if (targetIds.length === 0) return { prevStates: [] }
 
-    // 롤백용 이전 상태 보관
+    // 롤백용 이전 상태 (msField 기반)
     const prevStates = targetIds.map(id => {
       const m = milestones.find(ms => ms.id === id)
-      return { id, owner_id: m?.owner_id || null }
+      return { id, [msField]: m?.[msField] || null }
     })
 
-    // 로컬 즉시 반영 (단일 set)
+    // MS 로컬 즉시 반영
     set(s => ({
-      milestones: s.milestones.map(m =>
-        targetIds.includes(m.id) ? { ...m, owner_id: ownerId } : m
-      )
+      milestones: s.milestones.map(m => targetIds.includes(m.id) ? { ...m, [msField]: ownerId } : m)
     }))
 
-    // DB 순차 update (moveMilestoneWithTasks 패턴)
+    // MS DB 업데이트
     let hasError = false
     for (const id of targetIds) {
       const { error } = await d.from('key_milestones')
-        .update({ owner_id: ownerId, updated_at: new Date().toISOString() })
+        .update({ [msField]: ownerId, updated_at: new Date().toISOString() })
         .eq('id', id)
       if (error) { console.error('[useStore] cascadeMilestoneOwner:', error); hasError = true }
     }
 
-    // 실패 시 롤백
+    // Task cascade (12d 신규 — MS + 하위 MS의 모든 task)
+    if (!hasError) {
+      const allMsIds = [msId, ...targetIds]
+      const targetTasks = tasks.filter(t => allMsIds.includes(t.keyMilestoneId) && !t.deletedAt)
+      const taskTargets = overwrite ? targetTasks : targetTasks.filter(t => !t[taskField])
+
+      if (taskTargets.length > 0) {
+        set(s => ({
+          tasks: s.tasks.map(t => taskTargets.some(tt => tt.id === t.id) ? { ...t, [taskField]: ownerId } : t)
+        }))
+        for (const t of taskTargets) {
+          const { error } = await d.from('tasks')
+            .update({ [taskDbField]: ownerId, updated_at: new Date().toISOString() })
+            .eq('id', t.id)
+          if (error) { console.error('[useStore] cascadeMilestoneOwner task:', error); hasError = true }
+        }
+      }
+    }
+
+    // 실패 시 MS 롤백 (task 롤백은 복잡하므로 console만)
     if (hasError) {
       set(s => ({
         milestones: s.milestones.map(m => {
           const prev = prevStates.find(p => p.id === m.id)
-          return prev ? { ...m, owner_id: prev.owner_id } : m
+          return prev ? { ...m, [msField]: prev[msField] } : m
         })
       }))
       return { prevStates: [], error: true }
     }
 
-    return { prevStates } // Undo용 반환
+    return { prevStates }
   },
 
   deleteMilestone: async (id) => {

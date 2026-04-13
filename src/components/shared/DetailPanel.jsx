@@ -6,6 +6,7 @@ import { subscribePush, unsubscribePush, isPushSubscribed } from '../../utils/we
 import { getDb } from '../../utils/supabase'
 import OutlinerEditor from './OutlinerEditor'
 import AssigneeSelector from './AssigneeSelector'
+import DualAssigneeSelector from './DualAssigneeSelector'
 import ColorPicker from './ColorPicker'
 import CommentSection from './CommentSection'
 import MilestoneSelector from './MilestoneSelector'
@@ -50,15 +51,19 @@ export default function DetailPanel() {
   const c = p ? getColor(p.color) : getColor('blue')
   const allTopCollapsed = collapseState.detailAllTop?.[task.id]
 
-  // 팀 모드: 생성자 이름 조회
+  // 팀 모드: 멤버 목록 + 생성자 이름 조회 (12d: DualAssigneeSelector용)
+  const [dpMembers, setDpMembers] = useState([])
   const [creatorName, setCreatorName] = useState(null)
   useEffect(() => {
-    if (!currentTeamId || !task?.createdBy) { setCreatorName(null); return }
+    if (!currentTeamId) { setCreatorName(null); setDpMembers([]); return }
     let cancelled = false
     useTeamMembers.getMembers(currentTeamId).then(members => {
       if (cancelled) return
-      const creator = members.find(m => m.userId === task.createdBy)
-      setCreatorName(creator?.displayName || null)
+      setDpMembers(members)
+      if (task?.createdBy) {
+        const creator = members.find(m => m.userId === task.createdBy)
+        setCreatorName(creator?.displayName || null)
+      }
     })
     return () => { cancelled = true }
   }, [currentTeamId, task?.createdBy])
@@ -186,10 +191,17 @@ export default function DetailPanel() {
             </div>
           </DetailRow>
 
-          {/* ★ Loop-21: 담당자 — 팀 모드일 때만 */}
+          {/* 12d: 정/부 담당자 — 팀 모드일 때만 */}
           {currentTeamId && (
             <DetailRow label="담당자">
-              <AssigneeSelector task={task} onUpdate={(patch) => updateTask(task.id, patch)} />
+              <DualAssigneeSelector
+                mode="full"
+                primaryId={task.assigneeId}
+                secondaryId={task.secondaryAssigneeId}
+                members={dpMembers}
+                onChangePrimary={(id) => updateTask(task.id, { assigneeId: id, scope: id ? 'assigned' : 'team' })}
+                onChangeSecondary={(id) => updateTask(task.id, { secondaryAssigneeId: id })}
+              />
             </DetailRow>
           )}
 

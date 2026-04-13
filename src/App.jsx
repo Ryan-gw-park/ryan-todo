@@ -37,6 +37,7 @@ const ModeSelect = lazy(() => import('./components/team/ModeSelect'))
 const ProjectManager = lazy(() => import('./components/shared/ProjectManager'))
 const HelpPage = lazy(() => import('./components/shared/HelpPage'))
 const ModalRouter = lazy(() => import('./components/modals/ModalRouter'))
+const MembersView = lazy(() => import('./components/views/MembersView'))
 
 function isMobile() { return window.innerWidth < 768 }
 
@@ -85,6 +86,7 @@ function AppShell({ mobile }) {
     'team-matrix': () => <UnifiedGridView initialView="matrix" initialScope="team" />,
     'team-timeline': InlineTimelineView,
     'team-weekly': () => <UnifiedGridView initialView="weekly" initialScope="team" />,
+    'team-members': () => <MembersView />,
     'personal-matrix': () => <UnifiedGridView initialView="matrix" initialScope="personal" />,
     'personal-timeline': () => <InlineTimelineView scope="personal" />,
     'personal-weekly': () => <UnifiedGridView initialView="weekly" initialScope="personal" />,

@@ -9,6 +9,8 @@ import InlineAdd from '../../../shared/InlineAdd'
 import MiniAvatar from '../shared/MiniAvatar'
 import MilestoneRow from '../cells/MilestoneRow'
 import TaskAssigneeChip from '../../../project/TaskAssigneeChip'
+import StackedAvatar from '../../../shared/StackedAvatar'
+import DualAssigneeSelector from '../../../shared/DualAssigneeSelector'
 
 /* ═══ Helpers ═══ */
 function hexToRgba(hex, alpha) {
@@ -33,11 +35,16 @@ function SortableLaneCard({ projId, section, children }) {
 }
 
 /* ═══ TaskRow (팀 매트릭스 전용 — 담당자 배지 포함) ═══ */
+function getMemberInfo(userId, members, memberColorMap) {
+  if (!userId) return null
+  const m = members.find(mem => mem.userId === userId)
+  return m ? { name: m.displayName || '?', color: memberColorMap[userId]?.dot || '#888', userId } : { name: '?', color: '#888', userId }
+}
+
 function TeamTaskRow({ task, members, memberColorMap, editingId, setEditingId, handleEditFinish, toggleDone, openDetail, updateTask, msTag }) {
   const [hover, setHover] = useState(false)
+  const [showPopover, setShowPopover] = useState(false)
   const isEditing = editingId === task.id
-  const assignee = task.assigneeId ? members.find(m => m.userId === task.assigneeId) : null
-  const assigneeColor = task.assigneeId && memberColorMap[task.assigneeId] ? memberColorMap[task.assigneeId].dot : null
 
   return (
     <div
@@ -96,13 +103,35 @@ function TeamTaskRow({ task, members, memberColorMap, editingId, setEditingId, h
 
       {/* 담당자 배지 (B안이 아닐 때만) */}
       {!msTag && (
-        <TaskAssigneeChip
-          taskId={task.id}
-          assigneeId={task.assigneeId}
-          members={members}
-          onChangeAssignee={(userId) => updateTask(task.id, { assigneeId: userId, scope: userId ? 'assigned' : 'team' })}
-          size={14}
-        />
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {task.secondaryAssigneeId ? (
+            <StackedAvatar
+              primary={getMemberInfo(task.assigneeId, members, memberColorMap)}
+              secondary={getMemberInfo(task.secondaryAssigneeId, members, memberColorMap)}
+              size={14}
+              onClick={() => setShowPopover(p => !p)}
+            />
+          ) : (
+            <TaskAssigneeChip
+              taskId={task.id}
+              assigneeId={task.assigneeId}
+              members={members}
+              onChangeAssignee={(userId) => updateTask(task.id, { assigneeId: userId, scope: userId ? 'assigned' : 'team' })}
+              size={14}
+            />
+          )}
+          {showPopover && (
+            <DualAssigneeSelector
+              mode="popover"
+              primaryId={task.assigneeId}
+              secondaryId={task.secondaryAssigneeId}
+              members={members}
+              onChangePrimary={(id) => { updateTask(task.id, { assigneeId: id, scope: id ? 'assigned' : 'team' }); setShowPopover(false) }}
+              onChangeSecondary={(id) => { updateTask(task.id, { secondaryAssigneeId: id }); setShowPopover(false) }}
+              onClose={() => setShowPopover(false)}
+            />
+          )}
+        </div>
       )}
 
       {/* Detail arrow */}
@@ -327,6 +356,10 @@ function MsGroupView({
               onDelete={() => handleMsDelete && handleMsDelete(g.ms.id, g.ms.title)}
               onOpenDetail={() => openModal({ type: 'milestoneDetail', milestoneId: g.ms.id, returnTo: null })}
               interactive
+              ownerInfo={g.ms.owner_id ? {
+                primary: getMemberInfo(g.ms.owner_id, members, memberColorMap),
+                secondary: g.ms.secondary_owner_id ? getMemberInfo(g.ms.secondary_owner_id, members, memberColorMap) : null,
+              } : null}
             />
             {!msCollapsed && (
               <div style={{ paddingLeft: 22 }}>
@@ -386,20 +419,30 @@ function OwnerGroupView({
   editingId, setEditingId, handleEditFinish,
   toggleDone, openDetail, updateTask, addTask,
 }) {
-  // 담당자별 그룹: 미배정 먼저, 나머지 task 수 내림차순
+  // 12d: 담당자별 그룹 — primary/secondary 분리 배열
   const ownerGroups = useMemo(() => {
     const groups = {}
+    // 정담당 그룹핑
     projTasks.forEach(t => {
       const key = t.assigneeId || '__unassigned__'
-      if (!groups[key]) groups[key] = []
-      groups[key].push(t)
+      if (!groups[key]) groups[key] = { primary: [], secondary: [] }
+      groups[key].primary.push(t)
     })
-    const unassigned = groups['__unassigned__'] || []
+    // 부담당 그룹핑 (별도 배열)
+    projTasks.forEach(t => {
+      if (t.secondaryAssigneeId) {
+        const key = t.secondaryAssigneeId
+        if (!groups[key]) groups[key] = { primary: [], secondary: [] }
+        groups[key].secondary.push(t)
+      }
+    })
+    // 정렬: 미배정 먼저, 나머지 정담당 task 수 내림차순
+    const unassigned = groups['__unassigned__'] || { primary: [], secondary: [] }
     delete groups['__unassigned__']
-    const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length)
+    const sorted = Object.entries(groups).sort((a, b) => b[1].primary.length - a[1].primary.length)
     const result = []
-    if (unassigned.length > 0) result.push({ userId: '__unassigned__', tasks: unassigned })
-    sorted.forEach(([uid, tasks]) => result.push({ userId: uid, tasks }))
+    if (unassigned.primary.length > 0) result.push({ userId: '__unassigned__', ...unassigned })
+    sorted.forEach(([uid, g]) => result.push({ userId: uid, ...g }))
     return result
   }, [projTasks])
 
@@ -417,6 +460,8 @@ function OwnerGroupView({
         const mem = !isUnassigned ? members.find(m => m.userId === g.userId) : null
         const mColor = !isUnassigned && memberColorMap[g.userId] ? memberColorMap[g.userId].dot : '#bbb'
         const displayName = isUnassigned ? '미배정' : (mem?.displayName || '?')
+        const primaryCount = g.primary.length
+        const secondaryCount = g.secondary.length
 
         return (
           <div key={g.userId} style={{ marginBottom: 8 }}>
@@ -427,15 +472,32 @@ function OwnerGroupView({
             }}>
               <MiniAvatar name={isUnassigned ? '?' : displayName} size={18} color={isUnassigned ? '#bbb' : mColor} />
               <span style={{ fontSize: 12, fontWeight: 600, color: COLOR.textPrimary }}>{displayName}</span>
-              <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>{g.tasks.length}</span>
+              <span style={{ fontSize: FONT.tiny, color: COLOR.textTertiary }}>
+                {primaryCount}{secondaryCount > 0 ? ` +부 ${secondaryCount}` : ''}
+              </span>
             </div>
-            {/* Task 리스트 */}
-            {g.tasks.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map(t => (
+            {/* 정담당 Task 리스트 */}
+            {g.primary.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map(t => (
               <TeamTaskRow key={t.id} task={t} members={members} memberColorMap={memberColorMap}
                 editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
                 toggleDone={toggleDone} openDetail={openDetail} updateTask={updateTask}
                 msTag={getMsName(t.keyMilestoneId)} />
             ))}
+            {/* 부담당 Task 리스트 (muted) */}
+            {secondaryCount > 0 && g.secondary.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map(t => {
+              const primaryMem = t.assigneeId ? members.find(m => m.userId === t.assigneeId) : null
+              return (
+                <div key={`${t.id}-secondary`} style={{ opacity: 0.55, boxShadow: 'inset 2px 0 0 #e8e6df', paddingLeft: 2 }}>
+                  <TeamTaskRow task={t} members={members} memberColorMap={memberColorMap}
+                    editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
+                    toggleDone={toggleDone} openDetail={openDetail} updateTask={updateTask}
+                    msTag={getMsName(t.keyMilestoneId)} />
+                  <span style={{ fontSize: 10, padding: '1px 6px', background: 'rgba(0,0,0,0.05)', borderRadius: 3, marginLeft: 22, color: COLOR.textTertiary }}>
+                    정 {primaryMem?.displayName || '미배정'}
+                  </span>
+                </div>
+              )
+            })}
             <InlineAdd projectId={proj.id} category="today" color={c}
               extraFields={{ keyMilestoneId: null, scope: isUnassigned ? 'team' : 'assigned', ...(isUnassigned ? {} : { assigneeId: g.userId }) }} compact />
           </div>
