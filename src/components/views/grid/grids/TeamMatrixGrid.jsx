@@ -194,18 +194,16 @@ export default function TeamMatrixGrid({
           const section = proj.teamId ? 'team' : 'personal'
 
           // 참여자 칩 (task 수 내림차순, 미배정 맨 뒤)
-          const memberCounts = useMemo(() => {
-            const counts = {}
-            projTasks.forEach(t => {
-              const key = t.assigneeId || '__unassigned__'
-              counts[key] = (counts[key] || 0) + 1
-            })
-            const unassignedCount = counts['__unassigned__'] || 0
-            delete counts['__unassigned__']
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([uid, cnt]) => ({ userId: uid, count: cnt }))
-            if (unassignedCount > 0) sorted.push({ userId: '__unassigned__', count: unassignedCount })
-            return sorted
-          }, [projTasks])
+          // 참여자 칩 (useMemo 아님 — 루프 안에서 hook 호출 불가, plain 계산)
+          const counts = {}
+          projTasks.forEach(t => {
+            const key = t.assigneeId || '__unassigned__'
+            counts[key] = (counts[key] || 0) + 1
+          })
+          const unassignedCount = counts['__unassigned__'] || 0
+          delete counts['__unassigned__']
+          const memberCounts = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([uid, cnt]) => ({ userId: uid, count: cnt }))
+          if (unassignedCount > 0) memberCounts.push({ userId: '__unassigned__', count: unassignedCount })
 
           return (
             <SortableLaneCard key={proj.id} projId={proj.id} section={section}>
