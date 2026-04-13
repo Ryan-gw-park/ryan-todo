@@ -33,10 +33,10 @@ const S = {
 }
 
 const TASK_VIEWS = [
-  { key: 'matrix',   label: '매트릭스',   icon: '⊞' },
+  { key: 'matrix',   label: '할일',       icon: '⊞' },
+  { key: 'members',  label: '팀원',       icon: '👥' },
   { key: 'weekly',   label: '주간 플래너', icon: '📅' },
   { key: 'timeline', label: '타임라인',   icon: '▤' },
-  { key: 'members',  label: '팀원',       icon: '👥' },
 ]
 
 export default function Sidebar() {

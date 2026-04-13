@@ -57,6 +57,46 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   const editorRef = useRef(null)
   const colorPickerRef = useRef(null)
 
+  // hotfix-02: debounce notes save (500ms) — 빠른 타이핑 시 매 keystroke upsert 방지
+  const debounceRef = useRef(null)
+  const pendingSaveRef = useRef(null)
+  const debouncedUpdateNotes = useCallback((newNotes) => {
+    // 로컬 state는 OutlinerEditor가 즉시 관리 (UI 반응 빠름)
+    // DB upsert만 debounce
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    pendingSaveRef.current = newNotes
+    debounceRef.current = setTimeout(async () => {
+      await updateMemo(memo.id, { notes: pendingSaveRef.current })
+      pendingSaveRef.current = null
+    }, 500)
+  }, [memo.id, updateMemo])
+
+  // 컴포넌트 언마운트 또는 메모 전환 시 pending save 즉시 flush
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        if (pendingSaveRef.current !== null) {
+          updateMemo(memo.id, { notes: pendingSaveRef.current })
+        }
+      }
+    }
+  }, [memo.id, updateMemo])
+
+  // 페이지 떠날 때(새로고침/닫기) pending save 즉시 flush
+  useEffect(() => {
+    const handler = () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        if (pendingSaveRef.current !== null) {
+          updateMemo(memo.id, { notes: pendingSaveRef.current })
+        }
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [memo.id, updateMemo])
+
   const colorObj = COLOR_OPTIONS.find(c => c.id === memo.color) || COLOR_OPTIONS[0]
 
   useEffect(() => { setTitle(memo.title) }, [memo.id, memo.title])
@@ -158,7 +198,7 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
         <OutlinerEditor
           ref={editorRef}
           notes={memo.notes}
-          onChange={(newNotes) => updateMemo(memo.id, { notes: newNotes })}
+          onChange={debouncedUpdateNotes}
           accentColor={colorObj.dot}
         />
       </div>
