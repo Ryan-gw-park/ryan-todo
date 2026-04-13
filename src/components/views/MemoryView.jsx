@@ -183,9 +183,9 @@ export default function MemoryView() {
     }
   }, [memos, selectedId])
 
-  const handleAdd = useCallback(() => {
+  const handleAdd = useCallback(async () => {
     const randomColor = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)].id
-    const newMemo = addMemo({ title: '', notes: '', color: randomColor })
+    const newMemo = await addMemo({ title: '', notes: '', color: randomColor })
     if (newMemo) setSelectedId(newMemo.id)
   }, [addMemo])
 

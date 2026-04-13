@@ -854,6 +854,7 @@ const useStore = create((set, get) => ({
       id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder, user_id: userId,
     })
     if (error) console.error('[Ryan Todo] addMemo:', error)
+    return m
   },
 
   updateMemo: async (id, patch) => {
