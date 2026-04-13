@@ -47,6 +47,19 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   // 집중 모드는 개인 매트릭스일 때만 실제로 active
   const focusModeActive = view === 'matrix' && scope === 'personal' && focusMode
 
+  // ─── 팀 매트릭스 담당자별 그룹 토글 (12c) ───
+  const [groupByOwner, setGroupByOwner] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('teamMatrixGroupByOwner') === 'true'
+  })
+  const toggleGroupByOwner = useCallback(() => {
+    setGroupByOwner(prev => {
+      const next = !prev
+      try { localStorage.setItem('teamMatrixGroupByOwner', String(next)) } catch {}
+      return next
+    })
+  }, [])
+
   // ─── Store ───
   const { projects, tasks, updateTask, moveTaskTo, reorderTasks, toggleDone, openDetail, addTask, sortProjectsLocally, updateMilestone, deleteMilestone, openConfirmDialog, moveMilestoneWithTasks, reorderMilestones } = useStore()
   const currentTeamId = useStore(s => s.currentTeamId)
@@ -349,11 +362,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
         const [, projId] = parts
         targetProjectId = projId
         targetOwnerId = userId
-      } else if (mode === 'tmat') {
-        const [, projId, memberId] = parts
-        targetProjectId = projId
-        targetOwnerId = memberId
       } else {
+        // tmat 제거 (12c — 팀 매트릭스는 더 이상 DroppableCell 미사용)
         // pw/tw weekly: MS drop 무시
         return
       }
@@ -368,10 +378,6 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       const [, targetProjId, targetCat] = parts
       if (task.projectId === targetProjId && task.category === targetCat) return
       moveTaskTo(taskId, targetProjId, targetCat)
-    } else if (mode === 'tmat') {
-      const [, targetProjId, targetMemberId] = parts
-      if (task.projectId === targetProjId && task.assigneeId === targetMemberId) return
-      updateTask(taskId, { projectId: targetProjId, assigneeId: targetMemberId, scope: 'assigned' })
     } else if (mode === 'pw') {
       const [, , targetDate] = parts
       if (task.dueDate === targetDate) return
@@ -411,6 +417,18 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
             <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>{title}</h1>
             <div style={{ flex: 1 }} />
             <Pill items={[{ k: 'matrix', l: '매트릭스' }, { k: 'weekly', l: '주간 플래너' }]} active={view} onChange={setView} />
+            {view === 'matrix' && scope === 'team' && (
+              <button
+                onClick={toggleGroupByOwner}
+                style={{
+                  border: `1px solid ${COLOR.border}`,
+                  background: groupByOwner ? '#2C2C2A' : '#fff',
+                  color: groupByOwner ? '#fff' : COLOR.textSecondary,
+                  borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                  fontSize: FONT.caption, fontFamily: 'inherit', fontWeight: 500,
+                }}
+              >{groupByOwner ? '담당자별' : '목록형'}</button>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary }}>{view === 'matrix' ? dateStr : weekRange}</span>
@@ -485,11 +503,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                   onStartMsEdit={onStartMsEdit}
                   handleMsEditFinish={handleMsEditFinish}
                   cancelMsEdit={cancelMsEdit}
-                  matrixMsCollapsed={matrixMsCollapsed}
-                  toggleMatrixMsCollapse={toggleMatrixMsCollapse}
                   handleMsDelete={handleMsDelete}
-                  matrixDoneCollapsed={matrixDoneCollapsed}
-                  toggleMatrixDoneCollapse={toggleMatrixDoneCollapse}
+                  groupByOwner={groupByOwner}
                 />
               )}
               {view === 'weekly' && scope === 'personal' && (

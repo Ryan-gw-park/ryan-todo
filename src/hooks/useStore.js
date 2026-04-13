@@ -232,7 +232,8 @@ const _defaultCollapseState = {
   allTasks: {},       // projectId → boolean (모바일 모든 할일 뷰)
   matrix: {},         // projectId → boolean
   matrixDone: {},     // projectId → boolean
-  matrixMs: {},       // msId → boolean (true = MS 접힘, 매트릭스 셀 내)
+  matrixMs: {},       // msId → boolean (true = MS 접힘, 개인 매트릭스 셀 내)
+  teamMatrixMs: {},   // msId → boolean (팀 매트릭스 전용, 개인과 분리)
   timeline: {},       // projectId → boolean
   projectExpanded: {},// taskId → boolean (false = collapsed)
   projectSection: {}, // "projectId:catKey" → boolean (true = collapsed)
