@@ -5,9 +5,9 @@ import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
 import { buildTree } from '../../utils/milestoneTree'
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
-import MsTaskTreeMode from './MsTaskTreeMode'
-import BacklogPanel from './BacklogPanel'
+import ProjectLaneCard from '../shared/ProjectLaneCard'
 import useTeamMembers from '../../hooks/useTeamMembers'
+import { getColorByIndex } from '../../utils/colors'
 import {
   getTimelineRange, getColumns, getColWidth, getTodayLabel,
   ScalePill, Toast, TimelineMsRow,
@@ -66,6 +66,13 @@ export default function UnifiedProjectView({ projectId }) {
     if (!currentTeamId) { setBlMembers([]); return }
     useTeamMembers.getMembers(currentTeamId).then(setBlMembers)
   }, [currentTeamId])
+
+  const memberColorMap = useMemo(() => {
+    const sorted = [...blMembers].sort((a, b) => (a.userId || '').localeCompare(b.userId || ''))
+    const map = {}
+    sorted.forEach((m, i) => { map[m.userId] = getColorByIndex(i) })
+    return map
+  }, [blMembers])
 
   const [wideEnough, setWideEnough] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true)
   useEffect(() => {
@@ -352,40 +359,33 @@ export default function UnifiedProjectView({ projectId }) {
       </div>
 
       {/* Content */}
-      <DndContext
-        sensors={rightMode === '전체 할일' ? dndSensors : undefined}
-        collisionDetection={pointerWithin}
-        onDragStart={handleDndStart}
-        onDragEnd={handleDndEnd}
-      >
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-        {/* 메인 콘텐츠 */}
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          {rightMode === '전체 할일' && (
-            <MsTaskTreeMode
-              tree={tree}
-              projectTasks={projectTasks}
-              backlogTasks={backlogTasks}
-              projectId={projectId}
-              pkmId={pkmId}
-              color={color}
-              toggleDone={toggleDone}
-              openDetail={openDetail}
-              addMilestone={addMilestone}
-              updateMilestone={updateMilestone}
-              deleteMilestone={deleteMilestone}
-              openConfirmDialog={openConfirmDialog}
-              externalCollapsed={collapsed}
-              onToggleNode={toggleNode}
-              onExpandAll={expandAll}
-              onCollapseAll={collapseAll}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {rightMode === '전체 할일' && (
+          <div style={{ padding: '12px 20px' }}>
+            <ProjectLaneCard
+              project={project}
+              tasks={projectTasks}
+              milestones={milestones}
+              members={blMembers}
+              memberColorMap={memberColorMap}
+              mode="project"
+              groupBy="milestone"
+              truncate={null}
+              collapsed={false}
+              onToggleCollapse={() => {}}
             />
-          )}
+          </div>
+        )}
 
-          {rightMode === '타임라인' && (
-            <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }} onDragEnd={() => setDragState(null)}>
+        {rightMode === '타임라인' && (
+          <DndContext
+            sensors={dndSensors}
+            collisionDetection={pointerWithin}
+            onDragStart={handleDndStart}
+            onDragEnd={handleDndEnd}
+          >
+            <div style={{ padding: '12px 20px' }} onDragEnd={() => setDragState(null)}>
               <div style={{ border: `1px solid ${COLOR.border}`, borderRadius: 10, overflow: 'hidden', display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
-                {/* Column header */}
                 <div style={{ display: 'flex', background: COLOR.bgSurface, borderBottom: `1px solid ${COLOR.border}`, position: 'sticky', top: 0, zIndex: 2 }}>
                   <div style={{ width: TREE_W, flexShrink: 0, padding: '6px 8px', fontSize: FONT.caption, fontWeight: 600, color: COLOR.textTertiary, borderRight: `1px solid ${COLOR.border}` }}>
                     마일스톤 / 할일
@@ -404,8 +404,6 @@ export default function UnifiedProjectView({ projectId }) {
                     })}
                   </div>
                 </div>
-
-                {/* Tree rows */}
                 {tree.length === 0 && (
                   <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: FONT.body }}>마일스톤이 없습니다</div>
                 )}
@@ -426,32 +424,21 @@ export default function UnifiedProjectView({ projectId }) {
                 ))}
               </div>
             </div>
-          )}
-        </div>
-
-        {/* BacklogPanel */}
-        <BacklogPanel
-          projectId={projectId}
-          projectTasks={projectTasks}
-          members={blMembers}
-          currentTeamId={currentTeamId}
-          color={color}
-          hidden={!wideEnough}
-        />
+            <DragOverlay dropAnimation={null}>
+              {dndActiveTask && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: '#e8f5e9', borderRadius: 5, fontSize: 12, border: '1px dashed #1D9E75', boxShadow: '0 2px 8px rgba(0,0,0,.12)', cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: '#2C2C2A' }}>{dndActiveTask.text}</span>
+                </div>
+              )}
+              {dndActiveMs && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 500, border: '1px solid #e0ddd6', boxShadow: '0 4px 12px rgba(0,0,0,.12)', cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: '#2C2C2A' }}>{dndActiveMs.title || '(제목 없음)'}</span>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        )}
       </div>
-      <DragOverlay dropAnimation={null}>
-        {dndActiveTask && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: '#e8f5e9', borderRadius: 5, fontSize: 12, border: '1px dashed #1D9E75', boxShadow: '0 2px 8px rgba(0,0,0,.12)', cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap' }}>
-            <span style={{ color: '#2C2C2A' }}>{dndActiveTask.text}</span>
-          </div>
-        )}
-        {dndActiveMs && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 500, border: '1px solid #e0ddd6', boxShadow: '0 4px 12px rgba(0,0,0,.12)', cursor: 'grabbing', userSelect: 'none', whiteSpace: 'nowrap' }}>
-            <span style={{ color: '#2C2C2A' }}>{dndActiveMs.title || '(제목 없음)'}</span>
-          </div>
-        )}
-      </DragOverlay>
-      </DndContext>
 
       {/* Toast */}
       {toast && <Toast msg={toast.msg} canUndo={toast.canUndo} onUndo={undo} onClose={() => setToast(null)} />}

@@ -32,20 +32,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const [view, setView] = useState(initialView) // 'matrix' | 'weekly'
   const scope = initialScope // 'team' | 'personal' — 사이드바 위치로만 결정, 토글 없음
 
-  // ─── 집중 모드 (개인 매트릭스 전용, localStorage 저장) ───
-  const [focusMode, setFocusMode] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('matrixFocusMode') === 'true'
-  })
-  const toggleFocusMode = useCallback(() => {
-    setFocusMode(prev => {
-      const next = !prev
-      try { localStorage.setItem('matrixFocusMode', String(next)) } catch {}
-      return next
-    })
-  }, [])
-  // 집중 모드는 개인 매트릭스일 때만 실제로 active
-  const focusModeActive = view === 'matrix' && scope === 'personal' && focusMode
+  // 12f: focusMode 폐기 (today 필터로 대체)
 
   // ─── 팀 매트릭스 담당자별 그룹 토글 (12c) ───
   const [groupByOwner, setGroupByOwner] = useState(() => {
@@ -445,65 +432,26 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
 
         {/* ═══ Grid + Sidebar ═══ */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 0 }}>
-          {focusModeActive ? (
-            /* 집중 모드: DnD 비활성 — DndContext/DragOverlay/MsBacklogSidebar의 DnD 없음 */
-            <>
-              <div style={{ flex: 1, overflow: 'auto' }}>
-                {view === 'matrix' && scope === 'personal' && (
-                  <PersonalMatrixGrid
-                    projects={displayProjects} myTasks={myTasks}
-                    collapsed={collapsed} toggleCollapse={toggleProjectCollapse}
-                    editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
-                    toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
-                    editingMsId={editingMsId}
-                    onStartMsEdit={onStartMsEdit}
-                    handleMsEditFinish={handleMsEditFinish}
-                    cancelMsEdit={cancelMsEdit}
-                    matrixMsCollapsed={matrixMsCollapsed}
-                    toggleMatrixMsCollapse={toggleMatrixMsCollapse}
-                    handleMsDelete={handleMsDelete}
-                    matrixDoneCollapsed={matrixDoneCollapsed}
-                    toggleMatrixDoneCollapse={toggleMatrixDoneCollapse}
-                    focusMode={focusMode}
-                    onToggleFocusMode={toggleFocusMode}
-                  />
-                )}
-              </div>
-            </>
-          ) : (
           <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div style={{ flex: 1, overflow: 'auto' }}>
               {view === 'matrix' && scope === 'personal' && (
                 <PersonalMatrixGrid
                   projects={displayProjects} myTasks={myTasks}
                   collapsed={collapsed} toggleCollapse={toggleProjectCollapse}
-                  editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
                   toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
-                  editingMsId={editingMsId}
-                  onStartMsEdit={onStartMsEdit}
-                  handleMsEditFinish={handleMsEditFinish}
-                  cancelMsEdit={cancelMsEdit}
                   matrixMsCollapsed={matrixMsCollapsed}
                   toggleMatrixMsCollapse={toggleMatrixMsCollapse}
                   handleMsDelete={handleMsDelete}
                   matrixDoneCollapsed={matrixDoneCollapsed}
                   toggleMatrixDoneCollapse={toggleMatrixDoneCollapse}
-                  focusMode={focusMode}
-                  onToggleFocusMode={toggleFocusMode}
                 />
               )}
               {view === 'matrix' && scope === 'team' && (
                 <TeamMatrixGrid
                   projects={displayProjects} tasks={filteredTasks} members={members}
                   collapsed={collapsed} toggleCollapse={toggleProjectCollapse}
-                  editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
                   toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
                   currentTeamId={currentTeamId}
-                  editingMsId={editingMsId}
-                  onStartMsEdit={onStartMsEdit}
-                  handleMsEditFinish={handleMsEditFinish}
-                  cancelMsEdit={cancelMsEdit}
-                  handleMsDelete={handleMsDelete}
                   groupByOwner={groupByOwner}
                 />
               )}
@@ -560,7 +508,6 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
               ) : null}
             </DragOverlay>
           </DndContext>
-          )}
         </div>
       </div>
     </div>
