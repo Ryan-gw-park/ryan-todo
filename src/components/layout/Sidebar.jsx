@@ -32,11 +32,15 @@ const S = {
   fontSection:  10,         // section label font
 }
 
-const TASK_VIEWS = [
+// 개인/팀 공용 뷰
+const COMMON_VIEWS = [
   { key: 'matrix',   label: '할일',       icon: '⊞' },
-  { key: 'members',  label: '팀원',       icon: '👥' },
   { key: 'weekly',   label: '주간 플래너', icon: '📅' },
   { key: 'timeline', label: '타임라인',   icon: '▤' },
+]
+// 팀 전용 뷰
+const TEAM_ONLY_VIEWS = [
+  { key: 'members',  label: '팀원',       icon: '👥' },
 ]
 
 export default function Sidebar() {
@@ -219,7 +223,7 @@ export default function Sidebar() {
       <div style={{ flex: 1, overflowY: 'auto', padding: `${S.dividerMy}px 0` }}>
         {/* ─── Section 1: 개인 ─── */}
         {!collapsed && <SectionLabel label="개인" />}
-        {TASK_VIEWS.map(v => (
+        {COMMON_VIEWS.map(v => (
           <NavItem key={`personal-${v.key}`} icon={v.icon} label={v.label}
             isActive={currentView === `personal-${v.key}`}
             onClick={() => setView(`personal-${v.key}`)}
@@ -233,7 +237,7 @@ export default function Sidebar() {
           <>
             <Divider />
             {!collapsed && <SectionLabel label="팀" />}
-            {TASK_VIEWS.map(v => (
+            {[...COMMON_VIEWS, ...TEAM_ONLY_VIEWS].map(v => (
               <NavItem key={`team-${v.key}`} icon={v.icon} label={v.label}
                 isActive={currentView === `team-${v.key}`}
                 onClick={() => setView(`team-${v.key}`)}
