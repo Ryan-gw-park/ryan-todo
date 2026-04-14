@@ -21,8 +21,9 @@ function hexToRgba(hex, alpha) {
 
 function getMemberInfo(userId, members, memberColorMap) {
   if (!userId) return null
-  const m = members.find(mem => mem.userId === userId)
-  return m ? { name: m.displayName || '?', color: memberColorMap[userId]?.dot || '#888', userId } : { name: '?', color: '#888', userId }
+  const m = (members || []).find(mem => mem.userId === userId)
+  const color = (memberColorMap && memberColorMap[userId]) ? memberColorMap[userId].dot : '#888'
+  return m ? { name: m.displayName || '?', color, userId } : { name: '?', color: '#888', userId }
 }
 
 /* ═══ ProjectLaneCard — 공용 프로젝트 카드 (12f) ═══ */

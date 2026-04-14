@@ -10,7 +10,7 @@ import { useKeyLinks } from '../../hooks/useKeyLinks'
 import { useKeyPolicies } from '../../hooks/useKeyPolicies'
 import CompactMilestoneRow from './CompactMilestoneRow'
 import MilestoneTaskChip from './MilestoneTaskChip'
-import BacklogPanel from './BacklogPanel'
+// BacklogPanel removed (12f)
 
 const DEFAULT_TASK_W = 400
 const TASK_COL_W_KEY = 'milestoneTaskColW'
@@ -332,15 +332,6 @@ export default function CompactMilestoneTab({ projectId }) {
 
     </div>
 
-    {/* BacklogPanel */}
-    <BacklogPanel
-      projectId={projectId}
-      projectTasks={projectTasks}
-      members={members}
-      currentTeamId={currentTeamId}
-      color={{ dot: '#888', text: '#888' }}
-      hidden={!wideEnough}
-    />
     </div>
     {/* Drag overlay */}
     <DragOverlay dropAnimation={null}>

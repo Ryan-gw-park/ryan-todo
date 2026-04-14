@@ -9,7 +9,7 @@ import MsBacklogSidebar from '../common/MsBacklogSidebar'
 import { getColor } from '../../utils/colors'
 
 import { EMPTY_OBJ, getMonday, fmtDate, getWeekNumber } from './grid/constants'
-import Pill from './grid/shared/Pill'
+// Pill removed (12f — top toggle removed)
 import PersonalMatrixGrid from './grid/grids/PersonalMatrixGrid'
 import TeamMatrixGrid from './grid/grids/TeamMatrixGrid'
 import PersonalWeeklyGrid from './grid/grids/PersonalWeeklyGrid'
@@ -29,8 +29,8 @@ import TeamWeeklyGrid from './grid/grids/TeamWeeklyGrid'
    ═══════════════════════════════════════════════════════ */
 
 export default function UnifiedGridView({ initialView = 'matrix', initialScope = 'personal' }) {
-  const [view, setView] = useState(initialView) // 'matrix' | 'weekly'
-  const scope = initialScope // 'team' | 'personal' — 사이드바 위치로만 결정, 토글 없음
+  const view = initialView // 12f: 사이드바에서 결정, 상단 토글 제거
+  const scope = initialScope
 
   // 12f: focusMode 폐기 (today 필터로 대체)
 
@@ -403,7 +403,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
             <h1 style={{ fontSize: FONT.viewTitle, fontWeight: 700, color: COLOR.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>{title}</h1>
             <div style={{ flex: 1 }} />
-            <Pill items={[{ k: 'matrix', l: '매트릭스' }, { k: 'weekly', l: '주간 플래너' }]} active={view} onChange={setView} />
+            {/* 12f: 상단 뷰 토글 제거 — 사이드바 메뉴로 일원화 */}
             {view === 'matrix' && scope === 'team' && (
               <button
                 onClick={toggleGroupByOwner}
