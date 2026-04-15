@@ -880,27 +880,12 @@ const useStore = create((set, get) => ({
     get().showToast('메모가 삭제됐습니다')
   },
 
-  // ─── Milestone CRUD (Loop-37: 계층형 마일스톤) ───
-  addMilestone: async (projectId, pkmId, title, parentId = null, ownerId = null) => {
+  // ─── Milestone CRUD (Loop-41: L1 flat — parentId/depth 무시) ───
+  addMilestone: async (projectId, pkmId, title, _parentId = null, ownerId = null) => {
     const d = db()
     if (!d) return null
     const userId = getCachedUserId()
-    // depth: parent_id 체인을 따라가서 실제 depth 계산 (DB depth 필드 의존 안함)
-    const computeDepthChain = (pid) => {
-      let depth = 0, cur = pid
-      const visited = new Set()
-      while (cur) {
-        if (visited.has(cur)) break
-        visited.add(cur)
-        const parent = get().milestones.find(m => m.id === cur)
-        if (!parent) break
-        depth++
-        cur = parent.parent_id
-      }
-      return depth
-    }
-    const depth = parentId ? computeDepthChain(parentId) : 0
-    const siblings = get().milestones.filter(m => m.project_id === projectId && m.parent_id === parentId)
+    const siblings = get().milestones.filter(m => m.project_id === projectId)
     const sortOrder = siblings.length
 
     const { data, error } = await d.from('key_milestones')
@@ -908,8 +893,8 @@ const useStore = create((set, get) => ({
         pkm_id: pkmId,
         project_id: projectId,
         title,
-        parent_id: parentId,
-        depth,
+        parent_id: null,
+        depth: 0,
         sort_order: sortOrder,
         created_by: userId,
         owner_id: ownerId,
@@ -923,8 +908,9 @@ const useStore = create((set, get) => ({
   },
 
   // 매트릭스 셀에서 MS를 추가할 때 사용 — pkm을 자동으로 select-or-insert 후 addMilestone 호출
+  // Loop 41: parentId 옵션 deprecated. L1 flat 정책에 의해 내부에서 무시됨.
   addMilestoneInProject: async (projectId, opts = {}) => {
-    const { ownerId = null, title = '', parentId = null } = opts
+    const { ownerId = null, title = '' } = opts
     // 1. pkm 확보 — 먼저 메모리의 milestones에서 추출 시도
     let pkmId = get().milestones.find(m => m.project_id === projectId)?.pkm_id
     if (!pkmId) {
@@ -958,7 +944,7 @@ const useStore = create((set, get) => ({
       }
     }
     if (!pkmId) return null
-    return get().addMilestone(projectId, pkmId, title, parentId, ownerId)
+    return get().addMilestone(projectId, pkmId, title, null, ownerId)
   },
 
   // 매트릭스 셀 간 MS 이동 + 자식 MS + task cascade
@@ -1108,23 +1094,8 @@ const useStore = create((set, get) => ({
       await d.from('key_milestones').update({ secondary_owner_id: null, updated_at: new Date().toISOString() }).eq('id', msId)
     }
 
-    // inline descendant 수집
-    const getDesc = (parentId, visited = new Set()) => {
-      if (visited.has(parentId)) return []
-      visited.add(parentId)
-      const children = milestones.filter(m => m.parent_id === parentId)
-      const ids = []
-      for (const c of children) { ids.push(c.id); ids.push(...getDesc(c.id, visited)) }
-      return ids
-    }
-    const descendantIds = getDesc(msId)
-
-    // overwrite=false면 해당 필드가 null인 것만 대상
-    const targetIds = overwrite
-      ? descendantIds
-      : descendantIds.filter(id => { const m = milestones.find(ms => ms.id === id); return m && !m[msField] })
-
-    if (targetIds.length === 0) return { prevStates: [] }
+    // Loop 41: L1 flat. 하위 MS 재귀 cascade 제거. MS 업데이트 없음, task cascade만 수행.
+    const targetIds = []
 
     // 롤백용 이전 상태 (msField 기반)
     const prevStates = targetIds.map(id => {
@@ -1182,26 +1153,15 @@ const useStore = create((set, get) => ({
   deleteMilestone: async (id) => {
     const d = db()
     if (!d) return
-    // CASCADE 삭제: 하위 MS도 DB에서 자동 삭제 → 로컬에서도 제거
-    const toDelete = new Set()
-    const walk = (targetId) => {
-      toDelete.add(targetId)
-      get().milestones.filter(m => m.parent_id === targetId).forEach(m => walk(m.id))
-    }
-    walk(id)
+    // Loop 41: L1 flat. CASCADE 재귀 제거. 단일 MS만 삭제.
     set(s => ({
-      milestones: s.milestones.filter(m => !toDelete.has(m.id)),
-      tasks: s.tasks.map(t => toDelete.has(t.keyMilestoneId) ? { ...t, keyMilestoneId: null } : t),
+      milestones: s.milestones.filter(m => m.id !== id),
+      tasks: s.tasks.map(t => t.keyMilestoneId === id ? { ...t, keyMilestoneId: null } : t),
     }))
     const { error } = await d.from('key_milestones').delete().eq('id', id)
     if (error) console.error('[useStore] deleteMilestone:', error)
-    // DB에서도 연결된 할일의 key_milestone_id 초기화 (CASCADE 대상 아님)
-    const d2 = db()
-    if (d2) {
-      for (const msId of toDelete) {
-        await d2.from('tasks').update({ key_milestone_id: null, updated_at: new Date().toISOString() }).eq('key_milestone_id', msId)
-      }
-    }
+    // DB에서도 연결된 task의 key_milestone_id 초기화
+    await d.from('tasks').update({ key_milestone_id: null, updated_at: new Date().toISOString() }).eq('key_milestone_id', id)
   },
 
   reorderMilestones: async (reordered) => {
@@ -1223,52 +1183,23 @@ const useStore = create((set, get) => ({
     }
   },
 
-  moveMilestone: async (id, newParentId) => {
+  // Loop 41: L1 flat. newParentId 무시. sort_order만 프로젝트 내 재계산.
+  moveMilestone: async (id, _newParentId) => {
     const d = db()
     if (!d) return
-    // depth: parent_id 체인을 따라가서 실제 depth 계산 (DB depth 필드 의존 안함)
-    const computeDepthChain = (pid) => {
-      let depth = 0, cur = pid
-      const visited = new Set()
-      while (cur) {
-        if (visited.has(cur)) break
-        visited.add(cur)
-        const parent = get().milestones.find(m => m.id === cur)
-        if (!parent) break
-        depth++
-        cur = parent.parent_id
-      }
-      return depth
-    }
-    const depth = newParentId ? computeDepthChain(newParentId) : 0
     const projectId = get().milestones.find(m => m.id === id)?.project_id
-    const siblings = get().milestones.filter(m => m.project_id === projectId && m.parent_id === newParentId && m.id !== id)
+    const siblings = get().milestones.filter(m => m.project_id === projectId && m.id !== id)
     const sortOrder = siblings.length
 
-    // 하위 노드 depth도 재귀 업데이트
-    const updates = []
-    const walkDepth = (targetId, parentDepth) => {
-      get().milestones.filter(m => m.parent_id === targetId).forEach(child => {
-        const newD = parentDepth + 1
-        updates.push({ id: child.id, depth: newD })
-        walkDepth(child.id, newD)
-      })
-    }
-    walkDepth(id, depth)
-
     set(s => ({
-      milestones: s.milestones.map(m => {
-        if (m.id === id) return { ...m, parent_id: newParentId, depth, sort_order: sortOrder }
-        const upd = updates.find(u => u.id === m.id)
-        if (upd) return { ...m, depth: upd.depth }
-        return m
-      })
+      milestones: s.milestones.map(m =>
+        m.id === id ? { ...m, parent_id: null, depth: 0, sort_order: sortOrder } : m
+      )
     }))
 
-    await d.from('key_milestones').update({ parent_id: newParentId, depth, sort_order: sortOrder, updated_at: new Date().toISOString() }).eq('id', id)
-    for (const u of updates) {
-      await d.from('key_milestones').update({ depth: u.depth, updated_at: new Date().toISOString() }).eq('id', u.id)
-    }
+    await d.from('key_milestones').update({
+      parent_id: null, depth: 0, sort_order: sortOrder, updated_at: new Date().toISOString()
+    }).eq('id', id)
   },
 
   // ─── Project Filter (Loop-20.2) ───

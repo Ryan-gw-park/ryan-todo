@@ -12,17 +12,7 @@ export function computeMilestoneCount(milestoneId, allTasks) {
   return { alive, total }
 }
 
-/**
- * 재귀 카운트 — MS + 하위 MS의 모든 task
- */
-export function computeMilestoneCountRecursive(msId, allMilestones, allTasks) {
-  let alive = 0, total = 0
-  const { alive: a, total: t } = computeMilestoneCount(msId, allTasks)
-  alive += a; total += t
-  const children = allMilestones.filter(m => m.parent_id === msId)
-  for (const child of children) {
-    const r = computeMilestoneCountRecursive(child.id, allMilestones, allTasks)
-    alive += r.alive; total += r.total
-  }
-  return { alive, total }
+// Loop 41: MS L1 flat. 재귀 카운트는 단일 MS 카운트와 동일. 호출자(MsTaskTreeMode)는 Loop 43에서 정리 예정.
+export function computeMilestoneCountRecursive(msId, _allMilestones, allTasks) {
+  return computeMilestoneCount(msId, allTasks)
 }

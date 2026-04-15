@@ -115,54 +115,6 @@ export function flattenTree(tree, defaultColor) {
 }
 
 /**
- * 트리를 flat rows로 변환 (v8 mockup 구조: 각 행 = 1개 task)
- * 리프에 연결된 task 수만큼 행을 생성
- * @param {Array} tree - 트리 루트 배열
- * @param {Array} tasks - store의 tasks 배열
- * @param {string} projectId - 프로젝트 ID
- * @param {string} defaultColor - 기본 색상
- * @returns {{ rows, maxDepth }}
- */
-export function flattenTreeWithTasks(tree, tasks, projectId, defaultColor) {
-  const rows = []
-  const maxDepth = getMaxDepth(tree)
-  const projectTasks = tasks.filter(t => t.projectId === projectId && !t.deletedAt)
-
-  const walk = (nodes, path, depth, color) => {
-    nodes.forEach(n => {
-      const c = n.color || color
-      const hasChildren = n.children && n.children.length > 0
-      if (hasChildren) {
-        walk(n.children, [...path, { id: n.id, title: n.title, color: c, isLeaf: false, _node: n }], depth + 1, c)
-      } else {
-        const cells = [...path, { id: n.id, title: n.title, color: c, isLeaf: true, _node: n }]
-        while (cells.length < maxDepth) cells.push(null)
-
-        // 리프에 연결된 할일 찾기
-        const leafTasks = projectTasks.filter(t => t.keyMilestoneId === n.id)
-        const subRowCount = Math.max(leafTasks.length, 1)
-
-        for (let i = 0; i < subRowCount; i++) {
-          rows.push({
-            leafId: n.id,
-            cells: i === 0 ? cells : cells.map(() => null), // rowspan simulation
-            task: leafTasks[i] || null,
-            isFirstSubRow: i === 0,
-            subRowCount: i === 0 ? subRowCount : 0,
-            color: c,
-            leafNode: n,
-            taskIndex: i,
-          })
-        }
-      }
-    })
-  }
-
-  walk(tree, [], 0, defaultColor || '#888')
-  return { rows, maxDepth }
-}
-
-/**
  * 노드에서 루트까지의 경로 문자열 생성
  * @param {string} nodeId
  * @param {Array} milestones - flat milestones 배열
@@ -177,66 +129,6 @@ export function getNodePath(nodeId, milestones) {
     current = current.parent_id ? msMap.get(current.parent_id) : null
   }
   return path.join(' > ')
-}
-
-/**
- * 펼쳐진 노드 기반으로 visible rows 생성 (타임라인 연동용)
- */
-export function flattenVisibleNodes(tree, expanded) {
-  const rows = []
-  const walk = (nodes, depth) => {
-    nodes.forEach(n => {
-      const hasChildren = n.children && n.children.length > 0
-      rows.push({
-        id: n.id,
-        title: n.title,
-        startDate: n.start_date,
-        endDate: n.end_date,
-        depth,
-        color: n.color,
-        type: hasChildren ? 'group' : 'leaf',
-        node: n,
-      })
-      if (hasChildren && expanded[n.id] !== false) {
-        walk(n.children, depth + 1)
-      }
-    })
-  }
-  walk(tree, 0)
-  return rows
-}
-
-/**
- * 트리의 모든 노드 ID를 expanded=true로 설정
- */
-export function expandAll(tree) {
-  const result = {}
-  const walk = (nodes) => {
-    nodes.forEach(n => {
-      if (n.children && n.children.length > 0) {
-        result[n.id] = true
-        walk(n.children)
-      }
-    })
-  }
-  walk(tree)
-  return result
-}
-
-/**
- * 그룹 바 기간 자동계산 (타임라인용)
- */
-export function computeGroupSpan(node) {
-  if (!node.children || node.children.length === 0) {
-    return { start: node.start_date, end: node.end_date }
-  }
-  const spans = node.children.map(c => computeGroupSpan(c))
-  const starts = spans.map(s => s.start).filter(Boolean)
-  const ends = spans.map(s => s.end).filter(Boolean)
-  return {
-    start: starts.length > 0 ? starts.sort()[0] : null,
-    end: ends.length > 0 ? ends.sort().reverse()[0] : null,
-  }
 }
 
 /**
@@ -292,17 +184,3 @@ export function getProjectMaxDepth(milestones, projectId) {
   return max
 }
 
-/**
- * Filter milestones by depth level for a project (Loop-38)
- * depth 필드 대신 parent_id 체인으로 실제 depth 계산
- * @param {Array} milestones - flat milestones array
- * @param {string} projectId - project ID (pkmId or project_id)
- * @param {string} depthFilter - 'all' | '0' | '1' | '2'
- * @returns {Array} filtered milestones
- */
-export function getVisibleMs(milestones, projectId, depthFilter) {
-  const projMs = milestones.filter(m => m.project_id === projectId)
-  if (depthFilter === 'all') return projMs
-  const d = parseInt(depthFilter)
-  return projMs.filter(m => computeDepth(m, projMs) === d)
-}
