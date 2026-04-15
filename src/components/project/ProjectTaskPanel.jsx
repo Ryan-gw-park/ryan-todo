@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
 import useStore from '../../hooks/useStore'
-import { collectLeaves, getNodePath, countTasksRecursive } from '../../utils/milestoneTree'
+// Loop 43: milestoneTree 트리 순회 제거 — L1 flat
 
 const TimelineEngine = lazy(() => import('../timeline/TimelineEngine'))
 
@@ -155,7 +155,9 @@ export default function ProjectTaskPanel({
 
   const selectedPath = useMemo(() => {
     if (!selectedLeafId) return ''
-    return getNodePath(selectedLeafId, milestones)
+    // Loop 43: L1 flat — path는 MS 자신의 title
+    const m = milestones.find(x => x.id === selectedLeafId)
+    return m?.title || ''
   }, [selectedLeafId, milestones])
 
   return (

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { COLOR, FONT, CHECKBOX } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
-import { countTasksRecursive } from '../../utils/milestoneTree'
+// Loop 43: countTasksRecursive 제거 — L1 flat 인라인 집계
 
 
 /* ═══════════════════════════════════════════════════════
@@ -76,7 +76,11 @@ export default function MsTaskListMode({
       const childMs = node.children?.filter(c => c.type === 'milestone' || c.children) || []
       const leafTasks = projectTasks.filter(t => t.keyMilestoneId === node.id && !t.deletedAt)
       const isLeaf = childMs.length === 0
-      const taskCount = countTasksRecursive(node, projectTasks)
+      // Loop 43: L1 flat — 단일 MS task 집계
+      const taskCount = {
+        total: leafTasks.length,
+        done: leafTasks.filter(t => t.done).length,
+      }
       const isEditing = editingMsId === node.id
       const indent = depth * 20
 

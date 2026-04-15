@@ -5,7 +5,7 @@ import { getCachedUserId } from '../../hooks/useStore'
 import useProjectFilter from '../../hooks/useProjectFilter'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import { getColor } from '../../utils/colors'
-import { buildTree } from '../../utils/milestoneTree'
+// Loop 43: buildTree 제거 (L1 flat으로 inline 처리)
 import {
   getTimelineRange, getColumns, getColWidth, getTodayLabel,
   ColumnHeader, ScalePill, Toast, TimelineMsRow, DraggableBar, ColumnGrid,
@@ -75,15 +75,11 @@ export default function InlineTimelineView({ scope, projectId }) {
   }, [])
   const expandAll = useCallback(() => setCollapsed(new Set()), [])
   const collapseAll = useCallback(() => {
+    // Loop 43: L1 flat — MS에 children 없으므로 프로젝트 ID만 수집
     const ids = new Set()
-    displayProjects.forEach(p => {
-      ids.add(p.id)
-      const tree = buildTree(milestones, p.id)
-      const walk = (nodes) => nodes.forEach(n => { if ((n.children || []).length > 0) { ids.add(n.id); walk(n.children) } })
-      walk(tree)
-    })
+    displayProjects.forEach(p => ids.add(p.id))
     setCollapsed(ids)
-  }, [milestones])
+  }, [])
 
   // ─── Projects ───
   const displayProjects = useMemo(() => {
@@ -233,7 +229,11 @@ export default function InlineTimelineView({ scope, projectId }) {
             {displayProjects.map(p => {
               const c = getColor(p.color)
               const dotColor = c.dot
-              const tree = buildTree(milestones, p.id)
+              // Loop 43: L1 flat — 프로젝트 내 MS를 sort_order로 정렬한 뒤 children: [] 구조로 감쌈
+              const tree = milestones
+                .filter(m => m.project_id === p.id)
+                .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                .map(m => ({ ...m, children: [] }))
               const projTasks = tasks.filter(t => t.projectId === p.id && !t.deletedAt)
               const isCol = collapsed.has(p.id)
 

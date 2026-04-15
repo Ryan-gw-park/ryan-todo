@@ -3,7 +3,7 @@ import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, closestC
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../hooks/useStore'
-import { flattenTree, countTasksRecursive } from '../../utils/milestoneTree'
+// Loop 43: flattenTree/countTasksRecursive 제거 — L1 flat 인라인 구성
 
 const COL_W_FIRST = 160
 const COL_W_REST = 150
@@ -43,8 +43,10 @@ function SortableTreeRow({ row, ri, isSelected, expanded, onSelectLeaf, onToggle
         if (!cell.isLeaf) rendered.current[cell.id] = true
 
         const isDepth0 = ci === 0
-        const nodeCount = countTasksRecursive(cell._node || { children: [] }, tasks)
-        const hasChildren = cell._node?.children?.length > 0
+        // Loop 43: L1 flat — MS의 task 수만 계산
+        const msTasks = tasks.filter(t => t.keyMilestoneId === cell.id && !t.deletedAt)
+        const nodeCount = { total: msTasks.length, done: msTasks.filter(t => t.done).length }
+        const hasChildren = false
         const isExpanded = expanded[cell.id] !== false
 
         return (
@@ -195,20 +197,15 @@ export default function HierarchicalTree({
   const sensors = useSensors(pointerSensor, touchSensor)
 
   const { rows, maxDepth } = useMemo(() => {
-    // flattenTree를 확장하여 _node 참조 추가
-    const result = flattenTree(tree, color?.dot || '#888')
-    // _node 참조를 cells에 추가 (countTasksRecursive용)
-    const nodeMap = new Map()
-    const buildMap = (nodes) => {
-      nodes.forEach(n => { nodeMap.set(n.id, n); if (n.children) buildMap(n.children) })
-    }
-    buildMap(tree)
-    result.rows.forEach(row => {
-      row.cells.forEach(cell => {
-        if (cell) cell._node = nodeMap.get(cell.id)
-      })
-    })
-    return result
+    // Loop 43: L1 flat — 모든 MS가 leaf. 각 행 1개 cell.
+    const c = color?.dot || '#888'
+    const rows = tree.map(n => ({
+      leafId: n.id,
+      cells: [{ id: n.id, title: n.title, color: n.color || c, isLeaf: true, _node: n }],
+      color: n.color || c,
+      node: n,
+    }))
+    return { rows, maxDepth: 1 }
   }, [tree, color])
 
   // rowspan 리셋 (매 렌더마다)

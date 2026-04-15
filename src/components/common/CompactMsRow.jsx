@@ -4,7 +4,7 @@
  * Height: ~32px, no card borders, hover background
  */
 
-import { getMsPath } from '../../utils/milestoneTree'
+// Loop 43: getMsPath 제거 — L1 flat이므로 path = null
 
 const S = {
   textPrimary: '#37352f',
@@ -68,7 +68,7 @@ export default function CompactMsRow({
   project,
   onClick,
 }) {
-  const path = getMsPath(milestone.id, milestones)
+  const path = null  // Loop 43: L1 flat
 
   return (
     <div

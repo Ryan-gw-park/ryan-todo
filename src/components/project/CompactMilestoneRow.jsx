@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import MilestoneTaskChip from './MilestoneTaskChip'
 import MilestoneOwnerSelector from './MilestoneOwnerSelector'
 import { computeOwnerDisplay } from '../../utils/milestoneOwnerAggregate'
-import { computeDepth } from '../../utils/milestoneTree'
+// Loop 43: L1 flat — computeDepth 제거. depth 항상 0
 
 const fmt = (d) => {
   if (!d) return ''
@@ -214,18 +214,14 @@ export default function CompactMilestoneRow({
           )}
           {/* MS Owner Avatar */}
           {!isBacklog && (() => {
-            const avatarSize = (() => {
-              if (!allMilestones) return 20
-              const d = computeDepth(milestone, allMilestones)
-              return d === 0 ? 20 : d === 1 ? 18 : 16
-            })()
+            const avatarSize = 20  // Loop 43: L1 flat — depth 기반 조정 제거
             return currentTeamId ? (
               <MilestoneOwnerSelector
                 milestoneId={milestone.id}
                 ownerId={milestone.owner_id}
                 ownerDisplay={computeOwnerDisplay(milestone, allMilestones || [])}
                 members={members || []}
-                hasChildren={allMilestones?.some(m => m.parent_id === milestone.id)}
+                hasChildren={false}
                 onChangeOwner={(userId) => onUpdateMilestone(milestone.id, { owner_id: userId })}
                 onCascade={(userId, opts) => onCascadeOwner?.(milestone.id, userId, opts)}
                 size={avatarSize}

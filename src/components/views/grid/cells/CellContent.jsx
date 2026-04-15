@@ -3,7 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { COLOR } from '../../../../styles/designTokens'
 import { getColor } from '../../../../utils/colors'
 import useStore from '../../../../hooks/useStore'
-import { getMsPath } from '../../../../utils/milestoneTree'
+// Loop 43: getMsPath 제거 — L1 flat이므로 breadcrumb = null
 import { computeMilestoneCount } from '../../../../utils/milestoneProgress'
 import TaskRow from './TaskRow'
 import MilestoneRow from './MilestoneRow'
@@ -118,7 +118,7 @@ export default function CellContent({
     <>
       {groups.msGroups.map(g => {
         const msCollapsed = matrixMsCollapsed ? !!matrixMsCollapsed[g.msId] : false
-        const breadcrumb = matrixMsInteractive ? getMsPath(g.msId, allMilestones) : null
+        const breadcrumb = null  // Loop 43: L1 flat
         return (
           <div key={g.msId} style={{ marginBottom: 4 }}>
             <MilestoneRow

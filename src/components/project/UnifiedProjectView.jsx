@@ -3,7 +3,7 @@ import { COLOR, FONT } from '../../styles/designTokens'
 import useStore from '../../hooks/useStore'
 import { useProjectKeyMilestone } from '../../hooks/useProjectKeyMilestone'
 import { getColor } from '../../utils/colors'
-import { buildTree } from '../../utils/milestoneTree'
+// Loop 43: buildTree 제거 (L1 flat으로 inline 처리)
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, TouchSensor, pointerWithin } from '@dnd-kit/core'
 import ProjectLaneCard from '../shared/ProjectLaneCard'
 import useTeamMembers from '../../hooks/useTeamMembers'
@@ -54,7 +54,13 @@ export default function UnifiedProjectView({ projectId }) {
   const reorderMilestones = useStore(s => s.reorderMilestones)
   const { pkm, loading: pkmLoading } = useProjectKeyMilestone(projectId)
 
-  const tree = useMemo(() => buildTree(milestones, projectId), [milestones, projectId])
+  // Loop 43: L1 flat — inline 구성 (parent_id는 항상 null, children: [])
+  const tree = useMemo(() =>
+    milestones
+      .filter(m => m.project_id === projectId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map(m => ({ ...m, children: [] })),
+    [milestones, projectId])
   const color = project ? getColor(project.color) : null
   const pkmId = pkm?.id || null
   const dotColor = color?.dot || '#888'

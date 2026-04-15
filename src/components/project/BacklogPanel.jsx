@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
-import { isBacklogTask } from '../../utils/backlogFilter'
 import TaskAssigneeChip from './TaskAssigneeChip'
 import InlineAdd from '../shared/InlineAdd'
 import MiniAvatar from '../views/grid/shared/MiniAvatar'
@@ -114,7 +113,10 @@ export default function BacklogPanel({
   const [filterChip, setFilterChip] = useState(null) // null | 'mine' | 'unassigned' | 'dueSoon'
   const [sortMode, setSortMode] = useState('default') // 'default' | 'recent' | 'oldest'
 
-  const backlogAll = useMemo(() => projectTasks.filter(isBacklogTask), [projectTasks])
+  // Loop 43: "백로그" 개념 폐기. 프로젝트 직속 task (MS 미지정, 미완료, 미삭제)
+  const backlogAll = useMemo(() =>
+    projectTasks.filter(t => !t.keyMilestoneId && !t.done && !t.deletedAt),
+    [projectTasks])
 
   const backlogTasks = useMemo(() => {
     let tasks = [...backlogAll]
@@ -162,7 +164,7 @@ export default function BacklogPanel({
       {/* 헤더 */}
       <div style={{ padding: '12px 12px 8px', borderBottom: '0.5px solid #e8e6df' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>📥 백로그</span>
+          {/* Loop 43 R01: 라벨 없음 — 카운트 배지만 노출 */}
           <span style={{ ...getBadgeStyle(totalCount), fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 10 }}>{totalCount}</span>
           <div style={{ flex: 1 }} />
           <select value={sortMode} onChange={e => setSortMode(e.target.value)}
@@ -193,7 +195,7 @@ export default function BacklogPanel({
       {totalCount === 0 && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#085041' }}>
           <span style={{ fontSize: 20, marginBottom: 4 }}>✓</span>
-          <span style={{ fontSize: 12 }}>백로그가 깨끗합니다</span>
+          <span style={{ fontSize: 12 }}>직속 할일이 없습니다</span>
         </div>
       )}
 

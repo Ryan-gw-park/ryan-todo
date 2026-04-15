@@ -25,7 +25,7 @@ export default function MsTaskTreeMode({
   const updateTask = useStore(s => s.updateTask)
   const openModal = useStore(s => s.openModal)
   const reorderTasks = useStore(s => s.reorderTasks)
-  const moveMilestone = useStore(s => s.moveMilestone)
+  // Loop 43: L1 flat — moveMilestone 직접 호출 제거 (handleMsReorder만 사용)
   const reorderMilestones = useStore(s => s.reorderMilestones)
   const milestones = useStore(s => s.milestones)
   const currentTeamId = useStore(s => s.currentTeamId)
@@ -165,62 +165,35 @@ export default function MsTaskTreeMode({
     showToast(`할일을 "${fromMs?.title || '?'}" → "${toMs?.title || '?'}"로 이동`)
   }, [milestones, updateTask, pushUndo])
 
-  // ─── DnD: MS → 하위 이동 ───
-  const handleMsDropChild = useCallback((msId, targetId) => {
-    if (msId === targetId) return
-    const ms = milestones.find(m => m.id === msId)
-    const oldParentId = ms?.parent_id || null
-    pushUndo({ label: `MS 하위 이동`, undo: () => moveMilestone(msId, oldParentId) })
-    moveMilestone(msId, targetId)
-    const target = milestones.find(m => m.id === targetId)
-    showToast(`"${ms?.title || '?'}"을 "${target?.title || '?'}" 하위로 이동`)
-    // 대상 펼치기
-    if (collapsed.has(targetId)) {
-      onToggleNode ? onToggleNode(targetId) : setInternalCollapsed(prev => { const n = new Set(prev); n.delete(targetId); return n })
-    }
-  }, [milestones, moveMilestone, pushUndo, collapsed, onToggleNode])
+  // Loop 43: L1 flat. 하위 이동 비활성화.
+  const handleMsDropChild = useCallback(() => {}, [])
 
-  // ─── DnD: MS → 순서 변경 ───
+  // Loop 43: L1 flat. 프로젝트 내 MS 순서 변경만 수행.
   const handleMsReorder = useCallback((msId, targetId, position) => {
     if (msId === targetId) return
     const ms = milestones.find(m => m.id === msId)
     const target = milestones.find(m => m.id === targetId)
     if (!ms || !target) return
 
-    // 같은 부모의 siblings 중에서 순서 변경
-    const oldParentId = ms.parent_id || null
-    const targetParentId = target.parent_id || null
+    const siblings = milestones
+      .filter(m => m.project_id === ms.project_id && m.id !== msId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const idx = siblings.findIndex(s => s.id === targetId)
+    if (idx === -1) return
+    const insertIdx = position === 'above' ? idx : idx + 1
+    const reordered = [...siblings]
+    reordered.splice(insertIdx, 0, ms)
+    reorderMilestones(reordered)
 
-    // 부모가 다르면 먼저 이동
-    if (oldParentId !== targetParentId) {
-      pushUndo({ label: `MS 이동+순서`, undo: () => moveMilestone(msId, oldParentId) })
-      moveMilestone(msId, targetParentId)
-    }
-
-    // siblings 재정렬
-    setTimeout(() => {
-      const siblings = milestones
-        .filter(m => m.project_id === ms.project_id && (m.parent_id || null) === targetParentId && m.id !== msId)
+    pushUndo({ label: `MS 순서 변경`, undo: () => {
+      const original = milestones
+        .filter(m => m.project_id === ms.project_id)
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      const idx = siblings.findIndex(s => s.id === targetId)
-      if (idx === -1) return
-      const insertIdx = position === 'above' ? idx : idx + 1
-      const reordered = [...siblings]
-      reordered.splice(insertIdx, 0, milestones.find(m => m.id === msId))
-      reorderMilestones(reordered)
-
-      if (oldParentId === targetParentId) {
-        pushUndo({ label: `MS 순서 변경`, undo: () => {
-          const original = milestones
-            .filter(m => m.project_id === ms.project_id && (m.parent_id || null) === targetParentId)
-            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-          reorderMilestones(original)
-        }})
-      }
-    }, 100)
+      reorderMilestones(original)
+    }})
 
     showToast(`"${ms?.title || '?'}" 순서 변경`)
-  }, [milestones, moveMilestone, reorderMilestones, pushUndo])
+  }, [milestones, reorderMilestones, pushUndo])
 
   // ─── Count (alive/total) ───
   const countAll = useCallback((n) => {
