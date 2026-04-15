@@ -98,5 +98,22 @@ export const SIDEBAR = {
   hoverBg: '#f5f4f0',
 };
 
+// ─── 카운트 pill (Loop 42, R13) ───
+export const PILL = {
+  amber: { bg: '#FAEEDA', fg: '#854F0B', borderRadius: 10, padding: '1px 8px', fontWeight: 500 },
+  coral: { bg: '#FAECE7', fg: '#993C1D', borderRadius: 10, padding: '1px 8px', fontWeight: 500 },
+};
+
+// ─── 피벗 매트릭스 (Loop 42) ───
+export const PIVOT = {
+  msSubRowBg: '#FAFAF7',
+  emptyCellColor: '#a09f99',
+  emptyCellMarker: '·',
+  emptyCellFontSize: 13,
+  colWidthProject: 170,
+  colWidthMember: 115,
+  colWidthTotal: 55,
+};
+
 // ─── 유틸 함수 ───
 export const isMobileWidth = () => window.innerWidth < 768;

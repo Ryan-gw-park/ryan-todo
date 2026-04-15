@@ -525,8 +525,11 @@ const useStore = create((set, get) => ({
     // 개인 프로젝트(teamId 없음)면 반드시 scope='private', 팀 프로젝트면 해당 팀
     const isPersonalProject = project && !project.teamId
     const effectiveTeamId = isPersonalProject ? null : (project?.teamId || teamId)
+    // Loop 42 (C3 fix): 명시적 `assigneeId: null` 전달을 userId로 덮지 않도록 `in` 연산자로 분기.
+    // 기존 `task.assigneeId || userId`는 null/undefined를 구분하지 않아 미배정 셀 생성 시 의도치 않게 자기 배정.
+    const hasAssignee = 'assigneeId' in task
     const teamDefaults = effectiveTeamId
-      ? { teamId: effectiveTeamId, scope: task.scope || 'assigned', assigneeId: task.assigneeId || userId, createdBy: userId }
+      ? { teamId: effectiveTeamId, scope: task.scope || 'assigned', assigneeId: hasAssignee ? task.assigneeId : userId, createdBy: userId }
       : { scope: 'private', createdBy: userId }
     const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', alarm: null, ...teamDefaults, ...task }
     // 개인 프로젝트 강제 보정 — ...task spread 후에도 scope/teamId 보장

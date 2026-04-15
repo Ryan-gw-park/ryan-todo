@@ -5,7 +5,6 @@ import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../hooks/useStore'
 import useTeamMembers from '../../hooks/useTeamMembers'
 import useProjectFilter from '../../hooks/useProjectFilter'
-import MsBacklogSidebar from '../common/MsBacklogSidebar'
 import { getColor } from '../../utils/colors'
 
 import { EMPTY_OBJ, getMonday, fmtDate, getWeekNumber } from './grid/constants'
@@ -473,9 +472,6 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                 />
               )}
             </div>
-
-            {/* Sidebar — DndContext 안에 위치해야 dnd-kit DnD 통신 가능 */}
-            <MsBacklogSidebar projects={displayProjects} milestones={milestones} tasks={tasks} weekDateStrs={view === 'weekly' ? weekDateStrs : null} />
 
             <DragOverlay dropAnimation={null}>
               {activeItem?.type === 'project-lane' ? (
