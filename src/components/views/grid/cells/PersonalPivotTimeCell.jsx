@@ -12,10 +12,12 @@ export default function PersonalPivotTimeCell({ tasks, timeCol, projectId, miles
   const updateTask = useStore(s => s.updateTask)
   const addTask = useStore(s => s.addTask)
   const toggleDone = useStore(s => s.toggleDone)
+  const openDetail = useStore(s => s.openDetail)
 
   const [editingId, setEditingId] = useState(null)
   const [addingNew, setAddingNew] = useState(false)
   const [hover, setHover] = useState(false)
+  const [hoverTaskId, setHoverTaskId] = useState(null)
 
   const cellTasks = tasks.filter(t => t.category === timeCol.key)
 
@@ -80,6 +82,8 @@ export default function PersonalPivotTimeCell({ tasks, timeCol, projectId, miles
         return (
           <div
             key={task.id}
+            onMouseEnter={() => setHoverTaskId(task.id)}
+            onMouseLeave={() => setHoverTaskId(null)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -117,6 +121,15 @@ export default function PersonalPivotTimeCell({ tasks, timeCol, projectId, miles
                   style={{ cursor: 'pointer', flex: 1 }}
                 >{task.text}</span>
               )}
+            {hoverTaskId === task.id && !isEditing && (
+              <div onClick={e => { e.stopPropagation(); openDetail(task) }} style={{
+                width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', opacity: 0.4,
+              }}>
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </div>
+            )}
           </div>
         )
       })}
