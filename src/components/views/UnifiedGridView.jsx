@@ -95,10 +95,8 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
     if (scope === 'team') {
       return currentTeamId ? filteredProjects.filter(p => p.teamId === currentTeamId) : []
     }
-    // Personal: 아카이브 제외된 프로젝트 중 내 할일이 있는 것만
-    const myTasks = tasks.filter(t => t.assigneeId === userId)
-    const projIds = new Set(myTasks.map(t => t.projectId))
-    return sortProjectsLocally(filteredProjects).filter(p => projIds.has(p.id))
+    // Personal: 사이드바에 보이는 모든 프로젝트 (task 0건이어도 표시, L44-R05)
+    return sortProjectsLocally(filteredProjects)
   }, [scope, currentTeamId, filteredProjects, tasks, userId, projects, sortProjectsLocally])
 
   const myTasks = useMemo(() => {
