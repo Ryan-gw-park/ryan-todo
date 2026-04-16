@@ -6,6 +6,7 @@ import { TIME_COLUMNS } from './personalPivotColumns'
 import PersonalPivotProjectRow from './cells/PersonalPivotProjectRow'
 import PersonalPivotMsSubRow from './cells/PersonalPivotMsSubRow'
 import PersonalPivotUngroupedSubRow from './cells/PersonalPivotUngroupedSubRow'
+import PivotAddMsRow from './cells/PivotAddMsRow'
 
 /* ═════════════════════════════════════════════
    PersonalPivotMatrixTable — 개인 매트릭스 시간 피벗 (Loop 44)
@@ -110,6 +111,13 @@ export default function PersonalPivotMatrixTable({ projects, tasks, milestones }
                     currentUserId={currentUserId}
                   />
                 ))}
+                {expanded && (
+                  <PivotAddMsRow
+                    key={`add-ms-${p.id}`}
+                    projectId={p.id}
+                    colSpan={TIME_COLUMNS.length + 2}
+                  />
+                )}
                 {expanded && (
                   <PersonalPivotUngroupedSubRow
                     key={`ungr-${p.id}`}

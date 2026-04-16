@@ -5,6 +5,7 @@ import { COLOR, PIVOT } from '../../../styles/designTokens'
 import PivotProjectRow from './cells/PivotProjectRow'
 import PivotMsSubRow from './cells/PivotMsSubRow'
 import PivotUngroupedSubRow from './cells/PivotUngroupedSubRow'
+import PivotAddMsRow from './cells/PivotAddMsRow'
 
 /* ═════════════════════════════════════════════
    PivotMatrixTable — 팀 매트릭스 피벗 테이블
@@ -148,6 +149,13 @@ export default function PivotMatrixTable({
                     tasks={projTasks.filter(t => t.keyMilestoneId === ms.id)}
                   />
                 ))}
+                {expanded && (
+                  <PivotAddMsRow
+                    key={`add-ms-${p.id}`}
+                    projectId={p.id}
+                    colSpan={members.length + 3}
+                  />
+                )}
                 {expanded && (
                   <PivotUngroupedSubRow
                     key={`ungr-${p.id}`}
