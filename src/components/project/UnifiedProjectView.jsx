@@ -126,8 +126,24 @@ export default function UnifiedProjectView({ projectId }) {
   }, [undo])
   function showToast(msg) { setToast({ msg, canUndo: true }); setTimeout(() => setToast(null), 4000) }
 
+  // ─── Done filter & GroupBy toggles ───
+  const isTeamProject = !!project?.teamId
+  const [showDone, setShowDone] = useState(() =>
+    localStorage.getItem('projectViewShowDone') === 'true'
+  )
+  const [groupBy, setGroupBy] = useState(() =>
+    localStorage.getItem('projectViewGroupBy') || 'milestone'
+  )
+  const toggleShowDone = useCallback(() => {
+    setShowDone(prev => { const next = !prev; localStorage.setItem('projectViewShowDone', String(next)); return next })
+  }, [])
+  const toggleGroupBy = useCallback(() => {
+    setGroupBy(prev => { const next = prev === 'milestone' ? 'owner' : 'milestone'; localStorage.setItem('projectViewGroupBy', next); return next })
+  }, [])
+
   // ─── Project tasks (must be before timelineDates/handlers that reference them) ───
-  const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
+  const projectTasksAll = useMemo(() => tasks.filter(t => t.projectId === projectId && !t.deletedAt), [tasks, projectId])
+  const projectTasks = useMemo(() => showDone ? projectTasksAll : projectTasksAll.filter(t => !t.done), [projectTasksAll, showDone])
   const backlogTasks = useMemo(() => projectTasks.filter(t => !t.keyMilestoneId), [projectTasks])
 
   // ─── Shared collapsed state ───
@@ -355,6 +371,25 @@ export default function UnifiedProjectView({ projectId }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={expandAll} style={{ border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer', background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500 }}>모두 펼치기</button>
           <button onClick={collapseAll} style={{ border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny, fontFamily: 'inherit', cursor: 'pointer', background: COLOR.bgHover, color: COLOR.textSecondary, fontWeight: 500 }}>모두 접기</button>
+          {rightMode === '전체 할일' && (
+            <>
+              <div style={{ width: 1, height: 16, background: COLOR.border, margin: '0 4px' }} />
+              {isTeamProject && (
+                <button onClick={toggleGroupBy} style={{
+                  border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny,
+                  fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500,
+                  background: groupBy === 'owner' ? COLOR.bgActive : COLOR.bgHover,
+                  color: groupBy === 'owner' ? COLOR.textPrimary : COLOR.textSecondary,
+                }}>{groupBy === 'owner' ? '팀원별' : 'MS별'}</button>
+              )}
+              <button onClick={toggleShowDone} style={{
+                border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny,
+                fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500,
+                background: showDone ? COLOR.bgActive : COLOR.bgHover,
+                color: showDone ? COLOR.textPrimary : COLOR.textSecondary,
+              }}>{showDone ? '✓ 완료 포함' : '완료 제외'}</button>
+            </>
+          )}
           {rightMode === '타임라인' && (
             <>
               <div style={{ width: 1, height: 16, background: COLOR.border, margin: '0 4px' }} />
@@ -375,7 +410,7 @@ export default function UnifiedProjectView({ projectId }) {
               members={blMembers}
               memberColorMap={memberColorMap}
               mode="project"
-              groupBy="milestone"
+              groupBy={isTeamProject ? groupBy : 'milestone'}
               truncate={null}
               collapsed={false}
               onToggleCollapse={() => {}}
