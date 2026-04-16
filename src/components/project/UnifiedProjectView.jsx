@@ -375,12 +375,16 @@ export default function UnifiedProjectView({ projectId }) {
             <>
               <div style={{ width: 1, height: 16, background: COLOR.border, margin: '0 4px' }} />
               {isTeamProject && (
-                <button onClick={toggleGroupBy} style={{
-                  border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny,
-                  fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500,
-                  background: groupBy === 'owner' ? COLOR.bgActive : COLOR.bgHover,
-                  color: groupBy === 'owner' ? COLOR.textPrimary : COLOR.textSecondary,
-                }}>{groupBy === 'owner' ? '팀원별' : 'MS별'}</button>
+                <div style={{ display: 'flex', gap: 2 }}>
+                  {[{ key: 'milestone', label: 'MS별' }, { key: 'owner', label: '팀원별' }].map(opt => (
+                    <button key={opt.key} onClick={() => { setGroupBy(opt.key); localStorage.setItem('projectViewGroupBy', opt.key) }} style={{
+                      border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny,
+                      fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500,
+                      background: groupBy === opt.key ? '#37352f' : COLOR.bgHover,
+                      color: groupBy === opt.key ? '#fff' : COLOR.textSecondary,
+                    }}>{opt.label}</button>
+                  ))}
+                </div>
               )}
               <button onClick={toggleShowDone} style={{
                 border: 'none', borderRadius: 5, padding: '3px 10px', fontSize: FONT.tiny,
