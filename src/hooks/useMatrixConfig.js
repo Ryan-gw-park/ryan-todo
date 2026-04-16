@@ -36,7 +36,7 @@ const useMatrixConfig = {
 
     // 나 섹션
     rows.push({ user_id: userId, team_id: teamId, section: 'me', label: '나', row_type: 'section_header', sort_order: order++ })
-    rows.push({ user_id: userId, team_id: teamId, section: 'me_today', label: '오늘 할일', row_type: 'task_row', parent_section: 'me', mapped_user_id: userId, sort_order: order++ })
+    rows.push({ user_id: userId, team_id: teamId, section: 'me_today', label: '지금 할일', row_type: 'task_row', parent_section: 'me', mapped_user_id: userId, sort_order: order++ })
     rows.push({ user_id: userId, team_id: teamId, section: 'me_next', label: '다음 할일', row_type: 'task_row', parent_section: 'me', mapped_user_id: userId, sort_order: order++ })
 
     // 팀 섹션

@@ -12,7 +12,7 @@ const MS_STATUS = [
 ]
 
 const CAT_CHIP = {
-  today: { bg: '#FAEEDA', text: '#633806', label: '오늘' },
+  today: { bg: '#FAEEDA', text: '#633806', label: '지금' },
   next: { bg: '#E6F1FB', text: '#0C447C', label: '다음' },
   backlog: { bg: '#F1EFE8', text: '#444441', label: '남은' },
 }

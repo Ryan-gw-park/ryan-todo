@@ -431,7 +431,7 @@ export function getTooltipData(node) {
     }
   }
   // task
-  const catLabel = { today: '오늘 할일', next: '다음 할일', backlog: '남은 할일' }
+  const catLabel = { today: '지금 할일', next: '다음 할일', backlog: '남은 할일' }
   return {
     title: node.name,
     lines: [

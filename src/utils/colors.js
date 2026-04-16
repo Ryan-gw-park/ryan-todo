@@ -18,7 +18,7 @@ export function getColorByIndex(index) {
 }
 
 export const CATEGORIES = [
-  { key: 'today',   label: '오늘 할일', shortLabel: '오늘', emoji: '🎯' },
+  { key: 'today',   label: '지금 할일', shortLabel: '지금', emoji: '🎯' },
   { key: 'next',    label: '다음 할일', shortLabel: '다음', emoji: '📌' },
   { key: 'backlog', label: '남은 할일', shortLabel: '남은', emoji: '📋' },
   { key: 'done',    label: '완료',      shortLabel: '완료', emoji: '✅' },
