@@ -50,40 +50,48 @@ export default function PivotTaskCell({ tasks, memberId, projectId, milestoneId 
     })
   }
 
+  // 인라인 추가 행 (빈 셀 + 비어있지 않은 셀 공용)
+  const addRow = addingNew ? (
+    <div style={{ padding: '2px 0' }}>
+      <input
+        autoFocus
+        style={{ width: '100%', fontSize: 12, border: `1px solid ${COLOR.border}`, borderRadius: 4, padding: '2px 4px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        onBlur={e => handleAddNew(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') handleAddNew(e.target.value)
+          if (e.key === 'Escape') setAddingNew(false)
+        }}
+      />
+    </div>
+  ) : hover ? (
+    <div
+      onClick={() => setAddingNew(true)}
+      style={{ padding: '2px 0', cursor: 'pointer', fontSize: 11, color: COLOR.textTertiary, textAlign: 'center' }}
+    >+ 추가</div>
+  ) : null
+
   if (cellTasks.length === 0) {
     return (
       <div
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        style={{ textAlign: 'center', padding: SPACE.cellPadding, minHeight: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{ padding: SPACE.cellPadding, minHeight: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
       >
         {addingNew
-          ? (
-            <input
-              autoFocus
-              style={{ width: '100%', fontSize: 12, border: `1px solid ${COLOR.border}`, borderRadius: 4, padding: '2px 4px', fontFamily: 'inherit' }}
-              onBlur={e => handleAddNew(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddNew(e.target.value)
-                if (e.key === 'Escape') setAddingNew(false)
-              }}
-            />
-          )
+          ? addRow
           : hover
-            ? (
-              <button
-                onClick={() => setAddingNew(true)}
-                style={{ fontSize: 13, border: 'none', background: 'transparent', color: COLOR.textSecondary, cursor: 'pointer', padding: '0 4px' }}
-                aria-label="할일 추가"
-              >+</button>
-            )
+            ? addRow
             : <span style={{ color: PIVOT.emptyCellColor, fontSize: PIVOT.emptyCellFontSize }}>{PIVOT.emptyCellMarker}</span>}
       </div>
     )
   }
 
   return (
-    <div style={{ padding: SPACE.cellPadding }}>
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ padding: SPACE.cellPadding }}
+    >
       {cellTasks.map(task => {
         const isPrimary = isUnassignedCol ? true : task.assigneeId === memberId
         const style = isPrimary
@@ -145,6 +153,7 @@ export default function PivotTaskCell({ tasks, memberId, projectId, milestoneId 
           </div>
         )
       })}
+      {addRow}
     </div>
   )
 }
