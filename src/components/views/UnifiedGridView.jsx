@@ -11,8 +11,7 @@ import { EMPTY_OBJ, getMonday, fmtDate, getWeekNumber } from './grid/constants'
 // Pill removed (12f — top toggle removed)
 import PersonalMatrixGrid from './grid/grids/PersonalMatrixGrid'
 import TeamMatrixGrid from './grid/grids/TeamMatrixGrid'
-import PersonalWeeklyGrid from './grid/grids/PersonalWeeklyGrid'
-import TeamWeeklyGrid from './grid/grids/TeamWeeklyGrid'
+// 주간 플래너 제거됨 (PersonalWeeklyGrid, TeamWeeklyGrid)
 
 /* ═══════════════════════════════════════════════════════
    UnifiedGridView — 매트릭스 + 주간 플래너 통합 (Orchestrator)
@@ -384,9 +383,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const weekRange = `${weekStart.getFullYear()}.${String(weekStart.getMonth() + 1).padStart(2, '0')}.${String(weekStart.getDate()).padStart(2, '0')} ~ ${String(weekDays[4].getMonth() + 1).padStart(2, '0')}.${String(weekDays[4].getDate()).padStart(2, '0')} (${weekNum}주차)`
 
   // ─── Title ───
-  const title = scope === 'team'
-    ? (view === 'matrix' ? '팀 매트릭스' : '팀 주간 플래너')
-    : (view === 'matrix' ? '개인 매트릭스' : '개인 주간 플래너')
+  const title = scope === 'team' ? '팀 할일' : '개인 할일'
 
   // ─── Guard ───
   if (scope === 'team' && !currentTeamId) {
@@ -419,15 +416,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary }}>{view === 'matrix' ? dateStr : weekRange}</span>
-            <div style={{ flex: 1 }} />
-            {view === 'weekly' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-                <button onClick={prevWeek} style={{ border: `1px solid ${COLOR.border}`, background: '#fff', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: FONT.label, color: COLOR.textSecondary, fontFamily: 'inherit' }}>◀</button>
-                <button onClick={goThisWeek} style={{ border: `1px solid ${COLOR.border}`, background: '#fff', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: FONT.caption, color: COLOR.textSecondary, fontFamily: 'inherit' }}>이번 주</button>
-                <button onClick={nextWeek} style={{ border: `1px solid ${COLOR.border}`, background: '#fff', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: FONT.label, color: COLOR.textSecondary, fontFamily: 'inherit' }}>▶</button>
-              </div>
-            )}
+            <span style={{ fontSize: FONT.subtitle, color: COLOR.textTertiary }}>{dateStr}</span>
           </div>
         </div>
 
@@ -456,23 +445,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
                   groupByOwner={groupByOwner}
                 />
               )}
-              {view === 'weekly' && scope === 'personal' && (
-                <PersonalWeeklyGrid
-                  projects={displayProjects} myTasks={myTasks}
-                  weekDays={weekDays} weekDateStrs={weekDateStrs} todayStr={todayStr}
-                  editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
-                  toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
-                />
-              )}
-              {view === 'weekly' && scope === 'team' && (
-                <TeamWeeklyGrid
-                  projects={projects} tasks={filteredTasks} members={members}
-                  weekDays={weekDays} weekDateStrs={weekDateStrs} todayStr={todayStr}
-                  editingId={editingId} setEditingId={setEditingId} handleEditFinish={handleEditFinish}
-                  toggleDone={toggleDone} openDetail={openDetail} activeId={activeId}
-                  currentTeamId={currentTeamId}
-                />
-              )}
+              {/* 주간 플래너 제거됨 */}
             </div>
 
             <DragOverlay dropAnimation={null}>

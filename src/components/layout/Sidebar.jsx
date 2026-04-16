@@ -35,7 +35,6 @@ const S = {
 // 개인/팀 공용 뷰
 const COMMON_VIEWS = [
   { key: 'matrix',   label: '할일',       icon: '⊞' },
-  { key: 'weekly',   label: '주간 플래너', icon: '📅' },
   { key: 'timeline', label: '타임라인',   icon: '▤' },
 ]
 // 팀 전용 뷰
