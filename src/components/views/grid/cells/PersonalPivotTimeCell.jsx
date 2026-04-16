@@ -88,10 +88,10 @@ export default function PersonalPivotTimeCell({ tasks, timeCol, projectId, miles
               display: 'flex',
               alignItems: 'center',
               gap: 4,
-              wordBreak: 'keep-all',
-              overflowWrap: 'break-word',
               fontSize: 12,
               padding: '2px 0',
+              minWidth: 0,
+              overflow: 'hidden',
               color: COLOR.textPrimary,
               fontWeight: 500,
             }}
@@ -107,7 +107,7 @@ export default function PersonalPivotTimeCell({ tasks, timeCol, projectId, miles
                 <input
                   autoFocus
                   defaultValue={task.text}
-                  style={{ flex: 1, fontSize: 12, border: `1px solid ${COLOR.border}`, borderRadius: 4, padding: '1px 4px', fontFamily: 'inherit' }}
+                  style={{ flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', fontSize: 12, border: `1px solid ${COLOR.border}`, borderRadius: 4, padding: '1px 4px', fontFamily: 'inherit' }}
                   onBlur={e => handleEditFinish(task.id, e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') handleEditFinish(task.id, e.target.value)
@@ -118,7 +118,7 @@ export default function PersonalPivotTimeCell({ tasks, timeCol, projectId, miles
               : (
                 <span
                   onClick={() => setEditingId(task.id)}
-                  style={{ cursor: 'pointer', flex: 1 }}
+                  style={{ cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                 >{task.text}</span>
               )}
             {hoverTaskId === task.id && !isEditing && (
