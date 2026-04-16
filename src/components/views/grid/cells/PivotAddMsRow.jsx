@@ -20,29 +20,18 @@ export default function PivotAddMsRow({ projectId, colSpan }) {
     await addMilestoneInProject(projectId, { title })
   }
 
-  if (!adding && !hover) {
-    return (
-      <tr
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        style={{ height: 4 }}
-      >
-        <td colSpan={colSpan} />
-      </tr>
-    )
-  }
-
   return (
     <tr
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { if (!adding) setHover(false) }}
-      style={{ background: PIVOT.msSubRowBg }}
+      style={{ background: hover || adding ? PIVOT.msSubRowBg : 'transparent' }}
     >
       <td
         colSpan={colSpan}
         style={{
           padding: '4px 12px 4px 24px',
-          borderBottom: `1px solid ${COLOR.border}`,
+          borderBottom: hover || adding ? `1px solid ${COLOR.border}` : 'none',
+          height: 24,
         }}
       >
         {adding ? (
@@ -64,12 +53,12 @@ export default function PivotAddMsRow({ projectId, colSpan }) {
               if (e.key === 'Escape') { setAdding(false); setHover(false) }
             }}
           />
-        ) : (
+        ) : hover ? (
           <span
             onClick={() => setAdding(true)}
             style={{ fontSize: 11, color: COLOR.textTertiary, cursor: 'pointer' }}
           >+ 마일스톤</span>
-        )}
+        ) : null}
       </td>
     </tr>
   )
