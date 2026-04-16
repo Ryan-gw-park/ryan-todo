@@ -148,7 +148,7 @@ export default function PivotMatrixTable({
                     tasks={projTasks.filter(t => t.keyMilestoneId === ms.id)}
                   />
                 ))}
-                {expanded && ungrouped.length > 0 && (
+                {expanded && (
                   <PivotUngroupedSubRow
                     key={`ungr-${p.id}`}
                     project={p}

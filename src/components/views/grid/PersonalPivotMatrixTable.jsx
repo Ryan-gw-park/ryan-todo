@@ -110,7 +110,7 @@ export default function PersonalPivotMatrixTable({ projects, tasks, milestones }
                     currentUserId={currentUserId}
                   />
                 ))}
-                {expanded && ungrouped.length > 0 && (
+                {expanded && (
                   <PersonalPivotUngroupedSubRow
                     key={`ungr-${p.id}`}
                     project={p}
