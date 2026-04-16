@@ -97,12 +97,11 @@ export default function PivotTaskCell({ tasks, memberId, projectId, milestoneId 
             onMouseLeave={() => setHoverTaskId(null)}
             style={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-start',
               gap: 4,
               fontSize: 12,
               padding: '2px 0',
               minWidth: 0,
-              overflow: 'hidden',
               ...style,
             }}
           >
@@ -114,21 +113,24 @@ export default function PivotTaskCell({ tasks, memberId, projectId, milestoneId 
             />
             {isEditing
               ? (
-                <input
+                <textarea
                   autoFocus
                   defaultValue={task.text}
-                  style={{ flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', fontSize: 12, border: `1px solid ${COLOR.border}`, borderRadius: 4, padding: '1px 4px', fontFamily: 'inherit' }}
+                  rows={Math.max(1, Math.ceil((task.text || '').length / 12))}
+                  style={{ flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box', fontSize: 12, border: `1px solid ${COLOR.border}`, borderRadius: 4, padding: '1px 4px', fontFamily: 'inherit', resize: 'none', lineHeight: 1.4, overflow: 'hidden' }}
                   onBlur={e => handleEditFinish(task.id, e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') handleEditFinish(task.id, e.target.value)
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditFinish(task.id, e.target.value) }
                     if (e.key === 'Escape') setEditingId(null)
                   }}
+                  onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                  ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
                 />
               )
               : (
                 <span
                   onClick={() => setEditingId(task.id)}
-                  style={{ cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  style={{ cursor: 'pointer', flex: 1, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}
                 >{task.text}</span>
               )}
             {hoverTaskId === task.id && !isEditing && (
