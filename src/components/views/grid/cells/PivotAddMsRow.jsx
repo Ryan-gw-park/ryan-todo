@@ -24,13 +24,13 @@ export default function PivotAddMsRow({ projectId, colSpan }) {
     <tr
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { if (!adding) setHover(false) }}
-      style={{ background: hover || adding ? PIVOT.msSubRowBg : 'transparent' }}
+      style={{ background: PIVOT.msSubRowBg }}
     >
       <td
         colSpan={colSpan}
         style={{
           padding: '4px 12px 4px 24px',
-          borderBottom: hover || adding ? `1px solid ${COLOR.border}` : 'none',
+          borderBottom: `1px solid ${COLOR.border}`,
           height: 24,
         }}
       >
