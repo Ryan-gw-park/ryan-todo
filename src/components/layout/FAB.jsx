@@ -10,7 +10,7 @@ export default function FAB() {
         onClick={() => setShowAddSheet(true)}
         className="mobile-fab"
         style={{
-          position: 'fixed', bottom: 80, right: 20,
+          position: 'fixed', bottom: 60, right: 40,
           width: 52, height: 52, borderRadius: 16,
           background: '#37352f', color: 'white', border: 'none',
           boxShadow: '0 4px 16px rgba(0,0,0,0.18)', cursor: 'pointer',
