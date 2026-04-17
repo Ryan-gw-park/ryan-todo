@@ -1,18 +1,20 @@
 import useStore from '../../../../hooks/useStore'
 import PersonalPivotMatrixTable from '../PersonalPivotMatrixTable'
+import PersonalMatrixMobileList from '../PersonalMatrixMobileList'
 
 /* ═════════════════════════════════════════════
-   PersonalMatrixGrid — Loop 44: PersonalPivotMatrixTable Wrapper
-   외부 props 시그니처 유지 (UnifiedGridView 호환성).
-   내부는 시간 피벗 테이블로 전면 교체.
-   todayFilter / SortableContext / ProjectLaneCard 폐기.
-   사용 안 하는 props (collapsed, toggleCollapse, toggleDone, openDetail,
-     activeId, matrixMsCollapsed, toggleMatrixMsCollapse, handleMsDelete,
-     matrixDoneCollapsed, toggleMatrixDoneCollapse): PersonalPivotMatrixTable이
-     store 직접 구독하므로 무시.
+   PersonalMatrixGrid — Loop 44 + mobile optimization
+   Desktop (≥768px): PersonalPivotMatrixTable (피벗 테이블)
+   Mobile (<768px): PersonalMatrixMobileList (단일 리스트 + FAB)
    ═════════════════════════════════════════════ */
 export default function PersonalMatrixGrid({ projects, myTasks }) {
   const milestones = useStore(s => s.milestones)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+
+  if (isMobile) {
+    return <PersonalMatrixMobileList projects={projects} tasks={myTasks} />
+  }
+
   return (
     <PersonalPivotMatrixTable
       projects={projects}
