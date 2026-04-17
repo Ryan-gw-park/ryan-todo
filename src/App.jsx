@@ -113,7 +113,7 @@ function AppShell({ mobile }) {
         {mobile && <MobileTopBar />}
 
         {/* 뷰 컨텐츠 */}
-        <div style={{ flex: 1, overflow: 'auto', paddingBottom: mobile ? 100 : 0 }}>
+        <div style={{ flex: 1, overflow: 'auto' }}>
           <Suspense fallback={<ViewSkeleton />}>
             <ViewComponent />
           </Suspense>
