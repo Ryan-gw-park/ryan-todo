@@ -33,7 +33,7 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
   }, [isExpanded, setPivotCollapsed])
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div style={{ paddingBottom: 100 }}>
       {projects.map(p => {
           const projTasks = myTasks
             .filter(t => t.projectId === p.id)
@@ -46,8 +46,8 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 14px',
+                  gap: 8,
+                  padding: '12px 16px',
                   background: '#fff',
                   cursor: 'pointer',
                 }}
@@ -63,7 +63,7 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                 </span>
               </div>
               {expanded && projTasks.length === 0 && (
-                <div style={{ padding: '4px 14px 8px 32px', fontSize: 11, color: COLOR.textTertiary }}>
+                <div style={{ padding: '10px 16px 14px 36px', fontSize: 12, color: COLOR.textTertiary }}>
                   할일 없음
                 </div>
               )}
@@ -73,8 +73,8 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: 8,
-                    padding: '6px 14px 6px 32px',
+                    gap: 10,
+                    padding: '10px 16px 10px 36px',
                     background: '#fff',
                   }}
                 >
@@ -82,14 +82,14 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                     type="checkbox"
                     checked={!!task.done}
                     onChange={() => toggleDone(task.id)}
-                    style={{ flexShrink: 0, width: 16, height: 16, marginTop: 2 }}
+                    style={{ flexShrink: 0, width: 18, height: 18, marginTop: 1 }}
                   />
                   <span
                     onClick={() => openDetail(task)}
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      fontSize: 13,
+                      fontSize: 14,
                       color: COLOR.textPrimary,
                       wordBreak: 'keep-all',
                       overflowWrap: 'break-word',

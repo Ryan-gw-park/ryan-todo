@@ -37,7 +37,7 @@ export const FONT = {
 export const SPACE = {
   // 뷰 최외곽 패딩
   viewPadding: '40px 48px',
-  viewPaddingMobile: '20px 16px 100px',
+  viewPaddingMobile: '20px 16px 0',
   // 뷰 내부 컨텐츠 패딩 (풀 width 뷰에서는 사용하지 않음)
   contentPadding: '0 24px',
   // 카드 내부
