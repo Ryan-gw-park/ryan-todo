@@ -1,14 +1,13 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
 import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR } from '../../../styles/designTokens'
-import QuickAddFab from './QuickAddFab'
 
 /* ═════════════════════════════════════════════
    PersonalMatrixMobileList — 모바일 전용 개인 할일 뷰
    프로젝트별로 위→아래 단일 리스트 (시간 카테고리 구분 없음).
    탭 가능한 체크박스 + 제목. 상세 진입 = 제목 탭.
-   할일 추가는 하단 FAB로 일원화.
+   할일 추가는 App.jsx 전역 FAB(MobileAddSheet) 사용.
    ═════════════════════════════════════════════ */
 export default function PersonalMatrixMobileList({ projects, tasks }) {
   const { pivotCollapsed, setPivotCollapsed } = usePivotExpandState('personal')
@@ -34,9 +33,8 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
   }, [isExpanded, setPivotCollapsed])
 
   return (
-    <>
-      <div style={{ paddingBottom: 100 }}>
-        {projects.map(p => {
+    <div style={{ paddingBottom: 80 }}>
+      {projects.map(p => {
           const projTasks = myTasks
             .filter(t => t.projectId === p.id)
             .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -48,8 +46,8 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
-                  padding: '12px 16px',
+                  gap: 6,
+                  padding: '8px 14px',
                   background: '#fff',
                   cursor: 'pointer',
                 }}
@@ -65,7 +63,7 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                 </span>
               </div>
               {expanded && projTasks.length === 0 && (
-                <div style={{ padding: '10px 16px 14px 36px', fontSize: 12, color: COLOR.textTertiary }}>
+                <div style={{ padding: '4px 14px 8px 32px', fontSize: 11, color: COLOR.textTertiary }}>
                   할일 없음
                 </div>
               )}
@@ -75,8 +73,8 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: 10,
-                    padding: '10px 16px 10px 36px',
+                    gap: 8,
+                    padding: '6px 14px 6px 32px',
                     background: '#fff',
                   }}
                 >
@@ -84,14 +82,14 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
                     type="checkbox"
                     checked={!!task.done}
                     onChange={() => toggleDone(task.id)}
-                    style={{ flexShrink: 0, width: 18, height: 18, marginTop: 1 }}
+                    style={{ flexShrink: 0, width: 16, height: 16, marginTop: 2 }}
                   />
                   <span
                     onClick={() => openDetail(task)}
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      fontSize: 14,
+                      fontSize: 13,
                       color: COLOR.textPrimary,
                       wordBreak: 'keep-all',
                       overflowWrap: 'break-word',
@@ -107,13 +105,10 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
         })}
         {projects.length === 0 && (
           <div style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: 13 }}>
-            표시할 프로젝트가 없습니다
-          </div>
-        )}
-      </div>
-
-      <QuickAddFab projects={projects} />
-    </>
+          표시할 프로젝트가 없습니다
+        </div>
+      )}
+    </div>
   )
 }
 
