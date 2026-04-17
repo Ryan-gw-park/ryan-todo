@@ -33,7 +33,7 @@ export default function PersonalMatrixMobileList({ projects, tasks }) {
   }, [isExpanded, setPivotCollapsed])
 
   return (
-    <div style={{ paddingBottom: 100 }}>
+    <div>
       {projects.map(p => {
           const projTasks = myTasks
             .filter(t => t.projectId === p.id)
