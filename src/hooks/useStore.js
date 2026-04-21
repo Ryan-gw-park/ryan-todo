@@ -129,6 +129,8 @@ function taskToRow(t) {
     // ↓ Loop-26: Key Milestone 연결 ↓
     key_milestone_id: t.keyMilestoneId || null,
     deliverable_id: t.deliverableId || null,
+    // ↓ weekly-schedule ↓
+    scheduled_date: t.scheduledDate || null,
   }
   if (_alarmColExists) row.alarm = t.alarm ?? null
   return row
@@ -186,6 +188,8 @@ function mapTask(r) {
     // ↓ Loop-26: Key Milestone 연결 ↓
     keyMilestoneId: r.key_milestone_id || null,
     deliverableId: r.deliverable_id || null,
+    // ↓ weekly-schedule ↓
+    scheduledDate: r.scheduled_date || null,
   }
 }
 
@@ -582,6 +586,56 @@ const useStore = create((set, get) => ({
     const { error } = await safeUpsertTask(d, t)
     if (error) console.error('[Ryan Todo] updateTask:', error)
     set({ syncStatus: error ? 'error' : 'ok' })
+  },
+
+  // weekly-schedule: 복수 task 일괄 update. 허용 patch 키: { scheduledDate, assigneeId } 만.
+  // applyTransitionRules 미적용 — scheduled_date/assignee_id는 전이 규칙 대상 아님.
+  updateTasksBulk: async (ids, patch) => {
+    if (!Array.isArray(ids) || ids.length === 0) return
+    // 낙관적 로컬 반영
+    set(s => ({
+      tasks: s.tasks.map(t => ids.includes(t.id)
+        ? { ...t, ...patch, updatedAt: new Date().toISOString() }
+        : t)
+    }))
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    // camelCase → snake_case whitelist
+    const rowPatch = {}
+    if ('scheduledDate' in patch) rowPatch.scheduled_date = patch.scheduledDate || null
+    if ('assigneeId' in patch) rowPatch.assignee_id = patch.assigneeId || null
+    rowPatch.updated_at = new Date().toISOString()
+    const { error } = await d.from('tasks').update(rowPatch).in('id', ids)
+    if (error) {
+      console.error('[Ryan Todo] updateTasksBulk:', error)
+      set({ syncStatus: 'error' })
+      throw error
+    }
+    set({ syncStatus: 'ok' })
+  },
+
+  // weekly-schedule: milestone scheduled_date 업데이트. store.milestones를 직접 갱신 (useKeyMilestones는 로컬 state만 건드림).
+  // 허용 patch 키: { scheduled_date } 만. weekly-schedule 전용 — 범용 사용 금지.
+  // 다른 필드(title/status 등)는 기존 useKeyMilestones.update() 사용.
+  // id/pkm_id/project_id 같은 PK/FK는 절대 patch에 포함 금지.
+  updateMilestone: async (id, patch) => {
+    // 낙관적: store.milestones 갱신 (snake_case 그대로 — mapMilestone 없음)
+    set(s => ({
+      milestones: s.milestones.map(m => m.id === id ? { ...m, ...patch } : m)
+    }))
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    const { error } = await d.from('key_milestones')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) {
+      console.error('[Ryan Todo] updateMilestone:', error)
+      set({ syncStatus: 'error' })
+      throw error
+    }
+    set({ syncStatus: 'ok' })
   },
 
   deleteTask: async (id) => {
