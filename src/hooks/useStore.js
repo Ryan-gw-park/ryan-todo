@@ -250,6 +250,7 @@ const useStore = create((set, get) => ({
   projects: [],
   tasks: [],
   memos: [],
+  dirtyMemoIds: {}, // Hotfix-A A-1: upsert pending/실패한 memo id. 런타임 전용 — 스냅샷 제외
   milestones: [],
   syncStatus: 'ok',
   currentView: 'personal-matrix',
@@ -486,7 +487,22 @@ const useStore = create((set, get) => ({
       const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: mergedUts, milestones }
       if (!isArrayEqual(current.tasks, tasks)) patch.tasks = tasks
       if (!isArrayEqual(current.projects, projects)) patch.projects = projects
-      if (!isArrayEqual(current.memos, memos)) patch.memos = memos
+      if (!isArrayEqual(current.memos, memos)) {
+        // Hotfix-A A-1: 편집 중(dirty) memo는 서버 stale로 덮어쓰지 않는다.
+        const dirty = get().dirtyMemoIds
+        const dirtyIds = Object.keys(dirty)
+        if (dirtyIds.length === 0) {
+          patch.memos = memos
+        } else {
+          const localMap = new Map(current.memos.map(m => [m.id, m]))
+          const merged = memos.map(m => dirty[m.id] ? (localMap.get(m.id) || m) : m)
+          // addMemo 직후 upsert 전: 로컬에만 있는 dirty 항목 보존
+          for (const m of current.memos) {
+            if (dirty[m.id] && !memos.find(s => s.id === m.id)) merged.push(m)
+          }
+          patch.memos = merged
+        }
+      }
       set(patch)
 
       // 12b: 사용자별 프로젝트 순서 로드 (최초 1회만, 내부에서 flag 체크)
@@ -849,28 +865,53 @@ const useStore = create((set, get) => ({
   // ─── Memo CRUD ───
   addMemo: async (memo) => {
     const m = { id: crypto.randomUUID(), title: '', notes: '', color: 'yellow', sortOrder: Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...memo }
-    set(s => ({ memos: [...s.memos, m] }))
+    // Hotfix-A A-1: 로컬 append + dirty mark (loadAll 머지에서 보호)
+    set(s => ({ memos: [...s.memos, m], dirtyMemoIds: { ...s.dirtyMemoIds, [m.id]: true } }))
     const d = db()
-    if (!d) return
+    if (!d) return m // 오프라인: dirty 유지한 채 리턴 (재시도는 Hotfix-B B-1)
     const userId = await getCurrentUserId()
     const { error } = await d.from('memos').upsert({
       id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder, user_id: userId,
     })
-    if (error) console.error('[Ryan Todo] addMemo:', error)
+    if (error) {
+      console.error('[Ryan Todo] addMemo:', error)
+      return m // dirty 유지, Hotfix-A commit 3에서 throw로 전환
+    }
+    // 성공: dirty 해제
+    set(s => {
+      const { [m.id]: _, ...rest } = s.dirtyMemoIds
+      return { dirtyMemoIds: rest }
+    })
     return m
   },
 
   updateMemo: async (id, patch) => {
-    set(s => ({ memos: s.memos.map(m => m.id === id ? { ...m, ...patch, updatedAt: new Date().toISOString() } : m) }))
+    // Hotfix-A A-1: 로컬 반영 + dirty mark
+    set(s => ({
+      memos: s.memos.map(m => m.id === id ? { ...m, ...patch, updatedAt: new Date().toISOString() } : m),
+      dirtyMemoIds: { ...s.dirtyMemoIds, [id]: true },
+    }))
     const m = get().memos.find(x => x.id === id)
-    if (!m) return
+    if (!m) {
+      // 방어: m이 없는 비정상 상태 — dirty 제거하여 영구 고착 방지
+      set(s => { const { [id]: _, ...rest } = s.dirtyMemoIds; return { dirtyMemoIds: rest } })
+      return
+    }
     const d = db()
-    if (!d) return
+    if (!d) return // 오프라인: dirty 유지, commit 3에서 throw로 전환
     const userId = await getCurrentUserId()
     const { error } = await d.from('memos').upsert({
       id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder, user_id: userId,
     })
-    if (error) console.error('[Ryan Todo] updateMemo:', error)
+    if (error) {
+      console.error('[Ryan Todo] updateMemo:', error)
+      return // dirty 유지
+    }
+    // 성공: dirty 해제
+    set(s => {
+      const { [id]: _, ...rest } = s.dirtyMemoIds
+      return { dirtyMemoIds: rest }
+    })
   },
 
   deleteMemo: async (id) => {
