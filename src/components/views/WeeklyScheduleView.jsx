@@ -183,6 +183,7 @@ export default function WeeklyScheduleView() {
           milestones={milestones}
           projects={projects}
           members={members}
+          teamProjectIds={teamProjectIds}
         />
         <ScheduleGrid
           members={members}

@@ -18,6 +18,7 @@ export default function BacklogPanel({
   milestones = [],
   projects = [],
   members = [],
+  teamProjectIds,
 }) {
   const [mode, setMode] = useState('project') // 'project' | 'member'
   const [search, setSearch] = useState('')
@@ -36,12 +37,15 @@ export default function BacklogPanel({
            (item.description || '').toLowerCase().includes(q)
   }
 
-  // 모든 아이템 (배치+미배치) — 검색 필터는 미배치 기준, 배치는 취소선만
+  // 팀 프로젝트만 포함 — 개인 프로젝트 task/MS가 백로그에 섞이지 않도록
   const projectMap = useMemo(() => {
     const m = {}
-    for (const p of projects) m[p.id] = p
+    for (const p of projects) {
+      if (teamProjectIds && !teamProjectIds.has(p.id)) continue
+      m[p.id] = p
+    }
     return m
-  }, [projects])
+  }, [projects, teamProjectIds])
 
   const memberColorMap = useMemo(() => {
     const map = {}
