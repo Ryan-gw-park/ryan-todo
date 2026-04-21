@@ -872,6 +872,7 @@ const useStore = create((set, get) => ({
     const userId = await getCurrentUserId()
     const { error } = await d.from('memos').upsert({
       id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder, user_id: userId,
+      updated_at: m.updatedAt, // Hotfix-A A-2: trigger 부재이므로 명시 전달 → loadAll 재조회 후 isArrayEqual 일치
     })
     if (error) {
       console.error('[Ryan Todo] addMemo:', error)
@@ -902,6 +903,7 @@ const useStore = create((set, get) => ({
     const userId = await getCurrentUserId()
     const { error } = await d.from('memos').upsert({
       id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder, user_id: userId,
+      updated_at: m.updatedAt, // Hotfix-A A-2
     })
     if (error) {
       console.error('[Ryan Todo] updateMemo:', error)
