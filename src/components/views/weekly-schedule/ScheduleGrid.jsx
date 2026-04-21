@@ -42,16 +42,8 @@ export default function ScheduleGrid({
     return map
   }, [members])
 
-  // 팀 멤버 0명 빈 상태 (E2)
-  if (members.length === 0) {
-    return (
-      <div style={{ flex: 1, padding: 32, color: COLOR.textSecondary, fontSize: 13 }}>
-        팀 멤버가 없습니다. 먼저 팀 설정에서 멤버를 초대하세요.
-      </div>
-    )
-  }
-
   // MS를 멤버 행에 라우팅 (D21): owner_id 있으면 해당, 없으면 첫 번째 멤버
+  // ⚠ 조기 return은 모든 hook 뒤에 둬야 함 (React Rules of Hooks — #310 방지)
   const firstMemberUserId = members[0]?.userId
   const msByRow = useMemo(() => {
     const map = new Map() // userId → Map<dateISO, MS[]>
@@ -80,6 +72,15 @@ export default function ScheduleGrid({
     }
     return map
   }, [scheduledTasks])
+
+  // 팀 멤버 0명 빈 상태 (E2) — hooks 모두 호출 후 return
+  if (members.length === 0) {
+    return (
+      <div style={{ flex: 1, padding: 32, color: COLOR.textSecondary, fontSize: 13 }}>
+        팀 멤버가 없습니다. 먼저 팀 설정에서 멤버를 초대하세요.
+      </div>
+    )
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
