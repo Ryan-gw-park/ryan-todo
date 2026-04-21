@@ -876,7 +876,7 @@ const useStore = create((set, get) => ({
     })
     if (error) {
       console.error('[Ryan Todo] addMemo:', error)
-      return m // dirty 유지, Hotfix-A commit 3에서 throw로 전환
+      throw error // Hotfix-A A-3: 호출측 .catch() 감지용 (dirty 유지)
     }
     // 성공: dirty 해제
     set(s => {
@@ -899,7 +899,7 @@ const useStore = create((set, get) => ({
       return
     }
     const d = db()
-    if (!d) return // 오프라인: dirty 유지, commit 3에서 throw로 전환
+    if (!d) throw new Error('offline') // Hotfix-A A-3: 오프라인도 실패로 간주 (dirty 유지)
     const userId = await getCurrentUserId()
     const { error } = await d.from('memos').upsert({
       id: m.id, title: m.title, notes: m.notes, color: m.color, sort_order: m.sortOrder, user_id: userId,
@@ -907,7 +907,7 @@ const useStore = create((set, get) => ({
     })
     if (error) {
       console.error('[Ryan Todo] updateMemo:', error)
-      return // dirty 유지
+      throw error // Hotfix-A A-3 (dirty 유지)
     }
     // 성공: dirty 해제
     set(s => {

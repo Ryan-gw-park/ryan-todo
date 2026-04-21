@@ -53,21 +53,36 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   const { updateMemo, deleteMemo } = useStore()
   const [title, setTitle] = useState(memo.title)
   const [showColorPicker, setShowColorPicker] = useState(false)
+  // Hotfix-A A-3: 저장 상태 로컬 state
+  const [saveState, setSaveState] = useState('idle') // 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
   const titleRef = useRef(null)
   const editorRef = useRef(null)
   const colorPickerRef = useRef(null)
+  const fadeRef = useRef(null) // 'saved' → 'idle' 페이드 타이머
 
   // hotfix-02: debounce notes save (500ms) — 빠른 타이핑 시 매 keystroke upsert 방지
   const debounceRef = useRef(null)
   const pendingSaveRef = useRef(null)
   const debouncedUpdateNotes = useCallback((newNotes) => {
-    // 로컬 state는 OutlinerEditor가 즉시 관리 (UI 반응 빠름)
-    // DB upsert만 debounce
+    // UI 즉시 반응: dirty 표시
+    setSaveState('dirty')
     if (debounceRef.current) clearTimeout(debounceRef.current)
     pendingSaveRef.current = newNotes
-    debounceRef.current = setTimeout(async () => {
-      await updateMemo(memo.id, { notes: pendingSaveRef.current })
-      pendingSaveRef.current = null
+    debounceRef.current = setTimeout(() => {
+      setSaveState('saving')
+      const payloadNotes = pendingSaveRef.current
+      updateMemo(memo.id, { notes: payloadNotes })
+        .then(() => {
+          pendingSaveRef.current = null
+          setSaveState('saved')
+          if (fadeRef.current) clearTimeout(fadeRef.current)
+          fadeRef.current = setTimeout(() => {
+            setSaveState(curr => curr === 'saved' ? 'idle' : curr)
+          }, 2000)
+        })
+        .catch(() => {
+          setSaveState('error')
+        })
     }, 500)
   }, [memo.id, updateMemo])
 
@@ -78,8 +93,10 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
         clearTimeout(debounceRef.current)
         if (pendingSaveRef.current !== null) {
           updateMemo(memo.id, { notes: pendingSaveRef.current })
+            .catch(e => console.error('[Ryan Todo] unmount flush:', e))
         }
       }
+      if (fadeRef.current) clearTimeout(fadeRef.current)
     }
   }, [memo.id, updateMemo])
 
@@ -90,6 +107,7 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
         clearTimeout(debounceRef.current)
         if (pendingSaveRef.current !== null) {
           updateMemo(memo.id, { notes: pendingSaveRef.current })
+            .catch(e => console.error('[Ryan Todo] beforeunload flush:', e))
         }
       }
     }
@@ -100,6 +118,15 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   const colorObj = COLOR_OPTIONS.find(c => c.id === memo.color) || COLOR_OPTIONS[0]
 
   useEffect(() => { setTitle(memo.title) }, [memo.id, memo.title])
+
+  // Hotfix-A A-3: 메모 전환 시 saveState를 idle로 리셋하고 페이드 타이머 정리
+  useEffect(() => {
+    setSaveState('idle')
+    if (fadeRef.current) {
+      clearTimeout(fadeRef.current)
+      fadeRef.current = null
+    }
+  }, [memo.id])
 
   // Auto-focus title on new empty memo
   useEffect(() => {
@@ -115,7 +142,17 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
   }, [showColorPicker])
 
   const saveTitle = () => {
-    if (title !== memo.title) updateMemo(memo.id, { title })
+    if (title === memo.title) return
+    setSaveState('saving')
+    updateMemo(memo.id, { title })
+      .then(() => {
+        setSaveState('saved')
+        if (fadeRef.current) clearTimeout(fadeRef.current)
+        fadeRef.current = setTimeout(() => {
+          setSaveState(curr => curr === 'saved' ? 'idle' : curr)
+        }, 2000)
+      })
+      .catch(() => setSaveState('error'))
   }
 
   const handleTitleKeyDown = (e) => {
@@ -160,7 +197,19 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
                 {COLOR_OPTIONS.map(c => (
                   <div
                     key={c.id}
-                    onClick={() => { updateMemo(memo.id, { color: c.id }); setShowColorPicker(false) }}
+                    onClick={() => {
+                      setSaveState('saving')
+                      updateMemo(memo.id, { color: c.id })
+                        .then(() => {
+                          setSaveState('saved')
+                          if (fadeRef.current) clearTimeout(fadeRef.current)
+                          fadeRef.current = setTimeout(() => {
+                            setSaveState(curr => curr === 'saved' ? 'idle' : curr)
+                          }, 2000)
+                        })
+                        .catch(() => setSaveState('error'))
+                      setShowColorPicker(false)
+                    }}
                     style={{ width: 20, height: 20, borderRadius: 4, background: c.dot, cursor: 'pointer', border: memo.color === c.id ? '2px solid #37352f' : '2px solid transparent' }}
                   />
                 ))}
@@ -185,9 +234,23 @@ function MemoDetailPane({ memo, onBack, isMobile }) {
             <TrashIcon />
           </button>
         </div>
-        {/* 날짜 (제목 아래) */}
-        <div style={{ fontSize: 11, color: '#a09f99', marginTop: 2, paddingLeft: isMobile ? 60 : 22 }}>
-          {formatDate(memo.updatedAt || memo.createdAt)}
+        {/* 날짜 + 저장 상태 (제목 아래) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, paddingLeft: isMobile ? 60 : 22 }}>
+          <span style={{ fontSize: 11, color: '#a09f99' }}>
+            {formatDate(memo.updatedAt || memo.createdAt)}
+          </span>
+          {saveState !== 'idle' && (
+            <span style={{
+              fontSize: 11,
+              color: saveState === 'saved' ? '#38A169'
+                   : saveState === 'error' ? '#E53E3E'
+                   : '#888',
+            }}>
+              {saveState === 'saved' ? '저장됨 ✓'
+                : saveState === 'error' ? '저장 실패 ⚠'
+                : '저장 중…'}
+            </span>
+          )}
         </div>
         {/* Hairline */}
         <div style={{ height: '0.5px', background: '#f0efe8', marginTop: 10 }} />
@@ -225,8 +288,13 @@ export default function MemoryView() {
 
   const handleAdd = useCallback(async () => {
     const randomColor = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)].id
-    const newMemo = await addMemo({ title: '', notes: '', color: randomColor })
-    if (newMemo) setSelectedId(newMemo.id)
+    try {
+      const newMemo = await addMemo({ title: '', notes: '', color: randomColor })
+      if (newMemo) setSelectedId(newMemo.id)
+    } catch (e) {
+      // Hotfix-A: 최소 가드, 본격 에러 UI는 Hotfix-B B-1
+      console.error('[Ryan Todo] handleAdd:', e)
+    }
   }, [addMemo])
 
   const handleDelete = useCallback((memo) => {
