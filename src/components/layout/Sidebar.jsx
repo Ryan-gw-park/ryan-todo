@@ -40,6 +40,7 @@ const COMMON_VIEWS = [
 // 팀 전용 뷰
 const TEAM_ONLY_VIEWS = [
   { key: 'members',  label: '팀원',       icon: '👥' },
+  { key: 'weekly-schedule', label: '주간 스케줄', icon: '📅' },
 ]
 
 export default function Sidebar() {

@@ -7,6 +7,7 @@ const VIEW_TO_PATH = {
   'team-matrix':       '/team/matrix',
   'team-timeline':     '/team/timeline',
   'team-weekly':       '/team/weekly',
+  'team-weekly-schedule': '/team/weekly-schedule',
   'personal-matrix':   '/personal/matrix',
   'personal-timeline': '/personal/timeline',
   'personal-weekly':   '/personal/weekly',

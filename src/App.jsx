@@ -38,6 +38,7 @@ const ProjectManager = lazy(() => import('./components/shared/ProjectManager'))
 const HelpPage = lazy(() => import('./components/shared/HelpPage'))
 const ModalRouter = lazy(() => import('./components/modals/ModalRouter'))
 const MembersView = lazy(() => import('./components/views/MembersView'))
+const WeeklyScheduleView = lazy(() => import('./components/views/WeeklyScheduleView'))
 
 function isMobile() { return window.innerWidth < 768 }
 
@@ -61,7 +62,7 @@ function AppShell({ mobile }) {
   }, [])
 
   // Keyboard shortcuts
-  const VIEW_ORDER = ['personal-matrix', 'personal-weekly', 'personal-timeline', 'memory', 'team-matrix', 'team-weekly', 'team-timeline']
+  const VIEW_ORDER = ['personal-matrix', 'personal-weekly', 'personal-timeline', 'memory', 'team-matrix', 'team-weekly', 'team-weekly-schedule', 'team-timeline']
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') { closeDetail() }
@@ -87,6 +88,7 @@ function AppShell({ mobile }) {
     'team-timeline': InlineTimelineView,
     'team-weekly': () => <UnifiedGridView initialView="weekly" initialScope="team" />,
     'team-members': () => <MembersView />,
+    'team-weekly-schedule': () => <WeeklyScheduleView />,
     'personal-matrix': () => <UnifiedGridView initialView="matrix" initialScope="personal" />,
     'personal-timeline': () => <InlineTimelineView scope="personal" />,
     'personal-weekly': () => <UnifiedGridView initialView="weekly" initialScope="personal" />,
