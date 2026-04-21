@@ -474,7 +474,7 @@ const useStore = create((set, get) => ({
       if (projectIdsList.length > 0) {
         try {
           const msResult = await d.from('key_milestones')
-            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, secondary_owner_id, status, start_date, end_date, created_by, parent_id, depth')
+            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, secondary_owner_id, status, start_date, end_date, created_by, parent_id, depth, scheduled_date')
             .in('project_id', projectIdsList)
             .order('sort_order')
           milestones = msResult.data || []
@@ -1000,7 +1000,7 @@ const useStore = create((set, get) => ({
         owner_id: ownerId,
         status: 'not_started',
       })
-      .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by, parent_id, depth')
+      .select('id, pkm_id, project_id, title, color, sort_order, owner_id, status, start_date, end_date, created_by, parent_id, depth, scheduled_date')
       .single()
     if (error) { console.error('[useStore] addMilestone:', error); return null }
     if (data) set({ milestones: [...get().milestones, data] })
