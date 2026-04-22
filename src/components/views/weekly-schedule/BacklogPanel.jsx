@@ -62,7 +62,7 @@ function DirectTasksRow({ taskCount, expanded, onToggle }) {
       <span style={{ width: 10, flexShrink: 0, fontSize: 9, color: '#888780', lineHeight: 1 }}>
         {expanded ? '▼' : '▶'}
       </span>
-      <span style={{ fontStyle: 'italic' }}>프로젝트 직속 할일</span>
+      <span style={{ fontStyle: 'italic' }}>기타</span>
       {taskCount > 0 && (
         <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 10 }}>
           {taskCount}
