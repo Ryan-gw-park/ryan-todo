@@ -40,8 +40,9 @@ export default function useWeeklySchedule() {
   ), [projects, currentTeamId])
 
   // 이번주 셀 표시용 — task는 camelCase, milestone은 snake_case(raw row)
+  // 완료(done) task는 그리드에서 제외 — 배치 이력과 무관하게 현재 active한 것만 표시
   const scheduledTasks = useMemo(() => tasks.filter(t =>
-    t.scheduledDate && weekDateSet.has(t.scheduledDate) && teamProjectIds.has(t.projectId) && !t.deletedAt
+    t.scheduledDate && weekDateSet.has(t.scheduledDate) && teamProjectIds.has(t.projectId) && !t.done && !t.deletedAt
   ), [tasks, weekDateSet, teamProjectIds])
 
   const scheduledMilestones = useMemo(() => milestones.filter(m =>

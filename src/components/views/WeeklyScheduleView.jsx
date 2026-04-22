@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import {
   DndContext, DragOverlay,
   PointerSensor, TouchSensor, useSensor, useSensors,
-  pointerWithin,
+  closestCenter,
 } from '@dnd-kit/core'
 import useStore from '../../hooks/useStore'
 import useWeeklySchedule from '../../hooks/useWeeklySchedule'
@@ -91,9 +91,9 @@ export default function WeeklyScheduleView() {
       }
       if (kind === 'ms') {
         updateMilestone(id, { scheduled_date: null }).catch(e => console.error('[weekly] unschedule ms:', e))
-        // EC3: teamProjectIds 필터로 타팀 task 배제
+        // EC3 + 완료/삭제 제외: teamProjectIds 필터 + !done + !deletedAt (부활 버그 방지)
         const childIds = tasks
-          .filter(t => t.keyMilestoneId === id && teamProjectIds.has(t.projectId))
+          .filter(t => t.keyMilestoneId === id && teamProjectIds.has(t.projectId) && !t.done && !t.deletedAt)
           .map(t => t.id)
         if (childIds.length > 0) {
           updateTasksBulk(childIds, { scheduledDate: null }).catch(e => console.error('[weekly] cascade null:', e))
@@ -121,8 +121,8 @@ export default function WeeklyScheduleView() {
       if (!ms) return
       if (ms.scheduled_date === dateISO) return
       updateMilestone(id, { scheduled_date: dateISO }).catch(e => console.error('[weekly] schedule ms:', e))
-      // EC3: teamProjectIds 필터
-      const children = tasks.filter(t => t.keyMilestoneId === id && teamProjectIds.has(t.projectId))
+      // EC3 + 완료/삭제 제외: teamProjectIds + !done + !deletedAt (부활 버그 방지)
+      const children = tasks.filter(t => t.keyMilestoneId === id && teamProjectIds.has(t.projectId) && !t.done && !t.deletedAt)
       if (children.length > 0) {
         const needDefault = children.filter(t => !t.assigneeId).map(t => t.id)
         const keepAssignee = children.filter(t => t.assigneeId).map(t => t.id)
@@ -147,8 +147,9 @@ export default function WeeklyScheduleView() {
 
   const handleUnscheduleMS = useCallback((msId) => {
     updateMilestone(msId, { scheduled_date: null }).catch(e => console.error('[weekly] × ms:', e))
+    // EC3 + 완료/삭제 제외
     const childIds = tasks
-      .filter(t => t.keyMilestoneId === msId && teamProjectIds.has(t.projectId))
+      .filter(t => t.keyMilestoneId === msId && teamProjectIds.has(t.projectId) && !t.done && !t.deletedAt)
       .map(t => t.id)
     if (childIds.length > 0) {
       updateTasksBulk(childIds, { scheduledDate: null }).catch(e => console.error('[weekly] × cascade:', e))
@@ -171,7 +172,7 @@ export default function WeeklyScheduleView() {
     }}>
       <DndContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
