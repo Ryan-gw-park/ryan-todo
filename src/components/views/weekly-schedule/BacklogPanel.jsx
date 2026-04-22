@@ -12,7 +12,7 @@ function ProjectPillHeader({ project, totalCount, expanded, onToggle, compact })
     <div
       onClick={onToggle}
       style={{
-        display: 'flex', alignItems: 'center', gap: 7,
+        display: 'inline-flex', alignItems: 'center', gap: 7,
         padding: compact ? '3px 8px' : '5px 10px',
         marginBottom: 2,
         borderRadius: compact ? 4 : 6,
@@ -22,6 +22,8 @@ function ProjectPillHeader({ project, totalCount, expanded, onToggle, compact })
         fontWeight: 500,
         color: ramp.text,
         userSelect: 'none',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       }}
     >
       <span style={{
@@ -34,11 +36,13 @@ function ProjectPillHeader({ project, totalCount, expanded, onToggle, compact })
         width: 7, height: 7, borderRadius: 2,
         background: ramp.dot, flexShrink: 0,
       }} />
-      <span>{project.name}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {project.name}
+      </span>
       {totalCount > 0 && (
         <span style={{
-          marginLeft: 'auto', fontSize: 11, fontWeight: 400,
-          color: ramp.text, opacity: 0.7,
+          marginLeft: 4, fontSize: 11, fontWeight: 400,
+          color: ramp.text, opacity: 0.7, flexShrink: 0,
         }}>{totalCount}</span>
       )}
     </div>
@@ -62,7 +66,7 @@ function MsRow({ ms, taskCount, expanded, onToggle }) {
         opacity: isDragging ? 0.4 : (scheduled ? 0.3 : 1),
         textDecoration: scheduled ? 'line-through' : 'none',
         cursor: 'pointer',
-        padding: '4px 8px 4px 12px',
+        padding: '4px 8px 4px 20px',
         fontSize: 12,
         fontWeight: 500,
         color: COLOR.textSecondary,
@@ -91,7 +95,7 @@ function DirectTasksRow({ taskCount, expanded, onToggle }) {
       onClick={onToggle}
       style={{
         cursor: 'pointer',
-        padding: '4px 8px 4px 12px',
+        padding: '4px 8px 4px 20px',
         fontSize: 12,
         fontWeight: 500,
         color: COLOR.textSecondary,
@@ -448,7 +452,7 @@ export default function BacklogPanel({
                         <MsRow ms={ms} taskCount={msTasks.length} expanded={msExpanded}
                           onToggle={() => toggleMs(ms.id)} />
                         {msExpanded && msTasks.map(t => (
-                          <TaskRow key={t.id} task={t} indent={32} />
+                          <TaskRow key={t.id} task={t} indent={40} />
                         ))}
                       </div>
                     )
@@ -464,7 +468,7 @@ export default function BacklogPanel({
                           onToggle={() => toggleMs(directKey)}
                         />
                         {directExpanded && g.directTasks.map(t => (
-                          <TaskRow key={t.id} task={t} indent={32} />
+                          <TaskRow key={t.id} task={t} indent={40} />
                         ))}
                       </div>
                     )
@@ -501,7 +505,7 @@ export default function BacklogPanel({
                 const projKey = `${b.member.userId}:${g.project.id}`
                 const projExpanded = !!expandedProjects[projKey]
                 return (
-                  <div key={projKey} style={{ padding: '0 8px 0 20px', marginBottom: 2 }}>
+                  <div key={projKey} style={{ padding: '0 8px 0 28px', marginBottom: 2 }}>
                     <ProjectPillHeader
                       project={g.project}
                       totalCount={g.totalTaskCount}
@@ -519,7 +523,7 @@ export default function BacklogPanel({
                               <MsRow ms={ms} taskCount={msTasks.length} expanded={msExpanded}
                                 onToggle={() => toggleMs(msKey)} />
                               {msExpanded && msTasks.map(t => (
-                                <TaskRow key={t.id} task={t} indent={32} />
+                                <TaskRow key={t.id} task={t} indent={40} />
                               ))}
                             </div>
                           )
@@ -535,7 +539,7 @@ export default function BacklogPanel({
                                 onToggle={() => toggleMs(dkey)}
                               />
                               {dexp && g.directTasks.map(t => (
-                                <TaskRow key={t.id} task={t} indent={32} />
+                                <TaskRow key={t.id} task={t} indent={40} />
                               ))}
                             </div>
                           )
