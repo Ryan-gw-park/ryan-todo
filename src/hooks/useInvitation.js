@@ -36,15 +36,12 @@ const useInvitation = {
     const { data: { user } } = await d.auth.getUser()
     if (!user) return { success: false, error: '인증 필요' }
 
-    // 1. invite_code로 팀 찾기 (초대 링크)
+    // 1. invite_code로 팀 찾기 (SECURITY DEFINER RPC — exact match)
     let teamId = null
     let autoApprove = true
 
-    const { data: teamByCode } = await d
-      .from('teams')
-      .select('id, auto_approve')
-      .eq('invite_code', token)
-      .single()
+    const { data: teamRows } = await d.rpc('get_team_by_invite', { p_code: token })
+    const teamByCode = teamRows?.[0]
 
     if (!teamByCode) return { success: false, error: '유효하지 않은 초대입니다.' }
 
@@ -129,19 +126,14 @@ const useInvitation = {
     return true
   },
 
-  /** 초대 링크로 팀 정보 조회 (미인증도 가능하도록 간단한 정보만) */
+  /** 초대 링크로 팀 정보 조회 — SECURITY DEFINER RPC (exact match만) */
   async getTeamByInvite(token) {
     const d = db()
     if (!d) return null
 
-    // invite_code로 시도
-    const { data: teamByCode } = await d
-      .from('teams')
-      .select('id, name, description')
-      .eq('invite_code', token)
-      .single()
-
-    return teamByCode || null
+    const { data: rows, error } = await d.rpc('get_team_by_invite', { p_code: token })
+    if (error) { console.error('[Ryan Todo] getTeamByInvite:', error); return null }
+    return rows?.[0] || null
   },
 }
 
