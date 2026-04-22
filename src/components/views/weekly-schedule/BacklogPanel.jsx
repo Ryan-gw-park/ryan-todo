@@ -444,10 +444,19 @@ export default function BacklogPanel({
               {Array.from(g.projectMap.values()).map(sub => (
                 <div key={sub.project.id}>
                   <div style={{
-                    padding: '2px 10px 2px 18px',
-                    fontSize: 10,
-                    color: COLOR.textTertiary,
-                  }}>{sub.project.name}</div>
+                    padding: '3px 10px 3px 18px',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: COLOR.textSecondary,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: 2,
+                      background: getColor(sub.project.color).dot,
+                      flexShrink: 0,
+                    }} />
+                    <span>{sub.project.name}</span>
+                  </div>
                   {sub.milestones.map(m => (
                     <BacklogItem key={`ms:${m.id}`} kind="ms" item={m} scheduled={!!m.scheduled_date} />
                   ))}
