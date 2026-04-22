@@ -22,8 +22,8 @@ function MsRow({ ms, taskCount, expanded, onToggle }) {
         opacity: isDragging ? 0.4 : (scheduled ? 0.3 : 1),
         textDecoration: scheduled ? 'line-through' : 'none',
         cursor: 'pointer',
-        padding: '3px 8px 3px 20px',
-        fontSize: 11,
+        padding: '4px 8px 4px 12px',
+        fontSize: 12,
         fontWeight: 500,
         color: COLOR.textSecondary,
         whiteSpace: 'normal', wordBreak: 'break-word',
@@ -35,9 +35,11 @@ function MsRow({ ms, taskCount, expanded, onToggle }) {
         {expanded ? '▼' : '▶'}
       </span>
       <span>{ms.title}</span>
-      <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 10 }}>
-        {taskCount}
-      </span>
+      {taskCount > 0 && (
+        <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 10 }}>
+          {taskCount}
+        </span>
+      )}
     </div>
   )
 }
@@ -72,14 +74,14 @@ function TaskRow({ task, indent }) {
         onPointerDown={e => e.stopPropagation()}
         onClick={e => { e.stopPropagation(); toggleDone(task.id) }}
         style={{
-          width: 11, height: 11, borderRadius: 2, flexShrink: 0, cursor: 'pointer',
-          border: task.done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
+          width: 12, height: 12, borderRadius: 2, flexShrink: 0, cursor: 'pointer',
+          border: task.done ? 'none' : '1px solid #B4B2A9',
           background: task.done ? CHECKBOX.checkedBg : '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
         {task.done && (
-          <svg width={7} height={7} viewBox="0 0 12 12" fill="none">
+          <svg width={8} height={8} viewBox="0 0 12 12" fill="none">
             <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
@@ -144,11 +146,12 @@ export default function BacklogPanel({
            (item.description || '').toLowerCase().includes(q)
   }
 
-  // 팀 프로젝트만 포함 — 개인 프로젝트 task/MS가 백로그에 섞이지 않도록
+  // 팀 프로젝트만 포함 — 개인 프로젝트 task/MS + 아카이브 프로젝트가 백로그에 섞이지 않도록
   const projectMap = useMemo(() => {
     const m = {}
     for (const p of projects) {
       if (teamProjectIds && !teamProjectIds.has(p.id)) continue
+      if (p.archivedAt) continue
       m[p.id] = p
     }
     return m
@@ -357,7 +360,7 @@ export default function BacklogPanel({
                     )
                   })}
                   {g.directTasks.map(t => (
-                    <TaskRow key={t.id} task={t} indent={20} />
+                    <TaskRow key={t.id} task={t} indent={12} />
                   ))}
                 </>
               )}
