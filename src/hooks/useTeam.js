@@ -205,7 +205,7 @@ const useTeam = {
         id: projectId,
         name: proj.name,
         color: proj.color,
-        user_id: user.id,
+        user_id: null,
         team_id: teamId,
         sort_order: pi,
       })
