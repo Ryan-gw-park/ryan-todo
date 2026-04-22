@@ -64,6 +64,7 @@ export default function Onboarding() {
       // 팀 생성자용 초기 데이터 생성 (팀 프로젝트 3개 + 개인 프로젝트 1개)
       await useTeam.createInitialTeamOwnerData(team.id)
       await initTeamState()
+      await setTeam(team.id)
       navigate('/', { replace: true })
     } else {
       setError('팀 생성에 실패했습니다.')
