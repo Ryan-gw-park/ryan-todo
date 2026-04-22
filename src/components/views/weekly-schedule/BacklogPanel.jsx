@@ -3,7 +3,47 @@ import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { COLOR, CHECKBOX } from '../../../styles/designTokens'
 import { getColor, getColorByIndex } from '../../../utils/colors'
 import useStore from '../../../hooks/useStore'
-import BacklogItem from './BacklogItem'
+
+// 프로젝트 pill — 배경(header) + 텍스트(text) + dot을 ramp에서 직접 가져옴
+// color 필드가 unknown이면 getColor가 기본 yellow ramp fallback
+function ProjectPillHeader({ project, totalCount, expanded, onToggle, compact }) {
+  const ramp = getColor(project.color)
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: compact ? '3px 8px' : '5px 10px',
+        marginBottom: 2,
+        borderRadius: compact ? 4 : 6,
+        background: ramp.header,
+        cursor: 'pointer',
+        fontSize: compact ? 11 : 12,
+        fontWeight: 500,
+        color: ramp.text,
+        userSelect: 'none',
+      }}
+    >
+      <span style={{
+        width: 10, flexShrink: 0, fontSize: 9,
+        color: ramp.text, opacity: 0.7, lineHeight: 1,
+      }}>
+        {expanded ? '▼' : '▶'}
+      </span>
+      <span style={{
+        width: 7, height: 7, borderRadius: 2,
+        background: ramp.dot, flexShrink: 0,
+      }} />
+      <span>{project.name}</span>
+      {totalCount > 0 && (
+        <span style={{
+          marginLeft: 'auto', fontSize: 11, fontWeight: 400,
+          color: ramp.text, opacity: 0.7,
+        }}>{totalCount}</span>
+      )}
+    </div>
+  )
+}
 
 // 프로젝트 모드 — MS 행: chevron + 이름 + 건수 (체크박스 없음 = task와 시각 구분)
 function MsRow({ ms, taskCount, expanded, onToggle }) {
@@ -256,34 +296,70 @@ export default function BacklogPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tasks, milestones, projectMap, search, sortProjectsLocally])
 
-  // 담당자별: member별 project 서브그룹
+  // 담당자별: member → project → { milestones:[{ms, tasks}], directTasks, totalTaskCount }
   const memberGroups = useMemo(() => {
     if (mode !== 'member') return []
-    const out = members.map(mem => ({ member: mem, projectMap: new Map() }))
-    for (const t of tasks) {
-      if (!projectMap[t.projectId] || !matches(t, 'task') || t.done || t.deletedAt) continue
-      if (!t.assigneeId) continue
-      const bucket = out.find(g => g.member.userId === t.assigneeId)
-      if (!bucket) continue
-      if (!bucket.projectMap.has(t.projectId)) {
-        bucket.projectMap.set(t.projectId, { project: projectMap[t.projectId], tasks: [], milestones: [] })
+    const out = members.map(mem => ({ member: mem, byProj: new Map() }))
+
+    const ensureProj = (bucket, pid) => {
+      if (!bucket.byProj.has(pid)) {
+        bucket.byProj.set(pid, {
+          project: projectMap[pid],
+          msMap: new Map(),
+          directTasks: [],
+        })
       }
-      bucket.projectMap.get(t.projectId).tasks.push(t)
+      return bucket.byProj.get(pid)
     }
+
     // MS는 owner_id 기준으로 담당자별 분배
     for (const m of milestones) {
       if (!projectMap[m.project_id] || !matches(m, 'ms')) continue
       if (!m.owner_id) continue
-      const bucket = out.find(g => g.member.userId === m.owner_id)
+      const bucket = out.find(b => b.member.userId === m.owner_id)
       if (!bucket) continue
-      if (!bucket.projectMap.has(m.project_id)) {
-        bucket.projectMap.set(m.project_id, { project: projectMap[m.project_id], tasks: [], milestones: [] })
-      }
-      bucket.projectMap.get(m.project_id).milestones.push(m)
+      const grp = ensureProj(bucket, m.project_id)
+      grp.msMap.set(m.id, { ms: m, tasks: [] })
     }
+
+    // task는 assigneeId 기준, MS 매칭되면 MS 하위, 아니면 직속
+    for (const t of tasks) {
+      if (!projectMap[t.projectId] || !matches(t, 'task') || t.done || t.deletedAt) continue
+      if (!t.assigneeId) continue
+      const bucket = out.find(b => b.member.userId === t.assigneeId)
+      if (!bucket) continue
+      const grp = ensureProj(bucket, t.projectId)
+      if (t.keyMilestoneId && grp.msMap.has(t.keyMilestoneId)) {
+        grp.msMap.get(t.keyMilestoneId).tasks.push(t)
+      } else {
+        grp.directTasks.push(t)
+      }
+    }
+
+    // 사이드바 순서 적용 + 빈 프로젝트/멤버 제거
     return out
+      .map(bucket => {
+        const list = Array.from(bucket.byProj.values())
+          .filter(g => g.project)
+          .map(g => {
+            const msList = Array.from(g.msMap.values())
+            const nestedTaskCount = msList.reduce((s, { tasks: ts }) => s + ts.length, 0)
+            return {
+              project: g.project,
+              milestones: msList,
+              directTasks: g.directTasks,
+              totalTaskCount: nestedTaskCount + g.directTasks.length,
+            }
+          })
+          .filter(g => g.milestones.length > 0 || g.directTasks.length > 0)
+        const ordered = sortProjectsLocally(list.map(g => g.project))
+        const idx = new Map(ordered.map((p, i) => [p.id, i]))
+        list.sort((a, b) => (idx.get(a.project.id) ?? 0) - (idx.get(b.project.id) ?? 0))
+        return { member: bucket.member, projects: list }
+      })
+      .filter(b => b.projects.length > 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, members, tasks, milestones, projectMap, search])
+  }, [mode, members, tasks, milestones, projectMap, search, sortProjectsLocally])
 
   const panelStyle = {
     width: 230,
@@ -356,32 +432,13 @@ export default function BacklogPanel({
         {mode === 'project' && projectGroups.map(g => {
           const projectExpanded = !!expandedProjects[g.project.id]
           return (
-            <div key={g.project.id} style={{ marginBottom: 4 }}>
-              <div
-                onClick={() => toggleProject(g.project.id)}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: COLOR.textPrimary,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
-                <span style={{ width: 10, flexShrink: 0, fontSize: 9, color: '#888780', lineHeight: 1 }}>
-                  {projectExpanded ? '▼' : '▶'}
-                </span>
-                <span style={{
-                  width: 8, height: 8, borderRadius: 2,
-                  background: getColor(g.project.color).dot,
-                  flexShrink: 0,
-                }} />
-                <span>{g.project.name}</span>
-                <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 11 }}>
-                  {g.totalTaskCount}
-                </span>
-              </div>
+            <div key={g.project.id} style={{ padding: '0 8px', marginBottom: 4 }}>
+              <ProjectPillHeader
+                project={g.project}
+                totalCount={g.totalTaskCount}
+                expanded={projectExpanded}
+                onToggle={() => toggleProject(g.project.id)}
+              />
               {projectExpanded && (
                 <>
                   {g.milestones.map(({ ms, tasks: msTasks }) => {
@@ -418,55 +475,76 @@ export default function BacklogPanel({
           )
         })}
 
-        {mode === 'member' && memberGroups.every(g => g.projectMap.size === 0) && (
+        {mode === 'member' && memberGroups.length === 0 && (
           <div style={{ padding: 16, textAlign: 'center', fontSize: 11, color: COLOR.textTertiary }}>
             {search ? '검색 결과 없음' : '담당자 배정된 항목이 없습니다'}
           </div>
         )}
-        {mode === 'member' && memberGroups.map(g => {
-          if (g.projectMap.size === 0) return null
-          const color = memberColorMap[g.member.userId]?.dot || '#888'
+        {mode === 'member' && memberGroups.map(b => {
+          const memberDot = memberColorMap[b.member.userId]?.dot || '#888'
           return (
-            <div key={g.member.userId} style={{ marginBottom: 4 }}>
+            <div key={b.member.userId} style={{ marginBottom: 8 }}>
               <div style={{
                 padding: '4px 10px',
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 600,
-                color: COLOR.textSecondary,
+                color: COLOR.textPrimary,
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 <span style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: color, flexShrink: 0,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: memberDot, flexShrink: 0,
                 }} />
-                <span>{g.member.displayName}</span>
+                <span>{b.member.displayName}</span>
               </div>
-              {Array.from(g.projectMap.values()).map(sub => (
-                <div key={sub.project.id}>
-                  <div style={{
-                    padding: '3px 10px 3px 18px',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: COLOR.textSecondary,
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                    <span style={{
-                      width: 6, height: 6, borderRadius: 2,
-                      background: getColor(sub.project.color).dot,
-                      flexShrink: 0,
-                    }} />
-                    <span>{sub.project.name}</span>
-                  </div>
-                  {sub.milestones.map(m => (
-                    <BacklogItem key={`ms:${m.id}`} kind="ms" item={m} scheduled={!!m.scheduled_date} />
-                  ))}
-                  {sub.tasks.map(t => (
-                    <BacklogItem key={`task:${t.id}`} kind="task" item={t}
-                      scheduled={!!t.scheduledDate}
+              {b.projects.map(g => {
+                const projKey = `${b.member.userId}:${g.project.id}`
+                const projExpanded = !!expandedProjects[projKey]
+                return (
+                  <div key={projKey} style={{ padding: '0 8px 0 20px', marginBottom: 2 }}>
+                    <ProjectPillHeader
+                      project={g.project}
+                      totalCount={g.totalTaskCount}
+                      expanded={projExpanded}
+                      onToggle={() => toggleProject(projKey)}
+                      compact
                     />
-                  ))}
-                </div>
-              ))}
+                    {projExpanded && (
+                      <>
+                        {g.milestones.map(({ ms, tasks: msTasks }) => {
+                          const msKey = `${b.member.userId}:${ms.id}`
+                          const msExpanded = !!expandedMs[msKey]
+                          return (
+                            <div key={msKey}>
+                              <MsRow ms={ms} taskCount={msTasks.length} expanded={msExpanded}
+                                onToggle={() => toggleMs(msKey)} />
+                              {msExpanded && msTasks.map(t => (
+                                <TaskRow key={t.id} task={t} indent={32} />
+                              ))}
+                            </div>
+                          )
+                        })}
+                        {g.directTasks.length > 0 && (() => {
+                          const dkey = `__direct__:${b.member.userId}:${g.project.id}`
+                          const dexp = !!expandedMs[dkey]
+                          return (
+                            <div key={dkey}>
+                              <DirectTasksRow
+                                taskCount={g.directTasks.length}
+                                expanded={dexp}
+                                onToggle={() => toggleMs(dkey)}
+                              />
+                              {dexp && g.directTasks.map(t => (
+                                <TaskRow key={t.id} task={t} indent={32} />
+                              ))}
+                            </div>
+                          )
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )
         })}
