@@ -1,8 +1,93 @@
 import { useState, useMemo } from 'react'
-import { useDroppable } from '@dnd-kit/core'
-import { COLOR } from '../../../styles/designTokens'
+import { useDroppable, useDraggable } from '@dnd-kit/core'
+import { COLOR, CHECKBOX } from '../../../styles/designTokens'
 import { getColor, getColorByIndex } from '../../../utils/colors'
+import useStore from '../../../hooks/useStore'
 import BacklogItem from './BacklogItem'
+
+// 프로젝트 모드 — MS 행: chevron + 이름 + 건수 (체크박스 없음 = task와 시각 구분)
+function MsRow({ ms, taskCount, expanded, onToggle }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `ms:${ms.id}`,
+    data: { kind: 'ms', item: ms },
+  })
+  const scheduled = !!ms.scheduled_date
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onToggle}
+      style={{
+        opacity: isDragging ? 0.4 : (scheduled ? 0.3 : 1),
+        textDecoration: scheduled ? 'line-through' : 'none',
+        cursor: 'pointer',
+        padding: '3px 8px 3px 20px',
+        fontSize: 11,
+        fontWeight: 500,
+        color: COLOR.textSecondary,
+        whiteSpace: 'normal', wordBreak: 'break-word',
+        display: 'flex', alignItems: 'center', gap: 6,
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ width: 10, flexShrink: 0, fontSize: 9, color: '#888780', lineHeight: 1 }}>
+        {expanded ? '▼' : '▶'}
+      </span>
+      <span>{ms.title}</span>
+      <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 10 }}>
+        {taskCount}
+      </span>
+    </div>
+  )
+}
+
+// 프로젝트 모드 — task 행: 체크박스 + 텍스트 (MS와 시각 구분)
+function TaskRow({ task, indent }) {
+  const toggleDone = useStore(s => s.toggleDone)
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `task:${task.id}`,
+    data: { kind: 'task', item: task },
+  })
+  const scheduled = !!task.scheduledDate
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{
+        opacity: isDragging ? 0.4 : (scheduled ? 0.3 : 1),
+        textDecoration: scheduled ? 'line-through' : 'none',
+        cursor: 'grab',
+        padding: '3px 8px',
+        paddingLeft: indent,
+        fontSize: 11,
+        fontWeight: 400,
+        color: COLOR.textPrimary,
+        whiteSpace: 'normal', wordBreak: 'break-word',
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}
+    >
+      <div
+        onPointerDown={e => e.stopPropagation()}
+        onClick={e => { e.stopPropagation(); toggleDone(task.id) }}
+        style={{
+          width: 11, height: 11, borderRadius: 2, flexShrink: 0, cursor: 'pointer',
+          border: task.done ? 'none' : `1.5px solid ${CHECKBOX.borderColor}`,
+          background: task.done ? CHECKBOX.checkedBg : '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {task.done && (
+          <svg width={7} height={7} viewBox="0 0 12 12" fill="none">
+            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </div>
+      <span>{task.text}</span>
+    </div>
+  )
+}
 
 /**
  * 백로그 패널 (좌측 230px).
@@ -22,15 +107,26 @@ export default function BacklogPanel({
 }) {
   const [mode, setMode] = useState('project') // 'project' | 'member'
   const [search, setSearch] = useState('')
-  // 프로젝트별 접기/펼치기 — 기본 전체 접힘 (expanded set이 비어있으면 모두 접힘)
-  const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
+  // 프로젝트/MS 2단계 접기 — 기본 전체 접힘
+  const [expandedProjects, setExpandedProjects] = useState({}) // { [projectId]: true }
+  const [expandedMs, setExpandedMs] = useState({})             // { [msId]: true }
 
   const toggleProject = (projectId) => {
-    setExpandedProjectIds(prev => {
-      const next = new Set(prev)
-      if (next.has(projectId)) next.delete(projectId)
-      else next.add(projectId)
-      return next
+    setExpandedProjects(prev => {
+      if (prev[projectId]) {
+        const { [projectId]: _omit, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [projectId]: true }
+    })
+  }
+  const toggleMs = (msId) => {
+    setExpandedMs(prev => {
+      if (prev[msId]) {
+        const { [msId]: _omit, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [msId]: true }
     })
   }
 
@@ -71,25 +167,52 @@ export default function BacklogPanel({
 
   const totalUnscheduled = backlogTasks.length + backlogMilestones.length
 
-  // 렌더용 구조 생성 — 프로젝트별
+  // 렌더용 구조 생성 — 프로젝트별: project → { milestones:[{ms, tasks}], directTasks, totalTaskCount }
   const projectGroups = useMemo(() => {
     if (mode !== 'project') return []
-    const groups = new Map()
-    for (const t of tasks) {
-      if (!projectMap[t.projectId] || !matches(t, 'task') || t.done || t.deletedAt) continue
-      if (!groups.has(t.projectId)) {
-        groups.set(t.projectId, { project: projectMap[t.projectId], tasks: [], milestones: [] })
+    const byProj = new Map()
+    const ensureProj = (pid) => {
+      if (!byProj.has(pid)) {
+        byProj.set(pid, {
+          project: projectMap[pid],
+          msMap: new Map(), // msId → { ms, tasks: [] }
+          directTasks: [],
+        })
       }
-      groups.get(t.projectId).tasks.push(t)
+      return byProj.get(pid)
     }
+
+    // MS 먼저 수집 (msMap 세팅)
     for (const m of milestones) {
       if (!projectMap[m.project_id] || !matches(m, 'ms')) continue
-      if (!groups.has(m.project_id)) {
-        groups.set(m.project_id, { project: projectMap[m.project_id], tasks: [], milestones: [] })
-      }
-      groups.get(m.project_id).milestones.push(m)
+      const grp = ensureProj(m.project_id)
+      grp.msMap.set(m.id, { ms: m, tasks: [] })
     }
-    return Array.from(groups.values())
+
+    // task 분배: keyMilestoneId 일치 → MS 하위, 아니면 directTasks
+    for (const t of tasks) {
+      if (!projectMap[t.projectId] || !matches(t, 'task') || t.done || t.deletedAt) continue
+      const grp = ensureProj(t.projectId)
+      if (t.keyMilestoneId && grp.msMap.has(t.keyMilestoneId)) {
+        grp.msMap.get(t.keyMilestoneId).tasks.push(t)
+      } else {
+        grp.directTasks.push(t)
+      }
+    }
+
+    return Array.from(byProj.values())
+      .filter(g => g.project)
+      .map(g => {
+        const msList = Array.from(g.msMap.values())
+        const nestedTaskCount = msList.reduce((s, { tasks }) => s + tasks.length, 0)
+        return {
+          project: g.project,
+          milestones: msList,
+          directTasks: g.directTasks,
+          totalTaskCount: nestedTaskCount + g.directTasks.length,
+        }
+      })
+      .filter(g => g.milestones.length > 0 || g.directTasks.length > 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tasks, milestones, projectMap, search])
 
@@ -191,47 +314,50 @@ export default function BacklogPanel({
           </div>
         )}
         {mode === 'project' && projectGroups.map(g => {
-          const expanded = expandedProjectIds.has(g.project.id)
+          const projectExpanded = !!expandedProjects[g.project.id]
           return (
             <div key={g.project.id} style={{ marginBottom: 4 }}>
               <div
                 onClick={() => toggleProject(g.project.id)}
                 style={{
                   padding: '4px 10px',
-                  fontSize: 11,
-                  fontWeight: 600,
+                  fontSize: 13,
+                  fontWeight: 500,
                   color: COLOR.textPrimary,
                   display: 'flex', alignItems: 'center', gap: 6,
                   cursor: 'pointer',
                   userSelect: 'none',
                 }}
               >
-                <span style={{
-                  width: 10, flexShrink: 0,
-                  fontSize: 9, color: '#888780',
-                  lineHeight: 1,
-                }}>
-                  {expanded ? '▼' : '▶'}
+                <span style={{ width: 10, flexShrink: 0, fontSize: 9, color: '#888780', lineHeight: 1 }}>
+                  {projectExpanded ? '▼' : '▶'}
                 </span>
                 <span style={{
-                  width: 7, height: 7, borderRadius: 2,
+                  width: 8, height: 8, borderRadius: 2,
                   background: getColor(g.project.color).dot,
                   flexShrink: 0,
                 }} />
                 <span>{g.project.name}</span>
-                <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400 }}>
-                  {g.tasks.length + g.milestones.length}
+                <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 11 }}>
+                  {g.totalTaskCount}
                 </span>
               </div>
-              {expanded && (
+              {projectExpanded && (
                 <>
-                  {g.milestones.map(m => (
-                    <BacklogItem key={`ms:${m.id}`} kind="ms" item={m} scheduled={!!m.scheduled_date} />
-                  ))}
-                  {g.tasks.map(t => (
-                    <BacklogItem key={`task:${t.id}`} kind="task" item={t}
-                      scheduled={!!t.scheduledDate}
-                    />
+                  {g.milestones.map(({ ms, tasks: msTasks }) => {
+                    const msExpanded = !!expandedMs[ms.id]
+                    return (
+                      <div key={ms.id}>
+                        <MsRow ms={ms} taskCount={msTasks.length} expanded={msExpanded}
+                          onToggle={() => toggleMs(ms.id)} />
+                        {msExpanded && msTasks.map(t => (
+                          <TaskRow key={t.id} task={t} indent={32} />
+                        ))}
+                      </div>
+                    )
+                  })}
+                  {g.directTasks.map(t => (
+                    <TaskRow key={t.id} task={t} indent={20} />
                   ))}
                 </>
               )}
