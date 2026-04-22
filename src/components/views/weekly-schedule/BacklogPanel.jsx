@@ -44,6 +44,34 @@ function MsRow({ ms, taskCount, expanded, onToggle }) {
   )
 }
 
+// 프로젝트 모드 — "프로젝트 직속 할일" 그룹 헤더 (드래그 없음, MS와 동일 UX로 접기/펼치기)
+function DirectTasksRow({ taskCount, expanded, onToggle }) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        cursor: 'pointer',
+        padding: '4px 8px 4px 12px',
+        fontSize: 12,
+        fontWeight: 500,
+        color: COLOR.textSecondary,
+        display: 'flex', alignItems: 'center', gap: 6,
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ width: 10, flexShrink: 0, fontSize: 9, color: '#888780', lineHeight: 1 }}>
+        {expanded ? '▼' : '▶'}
+      </span>
+      <span style={{ fontStyle: 'italic' }}>프로젝트 직속 할일</span>
+      {taskCount > 0 && (
+        <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400, fontSize: 10 }}>
+          {taskCount}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // 프로젝트 모드 — task 행: 체크박스 + 텍스트 (MS와 시각 구분)
 function TaskRow({ task, indent }) {
   const toggleDone = useStore(s => s.toggleDone)
@@ -107,11 +135,13 @@ export default function BacklogPanel({
   members = [],
   teamProjectIds,
 }) {
+  const sortProjectsLocally = useStore(s => s.sortProjectsLocally)
   const [mode, setMode] = useState('project') // 'project' | 'member'
   const [search, setSearch] = useState('')
   // 프로젝트/MS 2단계 접기 — 기본 전체 접힘
   const [expandedProjects, setExpandedProjects] = useState({}) // { [projectId]: true }
-  const [expandedMs, setExpandedMs] = useState({})             // { [msId]: true }
+  // MS + "직속 할일" 그룹: msId 또는 `__direct__:${projectId}` 키
+  const [expandedMs, setExpandedMs] = useState({})
 
   const toggleProject = (projectId) => {
     setExpandedProjects(prev => {
@@ -203,7 +233,7 @@ export default function BacklogPanel({
       }
     }
 
-    return Array.from(byProj.values())
+    const rawGroups = Array.from(byProj.values())
       .filter(g => g.project)
       .map(g => {
         const msList = Array.from(g.msMap.values())
@@ -216,8 +246,15 @@ export default function BacklogPanel({
         }
       })
       .filter(g => g.milestones.length > 0 || g.directTasks.length > 0)
+
+    // 사이드바와 동일한 정렬 순서 적용 (localProjectOrder + sortOrder fallback)
+    const ordered = sortProjectsLocally(rawGroups.map(g => g.project))
+    const orderIndex = new Map(ordered.map((p, i) => [p.id, i]))
+    return rawGroups.sort((a, b) =>
+      (orderIndex.get(a.project.id) ?? 0) - (orderIndex.get(b.project.id) ?? 0)
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, tasks, milestones, projectMap, search])
+  }, [mode, tasks, milestones, projectMap, search, sortProjectsLocally])
 
   // 담당자별: member별 project 서브그룹
   const memberGroups = useMemo(() => {
@@ -359,9 +396,22 @@ export default function BacklogPanel({
                       </div>
                     )
                   })}
-                  {g.directTasks.map(t => (
-                    <TaskRow key={t.id} task={t} indent={12} />
-                  ))}
+                  {g.directTasks.length > 0 && (() => {
+                    const directKey = `__direct__:${g.project.id}`
+                    const directExpanded = !!expandedMs[directKey]
+                    return (
+                      <div key={directKey}>
+                        <DirectTasksRow
+                          taskCount={g.directTasks.length}
+                          expanded={directExpanded}
+                          onToggle={() => toggleMs(directKey)}
+                        />
+                        {directExpanded && g.directTasks.map(t => (
+                          <TaskRow key={t.id} task={t} indent={32} />
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </>
               )}
             </div>
