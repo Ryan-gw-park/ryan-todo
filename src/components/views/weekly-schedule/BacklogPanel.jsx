@@ -22,6 +22,17 @@ export default function BacklogPanel({
 }) {
   const [mode, setMode] = useState('project') // 'project' | 'member'
   const [search, setSearch] = useState('')
+  // 프로젝트별 접기/펼치기 — 기본 전체 접힘 (expanded set이 비어있으면 모두 접힘)
+  const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set())
+
+  const toggleProject = (projectId) => {
+    setExpandedProjectIds(prev => {
+      const next = new Set(prev)
+      if (next.has(projectId)) next.delete(projectId)
+      else next.add(projectId)
+      return next
+    })
+  }
 
   const { setNodeRef, isOver } = useDroppable({ id: 'backlog' })
 
@@ -179,36 +190,54 @@ export default function BacklogPanel({
             {search ? '검색 결과 없음' : '모든 항목이 배치되었습니다'}
           </div>
         )}
-        {mode === 'project' && projectGroups.map(g => (
-          <div key={g.project.id} style={{ marginBottom: 4 }}>
-            <div style={{
-              padding: '4px 10px',
-              fontSize: 11,
-              fontWeight: 600,
-              color: COLOR.textSecondary,
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <span style={{
-                width: 7, height: 7, borderRadius: 2,
-                background: getColor(g.project.color).dot,
-                flexShrink: 0,
-              }} />
-              <span>{g.project.name}</span>
-              <span style={{ marginLeft: 'auto', color: COLOR.textTertiary, fontWeight: 400 }}>
-                {g.tasks.length + g.milestones.length}
-              </span>
+        {mode === 'project' && projectGroups.map(g => {
+          const expanded = expandedProjectIds.has(g.project.id)
+          return (
+            <div key={g.project.id} style={{ marginBottom: 4 }}>
+              <div
+                onClick={() => toggleProject(g.project.id)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: COLOR.textPrimary,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <span style={{
+                  width: 10, flexShrink: 0,
+                  fontSize: 9, color: '#888780',
+                  lineHeight: 1,
+                }}>
+                  {expanded ? '▼' : '▶'}
+                </span>
+                <span style={{
+                  width: 7, height: 7, borderRadius: 2,
+                  background: getColor(g.project.color).dot,
+                  flexShrink: 0,
+                }} />
+                <span>{g.project.name}</span>
+                <span style={{ marginLeft: 'auto', color: '#888780', fontWeight: 400 }}>
+                  {g.tasks.length + g.milestones.length}
+                </span>
+              </div>
+              {expanded && (
+                <>
+                  {g.milestones.map(m => (
+                    <BacklogItem key={`ms:${m.id}`} kind="ms" item={m} scheduled={!!m.scheduled_date} />
+                  ))}
+                  {g.tasks.map(t => (
+                    <BacklogItem key={`task:${t.id}`} kind="task" item={t}
+                      scheduled={!!t.scheduledDate}
+                    />
+                  ))}
+                </>
+              )}
             </div>
-            {g.milestones.map(m => (
-              <BacklogItem key={`ms:${m.id}`} kind="ms" item={m} scheduled={!!m.scheduled_date} />
-            ))}
-            {g.tasks.map(t => (
-              <BacklogItem key={`task:${t.id}`} kind="task" item={t}
-                scheduled={!!t.scheduledDate}
-                projectColor={getColor(g.project.color).dot}
-              />
-            ))}
-          </div>
-        ))}
+          )
+        })}
 
         {mode === 'member' && memberGroups.every(g => g.projectMap.size === 0) && (
           <div style={{ padding: 16, textAlign: 'center', fontSize: 11, color: COLOR.textTertiary }}>
@@ -246,7 +275,6 @@ export default function BacklogPanel({
                   {sub.tasks.map(t => (
                     <BacklogItem key={`task:${t.id}`} kind="task" item={t}
                       scheduled={!!t.scheduledDate}
-                      projectColor={getColor(sub.project.color).dot}
                     />
                   ))}
                 </div>
