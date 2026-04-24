@@ -7,11 +7,11 @@ import useStore, { getCachedUserId } from '../../../hooks/useStore'
 import { COLOR } from '../../../styles/designTokens'
 import PersonalTodoListTable from './PersonalTodoListTable'
 import FocusPanel from './FocusPanel'
-import FocusNotePanel from './FocusNotePanel'
 
 /* ═══════════════════════════════════════════════
-   PersonalTodoShell (Loop-45 → Loop-46)
-   3컬럼 오케스트레이터 (grid) — 백로그 : 포커스 : 노트 = 1.2fr : 0.9fr : 1.2fr
+   PersonalTodoShell (Loop-45 → Loop-47)
+   2컬럼 오케스트레이터 (grid) — 백로그 : 포커스 = 1.5fr : 1fr
+   Loop-47: FocusNotePanel 제거, 노트 편집은 FocusCard 인라인 확장으로 이관.
 
    ⚠ 중요 — DndContext 컨텍스트 등록 순서 (Loop-46 QA fix):
    useDroppable/useSortable 은 호출 시점의 nearest React Context 로 등록됨.
@@ -120,7 +120,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     >
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(420px, 1.2fr) minmax(240px, 0.9fr) minmax(320px, 1.2fr)',
+        gridTemplateColumns: 'minmax(420px, 1.5fr) minmax(280px, 1fr)',
         gap: 20,
         width: '100%',
       }}>
@@ -141,14 +141,6 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
             milestones={milestones}
           />
         </FocusColumn>
-
-        {/* Column 3: 포커스 노트 패널 (Loop-46) */}
-        <div style={{ minWidth: 0 }}>
-          <FocusNotePanel
-            tasks={tasks}
-            projects={projects}
-          />
-        </div>
       </div>
     </DndContext>
   )
