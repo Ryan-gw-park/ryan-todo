@@ -1,11 +1,11 @@
 import useStore from '../../../../hooks/useStore'
-import PersonalPivotMatrixTable from '../PersonalPivotMatrixTable'
+import PersonalTodoShell from '../../personal-todo/PersonalTodoShell'
 import PersonalMatrixMobileList from '../PersonalMatrixMobileList'
 
 /* ═════════════════════════════════════════════
-   PersonalMatrixGrid — Loop 44 + mobile optimization
-   Desktop (≥768px): PersonalPivotMatrixTable (피벗 테이블)
-   Mobile (<768px): PersonalMatrixMobileList (단일 리스트 + FAB)
+   PersonalMatrixGrid — Loop 44 + Loop-45
+   Desktop (≥768px): PersonalTodoShell (백로그 3섹션 + 포커스 패널)
+   Mobile (<768px): PersonalMatrixMobileList (기존 유지, N-11)
    ═════════════════════════════════════════════ */
 export default function PersonalMatrixGrid({ projects, myTasks }) {
   const milestones = useStore(s => s.milestones)
@@ -16,7 +16,7 @@ export default function PersonalMatrixGrid({ projects, myTasks }) {
   }
 
   return (
-    <PersonalPivotMatrixTable
+    <PersonalTodoShell
       projects={projects}
       tasks={myTasks}
       milestones={milestones}
