@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../../../hooks/useStore'
 import { COLOR, FONT, CHECKBOX, SPACE } from '../../../../styles/designTokens'
+import { isEmptyNotes } from '../../../../utils/notes'
 
 /* ═══════════════════════════════════════════════
    FocusCard (Loop-45)
@@ -16,13 +17,16 @@ import { COLOR, FONT, CHECKBOX, SPACE } from '../../../../styles/designTokens'
 export default function FocusCard({ task, project, milestone }) {
   const toggleDone = useStore(s => s.toggleDone)
   const updateTask = useStore(s => s.updateTask)
-  const openDetail = useStore(s => s.openDetail)
+  const setSelectedFocusTaskId = useStore(s => s.setSelectedFocusTaskId)
+  const selectedFocusTaskId = useStore(s => s.selectedFocusTaskId)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `focus-card:${task.id}`,
   })
 
   const [hover, setHover] = useState(false)
+  const isSelected = selectedFocusTaskId === task.id
+  const hasNotes = !isEmptyNotes(task.notes)
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
@@ -46,14 +50,16 @@ export default function FocusCard({ task, project, milestone }) {
       ref={setNodeRef}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onClick={() => setSelectedFocusTaskId(task.id)}
       style={{
         ...sortableStyle,
         display: 'flex', alignItems: 'flex-start', gap: 8,
         padding: SPACE.cardPadding,
         background: '#fff',
-        border: `1px solid ${COLOR.border}`,
+        border: `1px solid ${isSelected ? COLOR.accent : COLOR.border}`,
         borderRadius: 6,
         marginBottom: 6,
+        cursor: 'pointer',
       }}
     >
       {/* Drag handle ⋮⋮ */}
@@ -89,32 +95,42 @@ export default function FocusCard({ task, project, milestone }) {
       {/* Text + meta */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
-          onClick={() => openDetail(task)}
           style={{
             fontSize: FONT.body,
             color: task.done ? COLOR.textTertiary : COLOR.textPrimary,
             textDecoration: task.done ? 'line-through' : 'none',
-            lineHeight: 1.4, cursor: 'pointer',
+            lineHeight: 1.4,
             wordBreak: 'break-word',
           }}
         >
           {task.text}
         </div>
-        {(projectLabel || milestone?.title) && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            marginTop: 2, fontSize: FONT.ganttMs,
-          }}>
-            {projectLabel && (
-              <span style={projectLabelStyle}>{projectLabel}</span>
-            )}
-            {milestone?.title && (
-              <span style={{ color: COLOR.textTertiary }}>
-                {projectLabel ? '·' : ''} {milestone.title}
-              </span>
-            )}
-          </div>
-        )}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          marginTop: 2, fontSize: FONT.ganttMs,
+        }}>
+          {projectLabel && (
+            <span style={projectLabelStyle}>{projectLabel}</span>
+          )}
+          {milestone?.title && (
+            <span style={{ color: COLOR.textTertiary }}>
+              {projectLabel ? '·' : ''} {milestone.title}
+            </span>
+          )}
+          <div style={{ flex: 1 }} />
+          {/* F-37: 노트 아이콘 (hasNotes → accent, 빈 노트 → 옅은 회색) */}
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none"
+            style={{ color: hasNotes ? COLOR.accent : '#d3d1c7', flexShrink: 0 }}
+            aria-label={hasNotes ? '노트 있음' : '노트 없음'}
+          >
+            <path
+              d="M5 4h14v16H5z M8 8h8 M8 12h8 M8 16h5"
+              stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" fill="none"
+            />
+          </svg>
+        </div>
       </div>
 
       {/* × (포커스 해제) */}
