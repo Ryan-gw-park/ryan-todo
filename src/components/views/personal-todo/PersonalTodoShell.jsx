@@ -7,22 +7,25 @@ import useStore, { getCachedUserId } from '../../../hooks/useStore'
 import { COLOR } from '../../../styles/designTokens'
 import PersonalTodoListTable from './PersonalTodoListTable'
 import FocusPanel from './FocusPanel'
+import FocusNotePanel from './FocusNotePanel'
 
 /* ═══════════════════════════════════════════════
-   PersonalTodoShell (Loop-45)
-   2컬럼 오케스트레이터 — 좌측 백로그 (flex 3) + 우측 포커스 패널 (flex 2)
+   PersonalTodoShell (Loop-45 → Loop-46)
+   3컬럼 오케스트레이터 (grid) — 백로그 : 포커스 : 노트 = 1.5fr : 0.9fr : 1.2fr
+   Loop-46 Commit 6: flex → grid 전환, FocusNotePanel wire.
 
    자체 DndContext (nested inside UnifiedGridView의 outer context).
    @dnd-kit은 useSortable/useDroppable이 nearest DndContext로 register되므로,
    Shell 내부 드래그(bl-task:*, focus-card:*)는 outer와 완전 격리.
 
-   DnD 시나리오 (spec §8.3):
+   DnD 시나리오:
      1) 백로그 task → 포커스 패널 (focus-panel:root 또는 focus-card:*) (F-23)
         → updateTask(id, { isFocus: true, focusSortOrder: max+1 })
-     2) 포커스 카드 간 reorder (F-25)
-        → reorderFocusTasks(reordered)
-     3) 포커스 카드 → 패널 밖 drop (F-24)
-        → updateTask(id, { isFocus: false }) — category 보존 (N-09)
+        + setSelectedFocusTaskId(taskId) (F-36)
+     2) 포커스 카드 간 reorder (F-25) → reorderFocusTasks(reordered)
+     3) focus-card → 패널 밖 drop: no-op (× 버튼만 해제)
+
+   ⚠ Commit 6 범위: 3컬럼 grid always — resize 반응형은 Commit 7 에서 추가.
    ═══════════════════════════════════════════════ */
 export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const currentUserId = getCachedUserId()
@@ -105,14 +108,13 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
       onDragEnd={handleDragEnd}
     >
       <div style={{
-        display: 'flex',
-        gap: 24,
+        display: 'grid',
+        gridTemplateColumns: 'minmax(450px, 1.5fr) minmax(240px, 0.9fr) minmax(320px, 1.2fr)',
+        gap: 20,
         width: '100%',
-        // alignItems 기본값(stretch)으로 우측 column이 container 높이만큼 stretch
-        // → focus-panel:root droppable이 우측 전체 영역 커버
       }}>
-        {/* Left: 백로그 3섹션 (flex 3) */}
-        <div style={{ flex: 3, minWidth: 0 }}>
+        {/* Column 1: 백로그 3섹션 */}
+        <div style={{ minWidth: 0 }}>
           <PersonalTodoListTable
             projects={projects}
             tasks={tasks}
@@ -120,12 +122,11 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
           />
         </div>
 
-        {/* Right: 포커스 드롭존 + 패널 (flex 2, 영역 전체가 drop target) */}
+        {/* Column 2: 포커스 드롭존 + 패널 (영역 전체가 drop target) */}
         <div
           ref={focusDropRef}
           style={{
-            flex: 2,
-            minWidth: 280,
+            minWidth: 0,
             background: focusIsOver ? COLOR.bgHover : 'transparent',
             transition: 'background 0.15s',
             borderRadius: 6,
@@ -135,6 +136,14 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
             projects={projects}
             tasks={tasks}
             milestones={milestones}
+          />
+        </div>
+
+        {/* Column 3: 포커스 노트 패널 (Loop-46) */}
+        <div style={{ minWidth: 0 }}>
+          <FocusNotePanel
+            tasks={tasks}
+            projects={projects}
           />
         </div>
       </div>
