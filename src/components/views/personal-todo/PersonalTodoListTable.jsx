@@ -72,6 +72,12 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
     return m
   }, [tasks, currentUserId])
 
+  // '즉시' 시스템 프로젝트 id (F-13 "+ 새 할일" 기본 귀속지)
+  const instantProjectId = useMemo(() => {
+    const p = projects.find(x => x.userId === currentUserId && x.systemKey === 'instant')
+    return p?.id || null
+  }, [projects, currentUserId])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: LIST.sectionGap }}>
       {/* ── 지금 할일 섹션 (F-01, F-13) ── */}
@@ -84,6 +90,7 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
         toggleProjectExpand={toggleProjectExpand}
         addTask={addTask}
         currentUserId={currentUserId}
+        instantProjectId={instantProjectId}
       />
 
       {/* ── 다음 할일 섹션 (F-02) ── */}
@@ -116,7 +123,7 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
 }
 
 /* ─── 지금 섹션 ─── */
-function TodaySection({ projects, tasks, milestones, allTasksMap, isProjectExpanded, toggleProjectExpand, addTask, currentUserId }) {
+function TodaySection({ projects, tasks, milestones, allTasksMap, isProjectExpanded, toggleProjectExpand, addTask, currentUserId, instantProjectId }) {
   const [adding, setAdding] = useState(false)
   const totalCount = tasks.length
 
@@ -124,11 +131,16 @@ function TodaySection({ projects, tasks, milestones, allTasksMap, isProjectExpan
     setAdding(false)
     const text = (value ?? '').trim()
     if (!text) return
-    // 지금 섹션 추가는 '즉시' 프로젝트 자동 귀속이 아니라, 현재 유저의 "inbox" 처럼 동작 가능.
-    // 스펙 F-13은 구체적 projectId 규정 없음 → Stage 3 통합 시 첫 번째 프로젝트 or 사용자 선택 UX.
-    // 여기선 projectId 미지정 호출 (addTask 내부에서 fallback 처리).
+    // F-13 + QA fix: '즉시' 프로젝트 기본 귀속.
+    // projectId 미지정 시 task.projectId=null → 프로젝트 그룹 렌더에서 필터링되어 안 보임.
+    // '즉시' seed 실패 상태면 경고만 하고 skip (UI 버튼 자체 유지, 다음 새로고침에 seed 재시도).
+    if (!instantProjectId) {
+      console.warn('[Loop-45] 즉시 프로젝트 미확보 — 빠른 추가 불가')
+      return
+    }
     addTask({
       text,
+      projectId: instantProjectId,
       assigneeId: currentUserId,
       secondaryAssigneeId: null,
       keyMilestoneId: null,

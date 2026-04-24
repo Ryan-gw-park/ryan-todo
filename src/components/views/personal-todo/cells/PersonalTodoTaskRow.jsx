@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSortable } from '@dnd-kit/sortable'
+import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../../../hooks/useStore'
 import { COLOR, FONT, CHECKBOX, LIST } from '../../../../styles/designTokens'
@@ -12,7 +12,9 @@ import { COLOR, FONT, CHECKBOX, LIST } from '../../../../styles/designTokens'
 
    - msLabel: 동일 MS 연속 2번째부터 '' (부모에서 dedup 후 전달)
    - '기타': keyMilestoneId==null → LIST.etcLabel 적용
-   - useSortable id = `bl-task:${task.id}` (Stage 3 DnD 연동)
+   - useDraggable id = `bl-task:${task.id}` (Shell DnD handleDragEnd 가 처리)
+     · 백로그 내 reorder 스펙 없으므로 useSortable 불필요
+     · useSortable은 SortableContext 필수 전제인데 backlog는 미포함 → useDraggable이 정답
    - 체크박스 = TaskRow 패턴 (custom div + SVG)
    ═══════════════════════════════════════════════ */
 export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
@@ -20,16 +22,15 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
   const updateTask = useStore(s => s.updateTask)
   const openDetail = useStore(s => s.openDetail)
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `bl-task:${task.id}`,
   })
 
   const [hover, setHover] = useState(false)
   const [editing, setEditing] = useState(false)
 
-  const sortableStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const dragStyle = {
+    transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.3 : 1,
   }
 
@@ -67,7 +68,7 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         style={{
-          ...sortableStyle,
+          ...dragStyle,
           display: 'flex', alignItems: 'flex-start', gap: 6,
           padding: '4px 8px',
           cursor: editing ? 'text' : 'grab',
