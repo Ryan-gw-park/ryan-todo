@@ -8,6 +8,7 @@ import { useState, useCallback } from 'react'
 const KEYS = {
   team: 'matrixPivotExpanded',
   personal: 'personalMatrixPivotExpanded',
+  personalSection: 'personalSectionExpanded',  // Loop-45 F-12: 다음/남은 섹션 접기 상태
 }
 
 function readLS(key) {
