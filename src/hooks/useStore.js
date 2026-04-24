@@ -723,6 +723,27 @@ const useStore = create((set, get) => ({
     set({ syncStatus: 'ok' })
   },
 
+  // ─── Reorder focus tasks (Loop-45) ───
+  // reorderTasks와 동일 패턴, 필드만 focusSortOrder / focus_sort_order
+  reorderFocusTasks: async (reorderedTasks) => {
+    const updates = reorderedTasks.map((t, i) => ({ id: t.id, focusSortOrder: i }))
+    set(s => ({
+      tasks: s.tasks.map(t => {
+        const u = updates.find(x => x.id === t.id)
+        return u ? { ...t, focusSortOrder: u.focusSortOrder } : t
+      })
+    }))
+    const d = db()
+    if (!d) { set({ syncStatus: 'error' }); return }
+    set({ syncStatus: 'syncing' })
+    for (const u of updates) {
+      const t = get().tasks.find(x => x.id === u.id)
+      if (!t) continue
+      await safeUpsertTask(d, t)
+    }
+    set({ syncStatus: 'ok' })
+  },
+
   // ─── Project CRUD ───
   addProject: async (name, color, projectScope) => {
     const teamId = get().currentTeamId
@@ -1375,6 +1396,8 @@ const useStore = create((set, get) => ({
   sortProjectsLocally: (projectList) => {
     const { localProjectOrder } = get()
     return [...projectList].sort((a, b) => {
+      // Loop-45: system project 최상단 고정
+      if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1
       const orderA = localProjectOrder[a.id] ?? a.sortOrder ?? 0
       const orderB = localProjectOrder[b.id] ?? b.sortOrder ?? 0
       return orderA - orderB
