@@ -477,6 +477,43 @@ const useStore = create((set, get) => ({
       const tasks = tr.data.map(mapTask)
       const memos = mr.error ? [] : mr.data.map(mapMemo)
 
+      // Loop-45: '즉시' system project idempotent seed (개인 모드에만 시드, user_id 기준)
+      // UNIQUE partial index (user_id, system_key WHERE system_key IS NOT NULL)가 DB 단 중복 차단.
+      // ignoreDuplicates: 동시 탭 레이스 안전.
+      try {
+        const seedUid = _cachedUserId || (await d.auth.getUser()).data?.user?.id
+        if (seedUid) {
+          const hasInstant = projects.some(p => p.userId === seedUid && p.systemKey === 'instant')
+          if (!hasInstant) {
+            const instantPayload = {
+              id: uid(),
+              name: '즉시',
+              color: '#888780',
+              user_id: seedUid,
+              owner_id: seedUid,
+              created_by: seedUid,
+              team_id: null,
+              is_system: true,
+              system_key: 'instant',
+              sort_order: 0,
+              status: 'active',
+              description: '',
+            }
+            const { error: seedErr } = await d.from('projects').upsert(instantPayload, {
+              onConflict: 'user_id,system_key',
+              ignoreDuplicates: true,
+            })
+            if (!seedErr) {
+              projects.push(mapProject(instantPayload))
+            } else {
+              console.warn('[Ryan Todo] instant seed:', seedErr)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Ryan Todo] instant seed exception:', e)
+      }
+
       // 마일스톤: 프로젝트 ID 기반으로 한번에 로딩 (별도 렌더 사이클 방지)
       let milestones = []
       const projectIdsList = projects.map(p => p.id)
