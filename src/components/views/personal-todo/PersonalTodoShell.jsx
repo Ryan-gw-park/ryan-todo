@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import {
-  DndContext, PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin,
+  DndContext, PointerSensor, TouchSensor, useSensor, useSensors, rectIntersection,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
@@ -103,7 +103,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={rectIntersection}
       onDragEnd={handleDragEnd}
     >
       <div style={{
