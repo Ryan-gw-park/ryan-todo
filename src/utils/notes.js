@@ -10,3 +10,8 @@ export function parseNotes(notes) {
 export function serializeNotes(nodes) {
   return nodes.filter(n => n.text.trim()).map(n => '\t'.repeat(n.level) + n.text).join('\n')
 }
+
+// Loop-46: 빈 노트 판별 — FocusCard 아이콘 색 분기 등에 재사용
+export function isEmptyNotes(notes) {
+  return !notes || !notes.trim()
+}
