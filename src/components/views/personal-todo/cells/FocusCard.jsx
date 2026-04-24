@@ -17,15 +17,12 @@ import { isEmptyNotes } from '../../../../utils/notes'
 export default function FocusCard({ task, project, milestone }) {
   const toggleDone = useStore(s => s.toggleDone)
   const updateTask = useStore(s => s.updateTask)
-  const setSelectedFocusTaskId = useStore(s => s.setSelectedFocusTaskId)
-  const selectedFocusTaskId = useStore(s => s.selectedFocusTaskId)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `focus-card:${task.id}`,
   })
 
   const [hover, setHover] = useState(false)
-  const isSelected = selectedFocusTaskId === task.id
   const hasNotes = !isEmptyNotes(task.notes)
 
   const sortableStyle = {
@@ -50,16 +47,14 @@ export default function FocusCard({ task, project, milestone }) {
       ref={setNodeRef}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onClick={() => setSelectedFocusTaskId(task.id)}
       style={{
         ...sortableStyle,
         display: 'flex', alignItems: 'flex-start', gap: 8,
         padding: SPACE.cardPadding,
         background: '#fff',
-        border: `1px solid ${isSelected ? COLOR.accent : COLOR.border}`,
+        border: `1px solid ${COLOR.border}`,
         borderRadius: 6,
         marginBottom: 6,
-        cursor: 'pointer',
       }}
     >
       {/* Drag handle ⋮⋮ */}

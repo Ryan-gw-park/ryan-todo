@@ -1574,23 +1574,7 @@ const useStore = create((set, get) => ({
   teamLoading: true,
   onboardingSkipped: JSON.parse(localStorage.getItem('onboardingSkipped') || 'false'),
 
-  // ─── Focus selection (Loop-46) ───
-  // 포커스 카드 중 선택된 것 (FocusNotePanel이 해당 task의 notes 렌더).
-  // reload 복원: localStorage. stale(선택 task가 unfocus/done/deleted 된 경우) 방어는
-  // FocusNotePanel 렌더 시점의 tasks.find 재검증 (spec F-40).
-  selectedFocusTaskId: localStorage.getItem('selectedFocusTaskId') || null,
-
   modeSelected: !!localStorage.getItem('currentTeamId') || !!localStorage.getItem('modeSelected'),
-
-  setSelectedFocusTaskId: (taskId) => {
-    set({ selectedFocusTaskId: taskId || null })
-    try {
-      if (taskId) localStorage.setItem('selectedFocusTaskId', taskId)
-      else localStorage.removeItem('selectedFocusTaskId')
-    } catch {
-      // localStorage quota / private mode 무시
-    }
-  },
 
   setTeam: async (teamId) => {
     const team = get().myTeams.find(t => t.id === teamId)

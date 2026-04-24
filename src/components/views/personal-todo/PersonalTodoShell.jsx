@@ -22,9 +22,9 @@ import FocusPanel from './FocusPanel'
    DnD 시나리오:
      1) 백로그 task → 포커스 패널 (focus-panel:root 또는 focus-card:*) (F-23)
         → updateTask(id, { isFocus: true, focusSortOrder: max+1 })
-        + setSelectedFocusTaskId(taskId) (F-36)
      2) 포커스 카드 간 reorder (F-25) → reorderFocusTasks(reordered)
      3) focus-card → 패널 밖 drop: no-op (× 버튼만 해제)
+     * Loop-47: 단일 active 선택 개념 철회. auto-expand 는 Commit 5 에서 추가.
    ═══════════════════════════════════════════════ */
 
 // Inner DndContext 내부에서 useDroppable 호출하기 위한 wrapper child
@@ -50,7 +50,6 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const currentUserId = getCachedUserId()
   const updateTask = useStore(s => s.updateTask)
   const reorderFocusTasks = useStore(s => s.reorderFocusTasks)
-  const setSelectedFocusTaskId = useStore(s => s.setSelectedFocusTaskId)
 
   // Focus tasks — Shell 레벨에서도 계산 (DnD handler에서 max order / idx 조회용)
   const focusTasks = useMemo(() => {
@@ -89,8 +88,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
           0,
         )
         updateTask(taskId, { isFocus: true, focusSortOrder: maxOrder + 1 })
-        // F-36: 드롭 직후 자동 active 선택
-        setSelectedFocusTaskId(taskId)
+        // F-36: 자동 선택은 Commit 5에서 auto-expand 로 교체
         return
       }
       return
@@ -110,7 +108,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     }
 
     // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
-  }, [focusTasks, updateTask, reorderFocusTasks, setSelectedFocusTaskId])
+  }, [focusTasks, updateTask, reorderFocusTasks])
 
   return (
     <DndContext
