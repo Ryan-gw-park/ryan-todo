@@ -52,14 +52,9 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     const { active, over } = e
     const activeIdStr = String(active?.id || '')
 
-    // over 없음: focus-card → 완전히 바깥으로 드롭된 경우 해제
-    if (!over) {
-      if (activeIdStr.startsWith('focus-card:')) {
-        const taskId = activeIdStr.slice('focus-card:'.length)
-        updateTask(taskId, { isFocus: false })
-      }
-      return
-    }
+    // Loop-45 revised: F-24 철회 — 포커스 해제는 FocusCard × 버튼만 가능.
+    // drag-out으로 해제 안 함 (no-op).
+    if (!over) return
 
     const overId = String(over.id)
 
@@ -90,14 +85,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
       return
     }
 
-    // ═══ 3) 포커스 카드 → 포커스 영역 밖 (F-24) ═══
-    if (activeIdStr.startsWith('focus-card:')) {
-      if (!overId.startsWith('focus-')) {
-        const taskId = activeIdStr.slice('focus-card:'.length)
-        updateTask(taskId, { isFocus: false })
-        return
-      }
-    }
+    // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
   }, [focusTasks, updateTask, reorderFocusTasks])
 
   return (

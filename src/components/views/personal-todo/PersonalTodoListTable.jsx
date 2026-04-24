@@ -24,13 +24,14 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
   const { pivotCollapsed: projectCollapsed, setPivotCollapsed: setProjectCollapsed } = usePivotExpandState('personal')
   const { pivotCollapsed: sectionCollapsed, setPivotCollapsed: setSectionCollapsed } = usePivotExpandState('personalSection')
 
-  // 기본 필터 (F-10, F-15): 내 할일 + 미완료 + 미삭제 + 비포커스 (포커스는 우측 패널)
+  // 기본 필터 (F-10): 내 할일 + 미완료 + 미삭제
+  // Loop-45 revised: 포커스로 이동한 task도 백로그에 남김 (개별 dim 처리, TaskRow에서).
+  // 우측 포커스 패널에 중복 표시되지만 의도된 동작.
   const myTasks = useMemo(() =>
     tasks.filter(t =>
       t.assigneeId === currentUserId &&
       !t.done &&
-      !t.deletedAt &&
-      !t.isFocus
+      !t.deletedAt
     ),
     [tasks, currentUserId]
   )
@@ -59,19 +60,6 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
     setSectionCollapsed(key, isSectionExpanded(key) ? true : false)
   }, [isSectionExpanded, setSectionCollapsed])
 
-  // 프로젝트별 전체 task (흐림/포커스 카운트)
-  const tasksByProjectAll = useMemo(() => {
-    const m = new Map()
-    for (const t of tasks) {
-      if (t.assigneeId !== currentUserId) continue
-      if (t.deletedAt) continue
-      const arr = m.get(t.projectId) || []
-      arr.push(t)
-      m.set(t.projectId, arr)
-    }
-    return m
-  }, [tasks, currentUserId])
-
   // '즉시' 시스템 프로젝트 id (F-13 "+ 새 할일" 기본 귀속지)
   const instantProjectId = useMemo(() => {
     const p = projects.find(x => x.userId === currentUserId && x.systemKey === 'instant')
@@ -85,7 +73,6 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
         projects={projects}
         tasks={todayTasks}
         milestones={milestones}
-        allTasksMap={tasksByProjectAll}
         isProjectExpanded={isProjectExpanded}
         toggleProjectExpand={toggleProjectExpand}
         addTask={addTask}
@@ -99,7 +86,6 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
         tasks={nextTasks}
         projects={projects}
         milestones={milestones}
-        allTasksMap={tasksByProjectAll}
         isExpanded={isSectionExpanded('next')}
         onToggle={() => toggleSection('next')}
         isProjectExpanded={isProjectExpanded}
@@ -112,7 +98,6 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
         tasks={backlogTasks}
         projects={projects}
         milestones={milestones}
-        allTasksMap={tasksByProjectAll}
         isExpanded={isSectionExpanded('backlog')}
         onToggle={() => toggleSection('backlog')}
         isProjectExpanded={isProjectExpanded}
@@ -123,7 +108,7 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
 }
 
 /* ─── 지금 섹션 ─── */
-function TodaySection({ projects, tasks, milestones, allTasksMap, isProjectExpanded, toggleProjectExpand, addTask, currentUserId, instantProjectId }) {
+function TodaySection({ projects, tasks, milestones, isProjectExpanded, toggleProjectExpand, addTask, currentUserId, instantProjectId }) {
   const [adding, setAdding] = useState(false)
   const totalCount = tasks.length
 
@@ -210,7 +195,6 @@ function TodaySection({ projects, tasks, milestones, allTasksMap, isProjectExpan
             project={p}
             sectionTasks={projTasks}
             milestones={milestones}
-            allProjectTasks={allTasksMap.get(p.id) || []}
             isExpanded={isProjectExpanded(p.id)}
             onToggle={() => toggleProjectExpand(p.id)}
           />
@@ -228,7 +212,7 @@ function TodaySection({ projects, tasks, milestones, allTasksMap, isProjectExpan
 
 /* ─── 접힘 섹션 (다음/남은) ─── */
 function CollapsibleSection({
-  label, tasks, projects, milestones, allTasksMap,
+  label, tasks, projects, milestones,
   isExpanded, onToggle,
   isProjectExpanded, toggleProjectExpand,
 }) {
@@ -268,7 +252,6 @@ function CollapsibleSection({
                 project={p}
                 sectionTasks={projTasks}
                 milestones={milestones}
-                allProjectTasks={allTasksMap.get(p.id) || []}
                 isExpanded={isProjectExpanded(p.id)}
                 onToggle={() => toggleProjectExpand(p.id)}
               />

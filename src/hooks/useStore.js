@@ -477,9 +477,11 @@ const useStore = create((set, get) => ({
       const tasks = tr.data.map(mapTask)
       const memos = mr.error ? [] : mr.data.map(mapMemo)
 
-      // Loop-45: '즉시' system project idempotent seed (개인 모드에만 시드, user_id 기준)
-      // UNIQUE partial index (user_id, system_key WHERE system_key IS NOT NULL)가 DB 단 중복 차단.
-      // ignoreDuplicates: 동시 탭 레이스 안전.
+      // Loop-45: '즉시' system project idempotent seed
+      // .insert() 사용 — PostgREST upsert의 onConflict 파라미터가 partial unique index
+      // (WHERE system_key IS NOT NULL) 와 호환되지 않아 42P10 에러로 실패하는 이슈 회피.
+      // 1차 방어: app-level hasInstant 체크
+      // 2차 방어: partial UNIQUE index가 동시 탭 race 시 두 번째 insert를 23505로 거절 (silent skip)
       try {
         const seedUid = _cachedUserId || (await d.auth.getUser()).data?.user?.id
         if (seedUid) {
@@ -499,13 +501,11 @@ const useStore = create((set, get) => ({
               status: 'active',
               description: '',
             }
-            const { error: seedErr } = await d.from('projects').upsert(instantPayload, {
-              onConflict: 'user_id,system_key',
-              ignoreDuplicates: true,
-            })
+            const { error: seedErr } = await d.from('projects').insert(instantPayload)
             if (!seedErr) {
               projects.push(mapProject(instantPayload))
-            } else {
+            } else if (seedErr.code !== '23505') {
+              // 23505 = unique_violation (다른 탭이 먼저 seed) → 정상 race, silent skip
               console.warn('[Ryan Todo] instant seed:', seedErr)
             }
           }

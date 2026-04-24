@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../../../hooks/useStore'
-import { COLOR, FONT, CHECKBOX, LIST } from '../../../../styles/designTokens'
+import { COLOR, FONT, CHECKBOX, LIST, OPACITY } from '../../../../styles/designTokens'
 
 /* ═══════════════════════════════════════════════
    PersonalTodoTaskRow (Loop-45)
@@ -29,9 +29,13 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
   const [hover, setHover] = useState(false)
   const [editing, setEditing] = useState(false)
 
+  // Loop-45 revised: 포커스로 이동한 task는 백로그에 남되 흐림 (F-31 재해석).
+  // isDragging 최우선, 그 다음 isFocus, 기본 1.
+  const rowOpacity = isDragging ? 0.3 : (task.isFocus ? OPACITY.projectDimmed : 1)
+
   const dragStyle = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.3 : 1,
+    opacity: rowOpacity,
   }
 
   const finishEdit = (v) => {
@@ -55,6 +59,8 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
           overflowWrap: 'break-word',
           wordBreak: 'keep-all',
           alignSelf: 'start',
+          opacity: task.isFocus ? OPACITY.projectDimmed : 1,
+          transition: 'opacity 0.2s',
           ...msStyle,
         }}
       >
