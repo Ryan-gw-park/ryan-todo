@@ -26,31 +26,27 @@ export default function PersonalTodoProjectGroup({
     () => allProjectTasks.filter(t => t.isFocus).length,
     [allProjectTasks]
   )
-  const hasFocus = focusCount > 0
   const totalInSection = sectionTasks.length
 
-  // F-11: 이 섹션에 task 0건이면 skip
-  if (totalInSection === 0) return null
-
-  const resolveMsLabel = (msId) => {
-    if (!msId) return '기타'
-    const ms = milestones.find(m => m.id === msId)
-    return ms?.title || ''
-  }
-
   const tasksWithLabels = useMemo(() => {
-    let prevMsId = '__init__'
-    return sectionTasks.map(t => {
+    const msMap = new Map(milestones.map(m => [m.id, m]))
+    return sectionTasks.map((t, idx) => {
       const msId = t.keyMilestoneId ?? null
+      const prevMsId = idx === 0 ? '__init__' : (sectionTasks[idx - 1].keyMilestoneId ?? null)
       const showLabel = msId !== prevMsId
-      prevMsId = msId
+      const label = msId ? (msMap.get(msId)?.title || '') : '기타'
       return {
         task: t,
-        msLabel: showLabel ? resolveMsLabel(msId) : '',
+        msLabel: showLabel ? label : '',
         isEtc: showLabel && msId == null,
       }
     })
   }, [sectionTasks, milestones])
+
+  // F-11: 이 섹션에 task 0건이면 skip (hooks 호출 이후)
+  if (totalInSection === 0) return null
+
+  const hasFocus = focusCount > 0
 
   const spanRows = isExpanded ? totalInSection : 1
 
