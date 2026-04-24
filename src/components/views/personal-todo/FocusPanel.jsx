@@ -22,9 +22,13 @@ import FocusQuickAddInput from './cells/FocusQuickAddInput'
 export default function FocusPanel({ projects, tasks, milestones }) {
   const currentUserId = getCachedUserId()
 
-  // '즉시' 프로젝트 id 조회 — Stage 1 seed 완료 가정 (user_id + systemKey='instant')
+  // '즉시' 프로젝트 id 조회
+  // Loop-46 QA fix: DB 상태 불일치 방어 — systemKey OR isSystem
   const instantProjectId = useMemo(() => {
-    const p = projects.find(x => x.userId === currentUserId && x.systemKey === 'instant')
+    const p = projects.find(x =>
+      x.userId === currentUserId &&
+      (x.systemKey === 'instant' || x.isSystem === true)
+    )
     return p?.id || null
   }, [projects, currentUserId])
 

@@ -11,12 +11,13 @@ import FocusNotePanel from './FocusNotePanel'
 
 /* ═══════════════════════════════════════════════
    PersonalTodoShell (Loop-45 → Loop-46)
-   3컬럼 오케스트레이터 (grid) — 백로그 : 포커스 : 노트 = 1.5fr : 0.9fr : 1.2fr
-   Loop-46 Commit 6: flex → grid 전환, FocusNotePanel wire.
+   3컬럼 오케스트레이터 (grid) — 백로그 : 포커스 : 노트 = 1.2fr : 0.9fr : 1.2fr
 
-   자체 DndContext (nested inside UnifiedGridView의 outer context).
-   @dnd-kit은 useSortable/useDroppable이 nearest DndContext로 register되므로,
-   Shell 내부 드래그(bl-task:*, focus-card:*)는 outer와 완전 격리.
+   ⚠ 중요 — DndContext 컨텍스트 등록 순서 (Loop-46 QA fix):
+   useDroppable/useSortable 은 호출 시점의 nearest React Context 로 등록됨.
+   Shell 함수 본체에서 직접 useDroppable 을 부르면 OUTER(UnifiedGridView) 에
+   등록되어 inner(Shell) DndContext 의 드래그에 보이지 않음.
+   → FocusColumn child 컴포넌트로 분리해 inner DndContext 내부에서 훅 호출.
 
    DnD 시나리오:
      1) 백로그 task → 포커스 패널 (focus-panel:root 또는 focus-card:*) (F-23)
@@ -24,9 +25,27 @@ import FocusNotePanel from './FocusNotePanel'
         + setSelectedFocusTaskId(taskId) (F-36)
      2) 포커스 카드 간 reorder (F-25) → reorderFocusTasks(reordered)
      3) focus-card → 패널 밖 drop: no-op (× 버튼만 해제)
-
-   ⚠ Commit 6 범위: 3컬럼 grid always — resize 반응형은 Commit 7 에서 추가.
    ═══════════════════════════════════════════════ */
+
+// Inner DndContext 내부에서 useDroppable 호출하기 위한 wrapper child
+function FocusColumn({ children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'focus-panel:root' })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minWidth: 0,
+        minHeight: 400,                 // 빈 focus 상태에도 충분한 drop 영역 확보
+        background: isOver ? COLOR.bgHover : 'transparent',
+        transition: 'background 0.15s',
+        borderRadius: 6,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const currentUserId = getCachedUserId()
   const updateTask = useStore(s => s.updateTask)
@@ -53,19 +72,11 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
 
-  // Loop-45: focus-panel:root droppable을 Shell 우측 wrapper 전체로 확장.
-  // FocusPanel 내부 droppable 대신 여기에 두어 우측 column 전체가 drop target.
-  const { setNodeRef: focusDropRef, isOver: focusIsOver } = useDroppable({
-    id: 'focus-panel:root',
-  })
-
   const handleDragEnd = useCallback((e) => {
     const { active, over } = e
     const activeIdStr = String(active?.id || '')
 
-    // Loop-45 revised: F-24 철회 — 포커스 해제는 FocusCard × 버튼만 가능.
-    // drag-out으로 해제 안 함 (no-op).
-    if (!over) return
+    if (!over) return  // F-24 revised: 포커스 해제는 × 버튼만
 
     const overId = String(over.id)
 
@@ -109,7 +120,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     >
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(450px, 1.5fr) minmax(240px, 0.9fr) minmax(320px, 1.2fr)',
+        gridTemplateColumns: 'minmax(420px, 1.2fr) minmax(240px, 0.9fr) minmax(320px, 1.2fr)',
         gap: 20,
         width: '100%',
       }}>
@@ -122,22 +133,14 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
           />
         </div>
 
-        {/* Column 2: 포커스 드롭존 + 패널 (영역 전체가 drop target) */}
-        <div
-          ref={focusDropRef}
-          style={{
-            minWidth: 0,
-            background: focusIsOver ? COLOR.bgHover : 'transparent',
-            transition: 'background 0.15s',
-            borderRadius: 6,
-          }}
-        >
+        {/* Column 2: 포커스 드롭존 + 패널 (FocusColumn = inner context 내부에서 useDroppable) */}
+        <FocusColumn>
           <FocusPanel
             projects={projects}
             tasks={tasks}
             milestones={milestones}
           />
-        </div>
+        </FocusColumn>
 
         {/* Column 3: 포커스 노트 패널 (Loop-46) */}
         <div style={{ minWidth: 0 }}>

@@ -61,8 +61,12 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
   }, [isSectionExpanded, setSectionCollapsed])
 
   // '즉시' 시스템 프로젝트 id (F-13 "+ 새 할일" 기본 귀속지)
+  // Loop-46 QA fix: DB 상태 불일치 방어 — systemKey OR isSystem
   const instantProjectId = useMemo(() => {
-    const p = projects.find(x => x.userId === currentUserId && x.systemKey === 'instant')
+    const p = projects.find(x =>
+      x.userId === currentUserId &&
+      (x.systemKey === 'instant' || x.isSystem === true)
+    )
     return p?.id || null
   }, [projects, currentUserId])
 

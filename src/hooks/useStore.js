@@ -1437,9 +1437,12 @@ const useStore = create((set, get) => ({
   // 로컬 순서 적용된 프로젝트 정렬
   sortProjectsLocally: (projectList) => {
     const { localProjectOrder } = get()
+    // Loop-46 QA fix: DB 상태 불일치 방어 — isSystem OR systemKey='instant'
+    const isSys = (p) => p.isSystem === true || p.systemKey === 'instant'
     return [...projectList].sort((a, b) => {
       // Loop-45: system project 최상단 고정
-      if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1
+      const sa = isSys(a), sb = isSys(b)
+      if (sa !== sb) return sa ? -1 : 1
       const orderA = localProjectOrder[a.id] ?? a.sortOrder ?? 0
       const orderB = localProjectOrder[b.id] ?? b.sortOrder ?? 0
       return orderA - orderB

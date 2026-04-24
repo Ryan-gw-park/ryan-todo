@@ -79,12 +79,15 @@ export default function Sidebar() {
 
   // 프로젝트 분리: 시스템 / 팀 / 개인 (활성 + 아카이브)
   // Loop-45: 시스템 프로젝트('즉시' 등)는 팀/개인 섹션보다 위에 노출
+  // Loop-46 QA fix: DB 상태 불일치 (is_system=false 이나 system_key='instant' 등) 방어 —
+  //                 OR 조건으로 한 flag만 set 되어도 system project 로 인식
   const sortProjectsLocally = useStore(s => s.sortProjectsLocally)
-  const systemProjects = sortProjectsLocally(projects.filter(p => p.isSystem && !p.archivedAt))
-  const teamProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && p.teamId === currentTeamId && currentTeamId && !p.archivedAt))
-  const personalProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && !p.teamId && !p.archivedAt))
-  const archivedTeamProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && p.teamId === currentTeamId && currentTeamId && p.archivedAt))
-  const archivedPersonalProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && !p.teamId && p.archivedAt))
+  const isSys = (p) => p.isSystem === true || p.systemKey === 'instant'
+  const systemProjects = sortProjectsLocally(projects.filter(p => isSys(p) && !p.archivedAt))
+  const teamProjects = sortProjectsLocally(projects.filter(p => !isSys(p) && p.teamId === currentTeamId && currentTeamId && !p.archivedAt))
+  const personalProjects = sortProjectsLocally(projects.filter(p => !isSys(p) && !p.teamId && !p.archivedAt))
+  const archivedTeamProjects = sortProjectsLocally(projects.filter(p => !isSys(p) && p.teamId === currentTeamId && currentTeamId && p.archivedAt))
+  const archivedPersonalProjects = sortProjectsLocally(projects.filter(p => !isSys(p) && !p.teamId && p.archivedAt))
 
   // 12b: 프로젝트 순서 DnD
   const reorderProjects = useStore(s => s.reorderProjects)
