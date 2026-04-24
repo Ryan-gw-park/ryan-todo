@@ -97,6 +97,9 @@ export default function Sidebar() {
     const activePid = active.data.current?.projectId
     const overPid = over.data.current?.projectId
     if (!activePid || !overPid) return
+    // Loop-45 F-30: system project 이동 거부 (방어적 2차 가드 — SortableProjectItem disabled가 1차)
+    const activeProject = [...teamProjects, ...personalProjects].find(p => p.id === activePid)
+    if (activeProject?.isSystem) return
     const sectionList = activeSection === 'team' ? teamProjects : personalProjects
     const oldIdx = sectionList.findIndex(p => p.id === activePid)
     const newIdx = sectionList.findIndex(p => p.id === overPid)
@@ -451,6 +454,7 @@ function SortableProjectItem({ project, section, isActive, onClick, collapsed, i
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `project-sidebar:${project.id}`,
     data: { section, projectId: project.id },
+    disabled: project.isSystem === true,  // Loop-45 F-30
   })
   const [hover, setHover] = useState(false)
   const style = {
@@ -493,7 +497,8 @@ function SortableProjectItem({ project, section, isActive, onClick, collapsed, i
 function ProjectItem({ project, isActive, onClick, collapsed, indent = 0, archiveFn }) {
   const [hovered, setHovered] = useState(false)
   const openModal = useStore(s => s.openModal)
-  const color = getColor(project.color)
+  // Loop-45: system project는 neutral gray dot (#888780), 일반은 팔레트에서 조회
+  const color = project.isSystem ? { dot: '#888780' } : getColor(project.color)
   return (
     <div
       onClick={onClick}
@@ -528,7 +533,7 @@ function ProjectItem({ project, isActive, onClick, collapsed, indent = 0, archiv
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
             {project.name}
           </span>
-          {hovered && (
+          {hovered && !project.isSystem && (
             <>
               <span
                 title="아카이브"

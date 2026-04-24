@@ -897,6 +897,11 @@ const useStore = create((set, get) => ({
   archiveProject: async (id) => {
     const project = get().projects.find(p => p.id === id)
     if (!project) return
+    // Loop-45 N-12: system project는 archive 불가 (UI 버튼은 숨김, 이건 방어적 3차 가드)
+    if (project.isSystem) {
+      get().showToast('시스템 프로젝트는 보관할 수 없습니다')
+      return
+    }
 
     // 권한 체크: 팀 프로젝트 → 팀 소속 전원, 개인 프로젝트 → 본인만
     if (project.teamId) {
