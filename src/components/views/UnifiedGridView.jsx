@@ -92,14 +92,15 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const { filteredProjects, filteredTasks } = useProjectFilter(projects, tasks)
   const displayProjects = useMemo(() => {
     if (scope === 'team') {
-      // 팀 매트릭스: 팀 프로젝트만, 사이드바 순서
-      return currentTeamId ? sortProjectsLocally(filteredProjects.filter(p => p.teamId === currentTeamId)) : []
+      // 팀 매트릭스: 팀 프로젝트만, 사이드바 순서 (system project 제외 — system은 개인 전용)
+      return currentTeamId ? sortProjectsLocally(filteredProjects.filter(p => !p.isSystem && p.teamId === currentTeamId)) : []
     }
-    // 개인 매트릭스: 사이드바에 보이는 모든 프로젝트 (task 0건이어도 표시, L44-R05)
-    // 사이드바 순서와 동일: 팀 프로젝트 → 개인 프로젝트 (projectSectionOrder 기준)
-    const teamPs = currentTeamId ? sortProjectsLocally(filteredProjects.filter(p => p.teamId === currentTeamId)) : []
-    const personalPs = sortProjectsLocally(filteredProjects.filter(p => !p.teamId))
-    return [...teamPs, ...personalPs]
+    // Loop-45: 개인 뷰 순서 = 시스템 → 팀 → 개인 (사이드바와 동일)
+    // 사이드바에 보이는 모든 프로젝트 (task 0건이어도 표시, L44-R05)
+    const systemPs = sortProjectsLocally(filteredProjects.filter(p => p.isSystem))
+    const teamPs = currentTeamId ? sortProjectsLocally(filteredProjects.filter(p => !p.isSystem && p.teamId === currentTeamId)) : []
+    const personalPs = sortProjectsLocally(filteredProjects.filter(p => !p.isSystem && !p.teamId))
+    return [...systemPs, ...teamPs, ...personalPs]
   }, [scope, currentTeamId, filteredProjects, sortProjectsLocally])
 
   const myTasks = useMemo(() => {

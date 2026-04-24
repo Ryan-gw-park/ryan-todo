@@ -77,17 +77,19 @@ export default function Sidebar() {
 
   const [sidebarHovered, setSidebarHovered] = useState(false)
 
-  // 프로젝트 분리: 팀 / 개인 (활성 + 아카이브)
+  // 프로젝트 분리: 시스템 / 팀 / 개인 (활성 + 아카이브)
+  // Loop-45: 시스템 프로젝트('즉시' 등)는 팀/개인 섹션보다 위에 노출
   const sortProjectsLocally = useStore(s => s.sortProjectsLocally)
-  const teamProjects = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId && currentTeamId && !p.archivedAt))
-  const personalProjects = sortProjectsLocally(projects.filter(p => !p.teamId && !p.archivedAt))
-  const archivedTeamProjects = sortProjectsLocally(projects.filter(p => p.teamId === currentTeamId && currentTeamId && p.archivedAt))
-  const archivedPersonalProjects = sortProjectsLocally(projects.filter(p => !p.teamId && p.archivedAt))
+  const systemProjects = sortProjectsLocally(projects.filter(p => p.isSystem && !p.archivedAt))
+  const teamProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && p.teamId === currentTeamId && currentTeamId && !p.archivedAt))
+  const personalProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && !p.teamId && !p.archivedAt))
+  const archivedTeamProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && p.teamId === currentTeamId && currentTeamId && p.archivedAt))
+  const archivedPersonalProjects = sortProjectsLocally(projects.filter(p => !p.isSystem && !p.teamId && p.archivedAt))
 
   // 12b: 프로젝트 순서 DnD
   const reorderProjects = useStore(s => s.reorderProjects)
   const sidebarSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-  const allSortableProjects = useMemo(() => [...teamProjects, ...personalProjects], [teamProjects, personalProjects])
+  const allSortableProjects = useMemo(() => [...systemProjects, ...teamProjects, ...personalProjects], [systemProjects, teamProjects, personalProjects])
   const handleSidebarDragEnd = useCallback((event) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -264,6 +266,11 @@ export default function Sidebar() {
             items={allSortableProjects.map(p => `project-sidebar:${p.id}`)}
             strategy={verticalListSortingStrategy}
           >
+            {/* 시스템 프로젝트 ('즉시' 등) — 팀/개인 섹션보다 위에 항상 노출 (Loop-45) */}
+            {systemProjects.map(p => (
+              <SortableProjectItem key={p.id} project={p} section="system" isActive={isProjectActive(p.id)} onClick={() => enterProjectLayer(p.id)} collapsed={collapsed} indent={collapsed ? 0 : 1} archiveFn={archiveProject} />
+            ))}
+
             {/* 팀 프로젝트 */}
             {currentTeamId && (
               <>

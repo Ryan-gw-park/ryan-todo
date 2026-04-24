@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from 'react'
 import {
-  DndContext, PointerSensor, TouchSensor, useSensor, useSensors, rectIntersection,
+  DndContext, PointerSensor, TouchSensor, useSensor, useSensors, rectIntersection, useDroppable,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
+import { COLOR } from '../../../styles/designTokens'
 import PersonalTodoListTable from './PersonalTodoListTable'
 import FocusPanel from './FocusPanel'
 
@@ -47,6 +48,12 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   const sensors = useSensors(pointerSensor, touchSensor)
+
+  // Loop-45: focus-panel:root droppable을 Shell 우측 wrapper 전체로 확장.
+  // FocusPanel 내부 droppable 대신 여기에 두어 우측 column 전체가 drop target.
+  const { setNodeRef: focusDropRef, isOver: focusIsOver } = useDroppable({
+    id: 'focus-panel:root',
+  })
 
   const handleDragEnd = useCallback((e) => {
     const { active, over } = e
@@ -98,7 +105,8 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
         display: 'flex',
         gap: 24,
         width: '100%',
-        alignItems: 'flex-start',
+        // alignItems 기본값(stretch)으로 우측 column이 container 높이만큼 stretch
+        // → focus-panel:root droppable이 우측 전체 영역 커버
       }}>
         {/* Left: 백로그 3섹션 (flex 3) */}
         <div style={{ flex: 3, minWidth: 0 }}>
@@ -109,8 +117,17 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
           />
         </div>
 
-        {/* Right: 포커스 패널 (flex 2, sticky) */}
-        <div style={{ flex: 2, minWidth: 280 }}>
+        {/* Right: 포커스 드롭존 + 패널 (flex 2, 영역 전체가 drop target) */}
+        <div
+          ref={focusDropRef}
+          style={{
+            flex: 2,
+            minWidth: 280,
+            background: focusIsOver ? COLOR.bgHover : 'transparent',
+            transition: 'background 0.15s',
+            borderRadius: 6,
+          }}
+        >
           <FocusPanel
             projects={projects}
             tasks={tasks}
