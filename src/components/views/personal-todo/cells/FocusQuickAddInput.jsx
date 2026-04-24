@@ -11,17 +11,17 @@ import { COLOR, FONT } from '../../../../styles/designTokens'
    ═══════════════════════════════════════════════ */
 export default function FocusQuickAddInput({ instantProjectId, currentUserId }) {
   const addTask = useStore(s => s.addTask)
+  const setSelectedFocusTaskId = useStore(s => s.setSelectedFocusTaskId)
   const [value, setValue] = useState('')
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const text = value.trim()
     if (!text) return
     if (!instantProjectId) {
       // '즉시' 프로젝트 seed 실패 상태 — 호출 skip.
-      // Stage 3에서 Shell이 seed 재시도 or 사용자 안내.
       return
     }
-    addTask({
+    const t = await addTask({
       text,
       projectId: instantProjectId,
       assigneeId: currentUserId,
@@ -30,6 +30,8 @@ export default function FocusQuickAddInput({ instantProjectId, currentUserId }) 
       category: 'today',
       isFocus: true,
     })
+    // F-36: 생성 직후 자동 active 선택
+    if (t?.id) setSelectedFocusTaskId(t.id)
     setValue('')
   }
 
