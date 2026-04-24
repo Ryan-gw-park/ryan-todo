@@ -4,7 +4,7 @@ import { getDb } from '../utils/supabase'
 // ─── Select 컬럼 최적화 ───
 // tasks: alarm, deleted_at 컬럼은 DB에 없을 수 있으므로 select('*') 유지 (기존 fallback 로직 활용)
 const TASK_COLUMNS = '*'
-const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id, description, start_date, due_date, status, created_by, archived_at'
+const PROJECT_COLUMNS = 'id, name, color, sort_order, team_id, user_id, owner_id, description, start_date, due_date, status, created_by, archived_at, is_system, system_key'
 const MEMO_COLUMNS = 'id, title, notes, color, sort_order, created_at, updated_at'
 
 // ─── 스냅샷 키 ───
