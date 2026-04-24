@@ -115,5 +115,22 @@ export const PIVOT = {
   colWidthTotal: 55,
 };
 
+// ─── 개인 할일 리스트 (Loop-45) ───
+export const LIST = {
+  colWidthProject:   170,
+  colWidthMilestone: 130,
+  sectionGap:        24,
+  projectRowGap:     12,
+  taskRowGap:        6,
+  etcLabel: { fontStyle: 'italic', color: '#a09f99' },
+};
+
+// ─── 투명도 (Loop-45) ───
+export const OPACITY = {
+  projectDimmed: 0.65,   // F-31: 포커스 이동 있는 프로젝트
+  // draggingItem: 0.3 (TaskRow L61), sortableDragging: 0.4 (Sidebar L459)
+  // → 범위 외 Hotfix에서 일원화 예정
+};
+
 // ─── 유틸 함수 ───
 export const isMobileWidth = () => window.innerWidth < 768;
