@@ -131,6 +131,9 @@ function taskToRow(t) {
     deliverable_id: t.deliverableId || null,
     // ↓ weekly-schedule ↓
     scheduled_date: t.scheduledDate || null,
+    // ↓ Loop-45: 포커스 ↓
+    is_focus: t.isFocus === true,
+    focus_sort_order: t.focusSortOrder ?? 0,
   }
   if (_alarmColExists) row.alarm = t.alarm ?? null
   return row
@@ -168,6 +171,9 @@ function mapProject(r) {
     userId: r.user_id || null,
     ownerId: r.owner_id || null,
     archivedAt: r.archived_at || null,
+    // ↓ Loop-45: system project ↓
+    isSystem: r.is_system === true,
+    systemKey: r.system_key || null,
   }
 }
 function mapTask(r) {
@@ -190,6 +196,9 @@ function mapTask(r) {
     deliverableId: r.deliverable_id || null,
     // ↓ weekly-schedule ↓
     scheduledDate: r.scheduled_date || null,
+    // ↓ Loop-45: 포커스 ↓
+    isFocus: r.is_focus === true,
+    focusSortOrder: r.focus_sort_order ?? 0,
   }
 }
 
@@ -739,6 +748,9 @@ const useStore = create((set, get) => ({
       team_id: p.teamId, user_id: p.userId, owner_id: p.ownerId,
       description: p.description, start_date: p.start_date,
       due_date: p.due_date, status: p.status, created_by: p.created_by,
+      // Loop-45: 기본값은 false/null — 기존 호출부 무영향
+      is_system: p.isSystem === true,
+      system_key: p.systemKey || null,
     })
     if (error) console.error('[Ryan Todo] addProject:', error)
   },
