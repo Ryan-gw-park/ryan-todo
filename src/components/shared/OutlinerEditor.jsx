@@ -17,17 +17,27 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
     const parsed = parseNotes(notes)
     return parsed.length ? parsed : [{ text: '', level: 0 }]
   })
-  const lastEmitted = useRef(notes || '')
+  // W-NEW-1: lastEmitted 를 정규화 form (serializeNotes 결과) 으로 초기화 — round-trip safe
+  const lastEmitted = useRef(null)
+  if (lastEmitted.current === null) {
+    lastEmitted.current = serializeNotes(nodes)
+  }
   const pendingAdd = useRef(false)
+  const isEditingRef = useRef(false)
+  const editingTimeoutRef = useRef(null)
   const [collapsed, setCollapsed] = useState({}) // { [nodeIndex]: true }
   const [selectedSet, setSelectedSet] = useState(new Set())
 
   /* ── Sync from parent (external edits) ── */
   useEffect(() => {
-    if (notes !== lastEmitted.current) {
-      const parsed = parseNotes(notes)
-      setNodes(parsed.length ? parsed : [{ text: '', level: 0 }])
-      lastEmitted.current = notes || ''
+    if (isEditingRef.current) return  // 편집 중 외부 sync 무시
+    // W-NEW-1: parseNotes → serializeNotes 정규화 후 비교 (raw notes 와 lastEmitted 직접 비교 시 false-positive 발생)
+    const parsed = parseNotes(notes)
+    const nextNodes = parsed.length ? parsed : [{ text: '', level: 0 }]
+    const normalized = serializeNotes(nextNodes)
+    if (normalized !== lastEmitted.current) {
+      setNodes(nextNodes)
+      lastEmitted.current = normalized  // 정규화 form 저장
     }
   }, [notes])
 
@@ -36,9 +46,18 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
     const serialized = serializeNotes(nodes)
     if (serialized !== lastEmitted.current) {
       lastEmitted.current = serialized
+      // 로컬 변경 마커 — text/Tab/Enter/Backspace/Swap/Paste 모두 이 경로 통과 (D1)
+      isEditingRef.current = true
+      clearTimeout(editingTimeoutRef.current)
+      editingTimeoutRef.current = setTimeout(() => {
+        isEditingRef.current = false
+      }, 1000)
       onChange(serialized)
     }
   }, [nodes, onChange])
+
+  /* ── unmount cleanup — editingTimeoutRef ── */
+  useEffect(() => () => clearTimeout(editingTimeoutRef.current), [])
 
   /* ── Apply allTopCollapsed from parent ── */
   useEffect(() => {
