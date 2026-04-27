@@ -4,6 +4,7 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
+import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR } from '../../../styles/designTokens'
 import PersonalTodoListTable from './PersonalTodoListTable'
 import FocusPanel from './FocusPanel'
@@ -50,6 +51,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const currentUserId = getCachedUserId()
   const updateTask = useStore(s => s.updateTask)
   const reorderFocusTasks = useStore(s => s.reorderFocusTasks)
+  const { setPivotCollapsed: setExpanded } = usePivotExpandState('focusCardExpanded')
 
   // Focus tasks — Shell 레벨에서도 계산 (DnD handler에서 max order / idx 조회용)
   const focusTasks = useMemo(() => {
@@ -88,7 +90,8 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
           0,
         )
         updateTask(taskId, { isFocus: true, focusSortOrder: maxOrder + 1 })
-        // F-36: 자동 선택은 Commit 5에서 auto-expand 로 교체
+        // E-11: 드롭 직후 자동 펼침 (노트 바로 입력 가능)
+        setExpanded(taskId, true)
         return
       }
       return
@@ -108,7 +111,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     }
 
     // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
-  }, [focusTasks, updateTask, reorderFocusTasks])
+  }, [focusTasks, updateTask, reorderFocusTasks, setExpanded])
 
   return (
     <DndContext

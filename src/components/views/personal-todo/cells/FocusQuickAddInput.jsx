@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useStore from '../../../../hooks/useStore'
+import usePivotExpandState from '../../../../hooks/usePivotExpandState'
 import { COLOR, FONT } from '../../../../styles/designTokens'
 
 /* ═══════════════════════════════════════════════
@@ -11,6 +12,7 @@ import { COLOR, FONT } from '../../../../styles/designTokens'
    ═══════════════════════════════════════════════ */
 export default function FocusQuickAddInput({ instantProjectId, currentUserId }) {
   const addTask = useStore(s => s.addTask)
+  const { setPivotCollapsed: setExpanded } = usePivotExpandState('focusCardExpanded')
   const [value, setValue] = useState('')
 
   const handleAdd = async () => {
@@ -20,7 +22,7 @@ export default function FocusQuickAddInput({ instantProjectId, currentUserId }) 
       // '즉시' 프로젝트 seed 실패 상태 — 호출 skip.
       return
     }
-    await addTask({
+    const t = await addTask({
       text,
       projectId: instantProjectId,
       assigneeId: currentUserId,
@@ -29,7 +31,8 @@ export default function FocusQuickAddInput({ instantProjectId, currentUserId }) 
       category: 'today',
       isFocus: true,
     })
-    // auto-expand 는 Commit 5에서 추가
+    // E-10: 생성 직후 자동 펼침 (노트 바로 입력 가능)
+    if (t?.id) setExpanded(t.id, true)
     setValue('')
   }
 
