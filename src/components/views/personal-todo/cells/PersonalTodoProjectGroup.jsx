@@ -101,6 +101,7 @@ export default function PersonalTodoProjectGroup({
 
   return (
     <div
+      ref={setDropRef}
       onMouseEnter={() => setHeaderHover(true)}
       onMouseLeave={() => setHeaderHover(false)}
       style={{
@@ -112,9 +113,12 @@ export default function PersonalTodoProjectGroup({
         paddingBottom: 8,
       }}
     >
-      {/* Project col (col 1) — row span. Loop-49 R-04: 헤더 영역 droppable */}
+      {/* Project col (col 1) — row span.
+          Loop-49 R-04 (hotfix): setDropRef 는 최외곽 div 로 이동 (rectIntersection
+          이 col 1 헤더 (130px) 과 col 2-3 task row 의 영역 불일치로 isOver 미발동
+          이슈 해소). 시각 피드백 (bgHover/dim/cursor) 은 헤더 col 에 유지하여
+          "어디로 옮기는지" 명시적 표시. */}
       <div
-        ref={setDropRef}
         onClick={onToggle}
         style={{
           gridRow: `1 / span ${spanRows}`,
