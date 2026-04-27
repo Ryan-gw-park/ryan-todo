@@ -25,7 +25,7 @@ export default function OutlinerRow({ node, idx, accentColor, inputRef, onTextCh
 
   useLayoutEffect(() => {
     autoResize(localRef.current)
-  })
+  }, [node.text, node.level])
 
   const bulletStyle = getBulletStyle(node.level, accentColor)
 
