@@ -1,17 +1,15 @@
-import React, { useMemo } from 'react'
-import { COLOR, FONT, LIST } from '../../../../styles/designTokens'
+import React, { useMemo, useState, useCallback } from 'react'
+import useStore, { getCachedUserId } from '../../../../hooks/useStore'
+import { COLOR, FONT, LIST, SPACE } from '../../../../styles/designTokens'
 import PersonalTodoTaskRow from './PersonalTodoTaskRow'
 
 /* ═══════════════════════════════════════════════
-   PersonalTodoProjectGroup (Loop-45 → Loop-47)
-   한 프로젝트 블록 = 독립 CSS grid (130px | 90px | 1fr — 튜닝 Loop-47)
-
-   Loop-47 R-03, R-04, R-05:
-   - F-11 예외: project.isSystem 이면 0건에도 렌더
-   - 0건 + isSystem → 우측 task col 에 "여기에 + 할일" placeholder (Commit 8 에서 클릭 동작)
-   - 프로젝트 col은 task rows span
-   - 포커스 이동 task 도 백로그 잔류 (개별 dim, TaskRow)
-   - MS dedup, '기타' (keyMilestoneId==null)
+   PersonalTodoProjectGroup (Loop-47 R-06/R-07)
+   - hover 시 헤더 우측 "+" 아이콘 표시
+   - 클릭 → task rows 영역(col 2-3 span) 최하단에 inline input
+   - Enter → addTask({projectId: project.id, category:'today', ...})
+   - Esc → cancel
+   - R-05 시스템 프로젝트 0건 placeholder 클릭 → 동일 input 진입
    ═══════════════════════════════════════════════ */
 export default function PersonalTodoProjectGroup({
   project,
@@ -20,6 +18,12 @@ export default function PersonalTodoProjectGroup({
   isExpanded,
   onToggle,
 }) {
+  const addTask = useStore(s => s.addTask)
+  const currentUserId = getCachedUserId()
+
+  const [headerHover, setHeaderHover] = useState(false)
+  const [adding, setAdding] = useState(false)
+
   const totalInSection = sectionTasks.length
 
   const tasksWithLabels = useMemo(() => {
@@ -37,14 +41,34 @@ export default function PersonalTodoProjectGroup({
     })
   }, [sectionTasks, milestones])
 
-  // R-04: 시스템 프로젝트는 0건에도 렌더 (placeholder 표시)
+  const handleAddFinish = useCallback((value) => {
+    setAdding(false)
+    const text = (value ?? '').trim()
+    if (!text) return
+    addTask({
+      text,
+      projectId: project.id,
+      assigneeId: currentUserId,
+      secondaryAssigneeId: null,
+      keyMilestoneId: null,
+      category: 'today',
+      isFocus: false,
+    })
+  }, [addTask, project.id, currentUserId])
+
+  // R-04: 시스템 프로젝트는 0건에도 렌더
   if (totalInSection === 0 && !project.isSystem) return null
 
-  const spanRows = isExpanded ? Math.max(totalInSection, 1) : 1
+  // 행 개수 계산: adding 중이면 +1 (input row)
+  const taskRowCount = isExpanded ? tasksWithLabels.length : 0
+  const addingExtra = adding ? 1 : 0
+  const spanRows = Math.max(taskRowCount + addingExtra, 1)
   const isEmpty = totalInSection === 0
 
   return (
     <div
+      onMouseEnter={() => setHeaderHover(true)}
+      onMouseLeave={() => setHeaderHover(false)}
       style={{
         display: 'grid',
         gridTemplateColumns: `${LIST.colWidthProject}px ${LIST.colWidthMilestone}px 1fr`,
@@ -63,6 +87,7 @@ export default function PersonalTodoProjectGroup({
           cursor: 'pointer',
           alignSelf: 'start',
           minWidth: 0,
+          position: 'relative',
         }}
       >
         <div style={{
@@ -77,6 +102,20 @@ export default function PersonalTodoProjectGroup({
             {isExpanded ? '▼' : '▶'}
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>{project.name}</span>
+          {/* R-06: hover 시 "+" 아이콘 (onClick 은 stopPropagation + adding trigger) */}
+          {headerHover && !adding && (
+            <span
+              onClick={e => { e.stopPropagation(); setAdding(true) }}
+              style={{
+                fontSize: 14, color: COLOR.textSecondary,
+                padding: '0 4px', cursor: 'pointer', flexShrink: 0,
+                lineHeight: 1,
+              }}
+              title="+ 할일"
+              onMouseEnter={e => e.currentTarget.style.color = COLOR.accent}
+              onMouseLeave={e => e.currentTarget.style.color = COLOR.textSecondary}
+            >+</span>
+          )}
         </div>
         <div style={{
           fontSize: FONT.caption, color: COLOR.textTertiary,
@@ -86,10 +125,10 @@ export default function PersonalTodoProjectGroup({
         </div>
       </div>
 
-      {/* R-05: 시스템 프로젝트 0건 placeholder (col 2-3 span, 클릭 동작은 Commit 8 에서 wire) */}
-      {isEmpty && project.isSystem && (
+      {/* R-05: 시스템 프로젝트 0건 placeholder — 클릭 시 adding trigger */}
+      {isEmpty && project.isSystem && !adding && (
         <div
-          data-sys-empty-placeholder
+          onClick={() => setAdding(true)}
           style={{
             gridColumn: '2 / 4',
             padding: '6px 8px',
@@ -105,15 +144,40 @@ export default function PersonalTodoProjectGroup({
         </div>
       )}
 
-      {/* Task rows (col 2 + col 3) — isEmpty 가 아닐 때만 */}
+      {/* Task rows (col 2 + col 3) */}
       {!isEmpty && isExpanded && tasksWithLabels.map(({ task, msLabel, isEtc }) => (
         <React.Fragment key={task.id}>
           <PersonalTodoTaskRow task={task} msLabel={msLabel} isEtc={isEtc} />
         </React.Fragment>
       ))}
 
-      {/* 접힘 상태: col 2/3 빈 placeholder (grid row balance) */}
-      {!isEmpty && !isExpanded && (
+      {/* R-07: inline add input — col 2-3 span, 기존 task rows 아래 */}
+      {adding && (
+        <div style={{
+          gridColumn: '2 / 4',
+          padding: SPACE.cellPadding,
+        }}>
+          <input
+            autoFocus
+            placeholder={`${project.name} 에 할일 추가 후 Enter`}
+            style={{
+              width: '100%', fontSize: FONT.body,
+              border: `1px solid ${COLOR.border}`, borderRadius: 4,
+              padding: '4px 8px', fontFamily: 'inherit',
+              boxSizing: 'border-box',
+              outline: 'none',
+            }}
+            onBlur={e => handleAddFinish(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); handleAddFinish(e.target.value) }
+              if (e.key === 'Escape') setAdding(false)
+            }}
+          />
+        </div>
+      )}
+
+      {/* 접힘 상태에서 빈 placeholder 없을 때: col 2/3 빈 slot */}
+      {!isEmpty && !isExpanded && !adding && (
         <>
           <div />
           <div />
