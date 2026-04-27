@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주간 스케줄 목업 — Ryan Todo</title>
+<style>
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f7f5;
+  --bg-tertiary: #f1efe8;
+  --text-primary: #2c2c2a;
+  --text-secondary: #888780;
+  --text-tertiary: #b4b2a9;
+  --border-primary: rgba(0,0,0,0.4);
+  --border-secondary: rgba(0,0,0,0.3);
+  --border-tertiary: rgba(0,0,0,0.15);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: var(--bg-tertiary); padding: 16px; }
+
+/* ============================================
+   LAYOUT: 좌측 백로그 + 우측 그리드
+   ============================================ */
+.app {
+  display: flex;
+  gap: 0;
+  min-height: 780px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  border: 0.5px solid var(--border-tertiary);
+  overflow: hidden;
+}
+
+/* ============================================
+   BACKLOG PANEL (좌측 230px)
+   ============================================ */
+.bl {
+  width: 230px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  border-right: 0.5px solid var(--border-tertiary);
+}
+
+/* 백로그 헤더 */
+.bl-header {
+  padding: 10px 12px 8px;
+  border-bottom: 0.5px solid var(--border-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bl-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.bl-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 그룹 토글 (프로젝트별 / 담당자별) */
+.bl-toggle {
+  display: flex;
+  gap: 0;
+  margin: 8px 10px 4px;
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.bl-toggle-btn {
+  flex: 1;
+  font-size: 11px;
+  padding: 5px 0;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.bl-toggle-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-weight: 500;
+}
+.bl-toggle-btn:first-child { border-right: 0.5px solid var(--border-tertiary); }
+
+/* 검색 */
+.bl-search {
+  margin: 4px 10px 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+.bl-search:focus { border-color: var(--border-secondary); }
+
+/* 백로그 스크롤 영역 */
+.bl-body { flex: 1; overflow-y: auto; padding: 2px 0; }
+
+/* 프로젝트 그룹 */
+.bl-group { margin-bottom: 2px; }
+.bl-group-header {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  padding: 6px 12px 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.bl-group-header:hover { color: var(--text-secondary); }
+.bl-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.bl-group-count { margin-left: auto; font-size: 9px; }
+
+/* 담당자 그룹 헤더 (담당자별 모드) */
+.bl-member-header {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  padding: 8px 12px 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bl-member-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* 백로그 아이템 (할일) */
+.bl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 4px 12px 4px 24px;
+  cursor: grab;
+  border-radius: 4px;
+  margin: 1px 4px;
+  line-height: 1.3;
+  transition: background 0.1s;
+}
+.bl-item:hover { background: var(--bg-primary); }
+.bl-item:active { cursor: grabbing; }
+.bl-item.used {
+  opacity: 0.3;
+  text-decoration: line-through;
+  cursor: default;
+  pointer-events: none;
+}
+.bl-item-cb {
+  width: 11px;
+  height: 11px;
+  border: 0.5px solid var(--border-secondary);
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.bl-item-text { font-size: 11px; color: var(--text-primary); }
+
+/* 백로그 아이템 (마일스톤) */
+.bl-ms-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px 4px 20px;
+  cursor: grab;
+  border-radius: 4px;
+  margin: 1px 4px;
+  line-height: 1.3;
+}
+.bl-ms-item:hover { background: var(--bg-primary); }
+.bl-ms-item.used {
+  opacity: 0.3;
+  text-decoration: line-through;
+  cursor: default;
+  pointer-events: none;
+}
+.bl-ms-cb {
+  width: 11px;
+  height: 11px;
+  border: 0.5px solid #534AB7;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: #EEEDFE;
+}
+.bl-ms-text { font-size: 11px; color: #534AB7; font-weight: 500; }
+.bl-ms-count { margin-left: auto; font-size: 9px; color: #534AB7; }
+
+/* 백로그 구분선 */
+.bl-divider { height: 0.5px; background: var(--border-tertiary); margin: 4px 12px; }
+
+/* ============================================
+   MAIN GRID (우측)
+   ============================================ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 상단 툴바 */
+.toolbar {
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 0.5px solid var(--border-tertiary);
+  background: var(--bg-primary);
+}
+.toolbar-title { font-size: 16px; font-weight: 500; color: var(--text-primary); }
+.toolbar-sub { font-size: 12px; color: var(--text-secondary); }
+.toolbar-nav { margin-left: auto; display: flex; gap: 4px; }
+.toolbar-nav button {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: 0.5px solid var(--border-secondary);
+  color: var(--text-secondary);
+}
+.toolbar-nav button.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* 그리드 래퍼 */
+.grid-wrap { flex: 1; overflow: auto; }
+
+/* 그리드: 6열 (팀원 + 월~금) */
+.grid {
+  display: grid;
+  grid-template-columns: 100px repeat(5, minmax(0, 1fr));
+  min-width: 650px;
+}
+
+/* 그리드 헤더 */
+.grid-header {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 7px 4px;
+  text-align: center;
+  border-bottom: 0.5px solid var(--border-tertiary);
+  border-right: 0.5px solid var(--border-tertiary);
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.grid-header.today {
+  background: #FAEEDA;
+  color: #854F0B;
+}
+.grid-header.name-col {
+  text-align: left;
+  padding-left: 8px;
+}
+
+/* 멤버 셀 (좌측 고정) */
+.member-cell {
+  padding: 6px 5px;
+  border-bottom: 0.5px solid var(--border-tertiary);
+  border-right: 0.5px solid var(--border-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-secondary);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.member-name { font-size: 11px; font-weight: 500; color: var(--text-primary); }
+
+/* 스케줄 셀 (드롭 타겟) */
+.schedule-cell {
+  padding: 4px;
+  border-bottom: 0.5px solid var(--border-tertiary);
+  border-right: 0.5px solid var(--border-tertiary);
+  min-height: 120px;
+  position: relative;
+  transition: background 0.15s;
+}
+.schedule-cell.today-col { background: rgba(250, 238, 218, 0.12); }
+.schedule-cell.drag-over {
+  background: rgba(49, 130, 206, 0.08);
+  outline: 1.5px dashed #3182CE;
+  outline-offset: -1.5px;
+}
+.schedule-cell:hover .cell-add { opacity: 1; }
+.cell-add {
+  position: absolute;
+  bottom: 2px;
+  right: 5px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.cell-add:hover { color: var(--text-secondary); }
+
+/* 셀 내 프로젝트 그룹 */
+.cell-project-group { margin-bottom: 3px; }
+.cell-project-name {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 1px;
+}
+.cell-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+/* 셀 내 할일 아이템 */
+.cell-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 1.5px 0;
+  line-height: 1.25;
+}
+.cell-task-cb {
+  width: 10px;
+  height: 10px;
+  border: 0.5px solid var(--border-secondary);
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.cell-task-text { font-size: 10px; color: var(--text-primary); }
+
+/* 셀 내 마일스톤 배지 */
+.cell-ms-badge {
+  font-size: 9px;
+  color: #534AB7;
+  background: #EEEDFE;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+  display: inline-block;
+  margin: 1px 0;
+}
+
+/* 하단 범례 */
+.footer-legend {
+  padding: 6px 12px;
+  border-top: 0.5px solid var(--border-tertiary);
+  display: flex;
+  gap: 14px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
+  align-items: center;
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+/* 드래그 고스트 */
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 999;
+  padding: 4px 10px;
+  background: var(--bg-primary);
+  border: 1px solid #3182CE;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: none;
+  transform: rotate(2deg);
+}
+
+/* ============================================
+   담당자별 모드 숨김 처리
+   ============================================ */
+.bl-view-project { display: block; }
+.bl-view-member { display: none; }
+.bl.mode-member .bl-view-project { display: none; }
+.bl.mode-member .bl-view-member { display: block; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ========================================
+       BACKLOG PANEL (좌측)
+       ======================================== -->
+  <div class="bl" id="backlog">
+    <div class="bl-header">
+      <span class="bl-title">백로그</span>
+      <span class="bl-count" id="bl-total">35건</span>
+    </div>
+
+    <!-- 그룹 토글 -->
+    <div class="bl-toggle">
+      <button class="bl-toggle-btn active" id="toggle-project" onclick="setBacklogMode('project')">프로젝트별</button>
+      <button class="bl-toggle-btn" id="toggle-member" onclick="setBacklogMode('member')">담당자별</button>
+    </div>
+
+    <input class="bl-search" placeholder="검색..." id="bl-search" oninput="filterBacklog()" />
+
+    <div class="bl-body">
+
+      <!-- ===== 프로젝트별 보기 ===== -->
+      <div class="bl-view-project" id="bl-project-view">
+
+        <div class="bl-group">
+          <div class="bl-group-header"><div class="bl-dot" style="background:#E53E3E"></div>26Q1 정기 이사회<span class="bl-group-count">13</span></div>
+          <div class="bl-ms-item" draggable="true" data-type="ms" data-project="이사회" data-assignee=""><div class="bl-ms-cb"></div><span class="bl-ms-text">P&L</span><span class="bl-ms-count">3건</span></div>
+          <div class="bl-ms-item" draggable="true" data-type="ms" data-project="이사회" data-assignee=""><div class="bl-ms-cb"></div><span class="bl-ms-text">안건</span><span class="bl-ms-count">2건</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Project Pipeline</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Engineering Milestone</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Headcounts (w/ Edmond)</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Agenda</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Sales Funnel</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Notice + Minutes (w/Edmond)</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">PPT Financials</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">PPT Financials Message</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">PPT 자료 완성 (17금)</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">메시지 정리 (21화)</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">본사/자회사 HR 데이터 수집</span></div>
+          <div class="bl-item" draggable="true" data-project="이사회" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">P&L 비용</span></div>
+        </div>
+
+        <div class="bl-divider"></div>
+        <div class="bl-group">
+          <div class="bl-group-header"><div class="bl-dot" style="background:#38A169"></div>26년 NDR<span class="bl-group-count">5</span></div>
+          <div class="bl-item" draggable="true" data-project="NDR" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">NDR 기본 Data 정리 (1st cut)</span></div>
+          <div class="bl-item" draggable="true" data-project="NDR" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">Data 작업 챙기기</span></div>
+          <div class="bl-item" draggable="true" data-project="NDR" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">Duke님 IR 자료 요청 정리</span></div>
+          <div class="bl-item" draggable="true" data-project="NDR" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">NDR 기본 Data 정리 (2nd cut)</span></div>
+          <div class="bl-item" draggable="true" data-project="NDR" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">Kugi님과 ABI 자료 요청</span></div>
+        </div>
+
+        <div class="bl-divider"></div>
+        <div class="bl-group">
+          <div class="bl-group-header"><div class="bl-dot" style="background:#3182CE"></div>팀 개별 과제<span class="bl-group-count">9</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">임원배상책임 예시 확인</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">MM</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">프로젝트 Dashboard</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="eric"><div class="bl-item-cb"></div><span class="bl-item-text">규정 개정</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">각종 자료 대시보드화</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ethan"><div class="bl-item-cb"></div><span class="bl-item-text">MM 스터디 (Ethan)</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ethan"><div class="bl-item-cb"></div><span class="bl-item-text">P&L 스터디 (Ethan)</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">조직개편 사항 적용</span></div>
+          <div class="bl-item" draggable="true" data-project="팀개별" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">주주명부 분석</span></div>
+        </div>
+
+        <div class="bl-divider"></div>
+        <div class="bl-group">
+          <div class="bl-group-header"><div class="bl-dot" style="background:#3182CE"></div>정기주총<span class="bl-group-count">4</span></div>
+          <div class="bl-item" draggable="true" data-project="정기주총" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">필요 서류 공증인 확인</span></div>
+          <div class="bl-item" draggable="true" data-project="정기주총" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">등기 서류 공증인 체크</span></div>
+          <div class="bl-item" draggable="true" data-project="정기주총" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">투표 엑셀</span></div>
+          <div class="bl-item" draggable="true" data-project="정기주총" data-assignee="ed"><div class="bl-item-cb"></div><span class="bl-item-text">의사록 작성</span></div>
+        </div>
+
+        <div class="bl-divider"></div>
+        <div class="bl-group">
+          <div class="bl-group-header"><div class="bl-dot" style="background:#805AD5"></div>SAP<span class="bl-group-count">2</span></div>
+          <div class="bl-item" draggable="true" data-project="SAP" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">구축사 & TFT 미팅 참여</span></div>
+          <div class="bl-item" draggable="true" data-project="SAP" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">프로젝트 생애 주기 데이터 연계</span></div>
+        </div>
+
+        <div class="bl-divider"></div>
+        <div class="bl-group">
+          <div class="bl-group-header"><div class="bl-dot" style="background:#D53F8C"></div>알칩<span class="bl-group-count">2</span></div>
+          <div class="bl-item" draggable="true" data-project="알칩" data-assignee="ryan"><div class="bl-item-cb"></div><span class="bl-item-text">부문 간 수익률 적용 확인</span></div>
+          <div class="bl-item" draggable="true" data-project="알칩" data-assignee="ash"><div class="bl-item-cb"></div><span class="bl-item-text">Alchip 기본 분석</span></div>
+        </div>
+      </div>
+
+      <!-- ===== 담당자별 보기 ===== -->
+      <div class="bl-view-member" id="bl-member-view">
+        <!-- JS로 동적 생성 -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================
+       MAIN GRID (우측)
+       ======================================== -->
+  <div class="main">
+    <div class="toolbar">
+      <span class="toolbar-title">주간 스케줄</span>
+      <span class="toolbar-sub">4월 20일 ~ 24일 (17주차)</span>
+      <div class="toolbar-nav">
+        <button>&#9664;</button>
+        <button class="active">이번 주</button>
+        <button>&#9654;</button>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid">
+        <div class="grid-header name-col">팀원</div>
+        <div class="grid-header">월 4/20</div>
+        <div class="grid-header today">화 4/21</div>
+        <div class="grid-header">수 4/22</div>
+        <div class="grid-header">목 4/23</div>
+        <div class="grid-header">금 4/24</div>
+
+        <!-- Edmond Park -->
+        <div class="member-cell"><div class="avatar" style="background:#E6F1FB;color:#0C447C">E</div><div class="member-name">Edmond</div></div>
+        <div class="schedule-cell" data-member="ed" data-day="0"><div class="cell-add">+</div></div>
+        <div class="schedule-cell today-col" data-member="ed" data-day="1"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ed" data-day="2"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ed" data-day="3"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ed" data-day="4"><div class="cell-add">+</div></div>
+
+        <!-- ash.kim -->
+        <div class="member-cell"><div class="avatar" style="background:#EEEDFE;color:#3C3489">A</div><div class="member-name">ash.kim</div></div>
+        <div class="schedule-cell" data-member="ash" data-day="0"><div class="cell-add">+</div></div>
+        <div class="schedule-cell today-col" data-member="ash" data-day="1"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ash" data-day="2"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ash" data-day="3"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ash" data-day="4"><div class="cell-add">+</div></div>
+
+        <!-- eric.kim -->
+        <div class="member-cell"><div class="avatar" style="background:#E1F5EE;color:#085041">E</div><div class="member-name">eric.kim</div></div>
+        <div class="schedule-cell" data-member="eric" data-day="0"><div class="cell-add">+</div></div>
+        <div class="schedule-cell today-col" data-member="eric" data-day="1"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="eric" data-day="2"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="eric" data-day="3"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="eric" data-day="4"><div class="cell-add">+</div></div>
+
+        <!-- Ryan -->
+        <div class="member-cell"><div class="avatar" style="background:#FAEEDA;color:#854F0B">R</div><div class="member-name">Ryan</div></div>
+        <div class="schedule-cell" data-member="ryan" data-day="0"><div class="cell-add">+</div></div>
+        <div class="schedule-cell today-col" data-member="ryan" data-day="1"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ryan" data-day="2"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ryan" data-day="3"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ryan" data-day="4"><div class="cell-add">+</div></div>
+
+        <!-- ethan.chang -->
+        <div class="member-cell"><div class="avatar" style="background:#FAECE7;color:#712B13">E</div><div class="member-name">ethan</div></div>
+        <div class="schedule-cell" data-member="ethan" data-day="0"><div class="cell-add">+</div></div>
+        <div class="schedule-cell today-col" data-member="ethan" data-day="1"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ethan" data-day="2"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ethan" data-day="3"><div class="cell-add">+</div></div>
+        <div class="schedule-cell" data-member="ethan" data-day="4"><div class="cell-add">+</div></div>
+      </div>
+    </div>
+
+    <div class="footer-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#EEEDFE;border:0.5px solid #534AB7"></div>MS (하위 할일 포함 배치)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--bg-primary);border:0.5px solid var(--border-secondary)"></div>할일 (개별 배치)</div>
+      <span style="margin-left:auto;color:#3182CE;font-size:10px">좌측 백로그에서 셀로 드래그</span>
+    </div>
+  </div>
+</div>
+
+<div class="drag-ghost" id="drag-ghost"></div>
+
+<script>
+// ============================================
+// 1. 백로그 모드 토글 (프로젝트별 / 담당자별)
+// ============================================
+var MEMBERS = [
+  { id: 'ed', name: 'Edmond Park', color: '#E6F1FB', textColor: '#0C447C', initial: 'E' },
+  { id: 'ash', name: 'ash.kim', color: '#EEEDFE', textColor: '#3C3489', initial: 'A' },
+  { id: 'eric', name: 'eric.kim', color: '#E1F5EE', textColor: '#085041', initial: 'E' },
+  { id: 'ryan', name: 'Ryan', color: '#FAEEDA', textColor: '#854F0B', initial: 'R' },
+  { id: 'ethan', name: 'ethan.chang', color: '#FAECE7', textColor: '#712B13', initial: 'E' }
+];
+
+function setBacklogMode(mode) {
+  var bl = document.getElementById('backlog');
+  var btnP = document.getElementById('toggle-project');
+  var btnM = document.getElementById('toggle-member');
+
+  if (mode === 'member') {
+    bl.classList.add('mode-member');
+    btnP.classList.remove('active');
+    btnM.classList.add('active');
+    buildMemberView();
+  } else {
+    bl.classList.remove('mode-member');
+    btnP.classList.add('active');
+    btnM.classList.remove('active');
+  }
+}
+
+function buildMemberView() {
+  var container = document.getElementById('bl-member-view');
+  var items = document.querySelectorAll('#bl-project-view .bl-item, #bl-project-view .bl-ms-item');
+  var byMember = {};
+
+  MEMBERS.forEach(function(m) { byMember[m.id] = []; });
+  byMember[''] = [];
+
+  items.forEach(function(item) {
+    var assignee = item.getAttribute('data-assignee') || '';
+    if (!byMember[assignee]) byMember[assignee] = [];
+    byMember[assignee].push({
+      text: (item.querySelector('.bl-item-text, .bl-ms-text') || {}).textContent || '',
+      project: item.getAttribute('data-project') || '',
+      type: item.getAttribute('data-type') || 'task',
+      used: item.classList.contains('used')
+    });
+  });
+
+  var html = '';
+  MEMBERS.forEach(function(m) {
+    var memberItems = byMember[m.id] || [];
+    if (memberItems.length === 0) return;
+
+    html += '<div class="bl-member-header">';
+    html += '<div class="bl-member-avatar" style="background:' + m.color + ';color:' + m.textColor + '">' + m.initial + '</div>';
+    html += m.name + '<span class="bl-group-count" style="margin-left:auto">' + memberItems.length + '</span></div>';
+
+    var byProject = {};
+    memberItems.forEach(function(it) {
+      if (!byProject[it.project]) byProject[it.project] = [];
+      byProject[it.project].push(it);
+    });
+
+    Object.keys(byProject).forEach(function(proj) {
+      html += '<div style="font-size:9px;color:' + 'var(--text-tertiary)' + ';padding:3px 12px 1px 28px;font-weight:500">' + proj + '</div>';
+      byProject[proj].forEach(function(it) {
+        var usedClass = it.used ? ' used' : '';
+        if (it.type === 'ms') {
+          html += '<div class="bl-ms-item' + usedClass + '" draggable="true" data-type="ms" data-project="' + proj + '" data-assignee="' + m.id + '"><div class="bl-ms-cb"></div><span class="bl-ms-text">' + it.text + '</span></div>';
+        } else {
+          html += '<div class="bl-item' + usedClass + '" draggable="true" data-project="' + proj + '" data-assignee="' + m.id + '"><div class="bl-item-cb"></div><span class="bl-item-text">' + it.text + '</span></div>';
+        }
+      });
+    });
+    html += '<div class="bl-divider"></div>';
+  });
+
+  container.innerHTML = html;
+  bindDragEvents(container);
+}
+
+// ============================================
+// 2. 검색 필터
+// ============================================
+function filterBacklog() {
+  var query = document.getElementById('bl-search').value.toLowerCase();
+  var items = document.querySelectorAll('.bl-item, .bl-ms-item');
+  items.forEach(function(item) {
+    var text = (item.querySelector('.bl-item-text, .bl-ms-text') || {}).textContent || '';
+    item.style.display = text.toLowerCase().indexOf(query) >= 0 ? '' : 'none';
+  });
+}
+
+// ============================================
+// 3. DnD: 백로그 → 그리드 셀
+// ============================================
+var ghost = document.getElementById('drag-ghost');
+var dragItem = null;
+
+function bindDragEvents(container) {
+  (container || document).querySelectorAll('.bl-item, .bl-ms-item').forEach(function(el) {
+    if (el._bound) return;
+    el._bound = true;
+    el.addEventListener('dragstart', function(e) {
+      dragItem = el;
+      var t = el.querySelector('.bl-item-text, .bl-ms-text');
+      ghost.textContent = t ? t.textContent : '';
+      ghost.style.display = 'block';
+      try { e.dataTransfer.setDragImage(new Image(), 0, 0); } catch(x) {}
+
+      // 담당자별 모드에서 해당 멤버 행 하이라이트
+      var assignee = el.getAttribute('data-assignee');
+      if (assignee) {
+        document.querySelectorAll('.schedule-cell[data-member="' + assignee + '"]').forEach(function(c) {
+          c.style.background = 'rgba(49,130,206,0.04)';
+        });
+      }
+    });
+    el.addEventListener('drag', function(e) {
+      if (!e.clientX && !e.clientY) return;
+      ghost.style.left = e.clientX + 14 + 'px';
+      ghost.style.top = e.clientY - 6 + 'px';
+    });
+    el.addEventListener('dragend', function() {
+      dragItem = null;
+      ghost.style.display = 'none';
+      // 하이라이트 제거
+      document.querySelectorAll('.schedule-cell').forEach(function(c) {
+        c.style.background = '';
+        c.classList.remove('drag-over');
+      });
+    });
+  });
+}
+
+bindDragEvents(document);
+
+document.querySelectorAll('.schedule-cell').forEach(function(cell) {
+  cell.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    cell.classList.add('drag-over');
+  });
+  cell.addEventListener('dragleave', function() {
+    cell.classList.remove('drag-over');
+  });
+  cell.addEventListener('drop', function(e) {
+    e.preventDefault();
+    cell.classList.remove('drag-over');
+    if (!dragItem) return;
+
+    var isMs = dragItem.classList.contains('bl-ms-item');
+    var txt = (dragItem.querySelector('.bl-item-text, .bl-ms-text') || {}).textContent || '';
+    var project = dragItem.getAttribute('data-project') || '';
+
+    var el;
+    if (isMs) {
+      el = document.createElement('div');
+      el.className = 'cell-ms-badge';
+      el.textContent = txt;
+    } else {
+      el = document.createElement('div');
+      el.className = 'cell-task';
+      el.innerHTML = '<div class="cell-task-cb"></div><span class="cell-task-text">' + txt + '</span>';
+    }
+
+    var addBtn = cell.querySelector('.cell-add');
+    cell.insertBefore(el, addBtn);
+
+    // 원본 used 처리
+    dragItem.classList.add('used');
+    dragItem.draggable = false;
+
+    // 프로젝트별 뷰의 원본도 동기화
+    var allItems = document.querySelectorAll('.bl-item, .bl-ms-item');
+    allItems.forEach(function(item) {
+      var itemTxt = (item.querySelector('.bl-item-text, .bl-ms-text') || {}).textContent || '';
+      if (itemTxt === txt && item.getAttribute('data-project') === project) {
+        item.classList.add('used');
+        item.draggable = false;
+      }
+    });
+
+    dragItem = null;
+    ghost.style.display = 'none';
+  });
+});
+</script>
+
+</body>
+</html>
