@@ -12,7 +12,7 @@ const MAX_LEVEL = 9
  *
  * Exposes via ref: { focusFirst(), focusLast() } for cross-component navigation.
  */
-const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, accentColor, onExitUp, onExitDown, allTopCollapsed }, ref) {
+const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, accentColor, onExitUp, onExitDown, allTopCollapsed, fontSize }, ref) {
   const [nodes, setNodes] = useState(() => {
     const parsed = parseNotes(notes)
     return parsed.length ? parsed : [{ text: '', level: 0 }]
@@ -241,6 +241,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
           node={nodes[i]}
           idx={i}
           accentColor={accentColor}
+          fontSize={fontSize}
           inputRef={el => refs.current[i] = el}
           onTextChange={handleTextChange}
           onKeyDown={handleKeyDown}

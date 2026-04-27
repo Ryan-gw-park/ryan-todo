@@ -217,6 +217,7 @@ export default function FocusCard({ task, project, milestone }) {
             notes={task.notes}
             onChange={handleNotesChange}
             accentColor={accentColor}
+            fontSize={FONT.body}
           />
         </div>
       )}
