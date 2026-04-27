@@ -115,10 +115,10 @@ export const PIVOT = {
   colWidthTotal: 55,
 };
 
-// ─── 개인 할일 리스트 (Loop-45) ───
+// ─── 개인 할일 리스트 (Loop-45, Loop-47 튜닝) ───
 export const LIST = {
-  colWidthProject:   170,
-  colWidthMilestone: 130,
+  colWidthProject:   130,   // Loop-47 R-01: 170→130
+  colWidthMilestone: 90,    // Loop-47 R-02: 130→90
   sectionGap:        24,
   projectRowGap:     12,
   taskRowGap:        6,
