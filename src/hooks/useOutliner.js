@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 
 const MAX_LEVEL = 9
 const MAX_UNDO = 50
@@ -31,14 +31,36 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
 
   // Undo stack
   const undoStack = useRef([])
+  const lastUndoTime = useRef(0)
+  const trailingTimer = useRef(null)
 
-  const pushUndo = useCallback(() => {
+  const pushUndoImmediate = useCallback(() => {
     const snap = JSON.stringify(nodesRef.current)
     const stack = undoStack.current
     if (stack.length > 0 && stack[stack.length - 1] === snap) return
     stack.push(snap)
     if (stack.length > MAX_UNDO) stack.shift()
   }, [])
+
+  // Leading + trailing 500ms throttle — 입력 시작 직전 + 입력 종료 직후 양쪽 보존
+  // W-NEW-2: trailing 콜백에서 lastUndoTime 갱신 금지 — leading 억제 방지 (R-03 #2 보호)
+  const pushUndoThrottled = useCallback(() => {
+    const now = Date.now()
+    clearTimeout(trailingTimer.current)
+    if (now - lastUndoTime.current >= 500) {
+      lastUndoTime.current = now
+      pushUndoImmediate()  // leading edge — lastUndoTime 갱신
+    }
+    trailingTimer.current = setTimeout(() => {
+      pushUndoImmediate()  // trailing edge — lastUndoTime 갱신 안 함 (W-NEW-2)
+    }, 500)
+  }, [pushUndoImmediate])
+
+  // 기존 pushUndo 시그니처 보존 — discrete 작업 (Tab/Enter/Backspace/Swap/Paste/Undo) 은 immediate
+  const pushUndo = pushUndoImmediate
+
+  // unmount 시 trailingTimer cleanup
+  useEffect(() => () => clearTimeout(trailingTimer.current), [])
 
   /* ── Focus helper (runs after React commit) ── */
   const focus = useCallback((idx, pos = 'end') => {
@@ -273,11 +295,11 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       return
     }
 
-    // Any other character input → push undo (throttled by snap comparison)
+    // Any other character input → push undo (leading + trailing throttled)
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      pushUndo()
+      pushUndoThrottled()
     }
-  }, [setNodes, focus, pushUndo])
+  }, [setNodes, focus, pushUndo, pushUndoThrottled])
 
   /* ── Paste handler — split multi-line text into separate nodes ── */
   const handlePaste = useCallback((e, idx) => {
@@ -312,5 +334,5 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
     focus(lastIdx, lastPos)
   }, [setNodes, focus, pushUndo])
 
-  return { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection, pushUndo }
+  return { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection, pushUndo, pushUndoThrottled }
 }

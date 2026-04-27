@@ -78,7 +78,7 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
   }
 
   /* ── Outliner keyboard / focus ── */
-  const { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection, pushUndo } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
+  const { refs, handleKeyDown, handlePaste, focus, selectionRef, onSelectionChange, clearSelection, pushUndo, pushUndoThrottled } = useOutliner(nodes, setNodes, { onExitUp, onExitDown, visibleIndices })
 
   /* ── Wire selection change callback ── */
   useEffect(() => {
@@ -108,13 +108,13 @@ const OutlinerEditor = forwardRef(function OutlinerEditor({ notes, onChange, acc
 
   /* ── Text change (per-keystroke) ── */
   const handleTextChange = useCallback((idx, text) => {
-    pushUndo()
+    pushUndoThrottled()
     setNodes(prev => {
       const n = [...prev]
       n[idx] = { ...n[idx], text }
       return n
     })
-  }, [pushUndo])
+  }, [pushUndoThrottled])
 
   /* ── Button handlers ── */
   const handleDelete = useCallback((idx) => {
