@@ -8,6 +8,7 @@ import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR } from '../../../styles/designTokens'
 import PersonalTodoListTable from './PersonalTodoListTable'
 import FocusPanel from './FocusPanel'
+import { canMoveTaskToProject } from './cells/PersonalTodoProjectGroup'
 
 /* ═══════════════════════════════════════════════
    PersonalTodoShell (Loop-45 → Loop-47)
@@ -94,6 +95,23 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
         setExpanded(taskId, true)
         return
       }
+
+      // ═══ 1.5) 백로그 → 다른 프로젝트 (Loop-49 R-05) ═══
+      if (overId.startsWith('bl-project:')) {
+        const taskId = activeIdStr.slice('bl-task:'.length)
+        const targetProjectId = overId.slice('bl-project:'.length)
+        // R-06 으로 active.data 항상 첨부됨
+        const task = active.data?.current?.task
+        const targetProject = projects.find(p => p.id === targetProjectId)
+        if (!task || !targetProject) return
+        // same-type validation (Spec §4-2 매트릭스). self-target 도 false 처리
+        if (!canMoveTaskToProject(task, targetProject)) return
+        // applyTransitionRules R5: projectId 변경 → keyMilestoneId 자동 초기화
+        // useStore.js:621 personal-target 가드 자동 적용 (private 보호)
+        updateTask(taskId, { projectId: targetProjectId })
+        return
+      }
+
       return
     }
 
@@ -111,7 +129,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     }
 
     // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
-  }, [focusTasks, updateTask, reorderFocusTasks, setExpanded])
+  }, [focusTasks, projects, updateTask, reorderFocusTasks, setExpanded])
 
   return (
     <DndContext
