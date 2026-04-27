@@ -181,17 +181,30 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       focus(insertAt)
       return
     }
-    // Alt+Shift+↓ — swap with below (including children)
+    // Alt+Shift+↓ — swap with below (including children, Option β: sibling-boundary outdent)
     if (e.altKey && e.shiftKey && e.key === 'ArrowDown') {
       e.preventDefault()
       const childEnd = getChildrenEnd(nodes, idx)
       if (childEnd >= nodes.length - 1) return
+      const myLevel = nodes[idx].level
+      // 다음 형제(같은 level 또는 더 작은 level)의 subtree 끝 찾기
+      let nextStart = -1
+      for (let j = childEnd + 1; j < nodes.length; j++) {
+        if (nodes[j].level <= myLevel) { nextStart = j; break }
+      }
+      if (nextStart === -1) return
+      const nextEnd = getChildrenEnd(nodes, nextStart)
       pushUndo()
       const block = nodes.slice(idx, childEnd + 1)
+      // Option β level 보정: nextStart 가 더 낮은 level 이면 block 전체 outdent
+      const targetLevel = nodes[nextStart].level
+      const delta = targetLevel - myLevel
+      const adjustedBlock = delta === 0 ? block : block.map(n => ({ ...n, level: n.level + delta }))
       const n = [...nodes]
       n.splice(idx, block.length)
-      const insertAt = idx + 1
-      n.splice(insertAt, 0, ...block)
+      // block 제거 후 nextEnd 의 실 위치 = nextEnd - block.length, 그 다음 위치 = +1
+      const insertAt = nextEnd - block.length + 1
+      n.splice(insertAt, 0, ...adjustedBlock)
       setNodes(n)
       focus(insertAt)
       return
