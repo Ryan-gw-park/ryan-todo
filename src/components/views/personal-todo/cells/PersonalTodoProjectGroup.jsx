@@ -1,7 +1,20 @@
 import React, { useMemo, useState, useCallback } from 'react'
+import { useDroppable, useDndContext } from '@dnd-kit/core'
 import useStore, { getCachedUserId } from '../../../../hooks/useStore'
-import { COLOR, FONT, LIST, SPACE } from '../../../../styles/designTokens'
+import { COLOR, FONT, LIST, SPACE, OPACITY } from '../../../../styles/designTokens'
 import PersonalTodoTaskRow from './PersonalTodoTaskRow'
+
+/* ── R-05/R-07: same-type drop validation (Loop-49 Option 2A) ──
+   Private task → personal/system project (둘 다 !teamId)
+   Team task → same-team project (teamId 일치)
+   같은 project 자기 자신 = false (no-op, V5 가드)
+   Spec §4-2 8가지 매트릭스 참조 */
+export function canMoveTaskToProject(task, targetProject) {
+  if (!task || !targetProject) return false
+  if (task.projectId === targetProject.id) return false
+  if (!task.teamId) return !targetProject.teamId
+  return task.teamId === targetProject.teamId
+}
 
 /* ═══════════════════════════════════════════════
    PersonalTodoProjectGroup (Loop-47 R-06/R-07)
@@ -23,6 +36,27 @@ export default function PersonalTodoProjectGroup({
 
   const [headerHover, setHeaderHover] = useState(false)
   const [adding, setAdding] = useState(false)
+
+  // R-04: 헤더 영역 droppable 등록 (Option D-ii)
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `bl-project:${project.id}`,
+    data: { projectId: project.id, teamId: project.teamId, isSystem: project.isSystem },
+  })
+
+  // R-07: drag 중인 source task 와 비교하여 drop 가능 여부 판정
+  const { active } = useDndContext()
+  const dragSourceTask = active?.data?.current?.task
+  const isDragActive = !!active && String(active.id).startsWith('bl-task:')
+  const isAllowedDrop = isDragActive && dragSourceTask
+    ? canMoveTaskToProject(dragSourceTask, project)
+    : false
+  const isSelfTarget = isDragActive && dragSourceTask?.projectId === project.id
+
+  // 시각 피드백 결정 (R-07 V1~V5)
+  // W6 (3차) 가드: V5 self-drop 시 모든 시각 효과 차단 — !isSelfTarget 필수
+  const headerBg = isOver && isAllowedDrop && !isSelfTarget ? COLOR.bgHover : 'transparent'
+  const headerOpacity = isOver && isDragActive && !isAllowedDrop && !isSelfTarget ? OPACITY.projectDimmed : 1
+  const headerCursor = isOver && isDragActive && !isAllowedDrop && !isSelfTarget ? 'not-allowed' : undefined
 
   const totalInSection = sectionTasks.length
 
@@ -78,13 +112,17 @@ export default function PersonalTodoProjectGroup({
         paddingBottom: 8,
       }}
     >
-      {/* Project col (col 1) — row span */}
+      {/* Project col (col 1) — row span. Loop-49 R-04: 헤더 영역 droppable */}
       <div
+        ref={setDropRef}
         onClick={onToggle}
         style={{
           gridRow: `1 / span ${spanRows}`,
           padding: '6px 12px 6px 4px',
-          cursor: 'pointer',
+          cursor: headerCursor || 'pointer',
+          background: headerBg,
+          opacity: headerOpacity,
+          transition: 'background 0.15s, opacity 0.15s',
           alignSelf: 'start',
           minWidth: 0,
           position: 'relative',
