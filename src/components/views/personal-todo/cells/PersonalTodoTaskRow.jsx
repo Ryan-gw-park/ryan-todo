@@ -24,6 +24,7 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `bl-task:${task.id}`,
+    data: { task },  // R-06: ProjectGroup 의 isOver 시각 피드백 + Shell 의 cross-project drop 의존
   })
 
   const [hover, setHover] = useState(false)
