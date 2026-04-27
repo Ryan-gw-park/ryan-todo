@@ -111,9 +111,21 @@ const OutlinerTaskNode = forwardRef(function OutlinerTaskNode(
     if (e.key === 'Escape') { setTitleText(task.text); e.target.blur() }
   }
 
+  // C7: DetailPanel/FocusCard 패턴 복제 — 800ms debounce + optimistic update
+  const debounceRef = useRef(null)
   const handleNotesChange = useCallback((newNotes) => {
-    updateTask(task.id, { notes: newNotes })
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      updateTask(task.id, { notes: newNotes })
+    }, 800)
+    // 즉시 visual feedback — store 의 tasks 갱신
+    useStore.setState(s => ({
+      tasks: s.tasks.map(t => t.id === task.id ? { ...t, notes: newNotes } : t)
+    }))
   }, [task.id, updateTask])
+
+  // unmount cleanup — stale updateTask 호출 방지
+  useEffect(() => () => clearTimeout(debounceRef.current), [])
 
   const handleNotesExitUp = useCallback(() => {
     setTimeout(() => {
