@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 
 const MAX_LEVEL = 9
 const MAX_UNDO = 50
@@ -62,16 +62,34 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
   // unmount 시 trailingTimer cleanup
   useEffect(() => () => clearTimeout(trailingTimer.current), [])
 
-  /* ── Focus helper (runs after React commit) ── */
-  const focus = useCallback((idx, pos = 'end') => {
-    setTimeout(() => {
-      const el = refs.current[idx]
-      if (!el) return
-      el.focus()
-      const p = pos === 'end' ? el.value.length : (typeof pos === 'number' ? pos : 0)
-      el.setSelectionRange(p, p)
-    }, 30)
+  /* ── Focus helper — hybrid (useLayoutEffect + rAF fallback) ── */
+  const pendingFocus = useRef(null)
+
+  // applyFocus: pendingFocus.current 직접 읽기 (no-arg)
+  const applyFocus = useCallback(() => {
+    if (!pendingFocus.current) return
+    const { idx, pos } = pendingFocus.current
+    pendingFocus.current = null
+    const el = refs.current[idx]
+    if (!el) return
+    el.focus()
+    const p = pos === 'end' ? el.value.length : (typeof pos === 'number' ? pos : 0)
+    el.setSelectionRange(p, p)
   }, [])
+
+  // rAF wrapper — DOMHighResTimeStamp 인자 무시
+  const rafApplyFocus = useCallback(() => { applyFocus() }, [applyFocus])
+
+  const focus = useCallback((idx, pos = 'end') => {
+    pendingFocus.current = { idx, pos }
+    // Fallback: setNodes/setState 미동반 경로 (arrow nav, imperative) 용
+    // setNodes 동반 경로는 useLayoutEffect 가 commit 직후 처리하여 pendingFocus null 로 만듦
+    requestAnimationFrame(rafApplyFocus)
+  }, [rafApplyFocus])
+
+  // useLayoutEffect: 매 commit 후 pendingFocus 처리 (no-dep, null 체크로 cost 무시)
+  // ESLint react-hooks/exhaustive-deps 경고 회피 위해 화살표 함수로 래핑
+  useLayoutEffect(() => { applyFocus() })
 
   /* ── Selection helpers ── */
   const getSelection = () => selectionRef.current
