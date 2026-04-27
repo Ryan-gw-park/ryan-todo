@@ -3,20 +3,20 @@ import { COLOR, FONT, LIST } from '../../../../styles/designTokens'
 import PersonalTodoTaskRow from './PersonalTodoTaskRow'
 
 /* ═══════════════════════════════════════════════
-   PersonalTodoProjectGroup (Loop-45, revised)
-   한 프로젝트 블록 = 독립 CSS grid (170px | 130px | 1fr)
+   PersonalTodoProjectGroup (Loop-45 → Loop-47)
+   한 프로젝트 블록 = 독립 CSS grid (130px | 90px | 1fr — 튜닝 Loop-47)
 
-   - 프로젝트 col은 task rows span (gridRow: '1 / span N')
-   - 포커스로 이동한 task도 백로그에 남아서 표시 (TaskRow에서 개별 dim)
-   - F-11: tasks 0건이면 render skip
-   - 접힘 시 header만 렌더
-   - MS dedup: 동일 MS 연속 task는 2번째부터 msLabel=''
-   - keyMilestoneId==null → '기타' (isEtc=true)
+   Loop-47 R-03, R-04, R-05:
+   - F-11 예외: project.isSystem 이면 0건에도 렌더
+   - 0건 + isSystem → 우측 task col 에 "여기에 + 할일" placeholder (Commit 8 에서 클릭 동작)
+   - 프로젝트 col은 task rows span
+   - 포커스 이동 task 도 백로그 잔류 (개별 dim, TaskRow)
+   - MS dedup, '기타' (keyMilestoneId==null)
    ═══════════════════════════════════════════════ */
 export default function PersonalTodoProjectGroup({
   project,
-  sectionTasks,          // 이 섹션(지금/다음/남은)에 속한 이 프로젝트의 task 리스트
-  milestones,            // 전체 milestones 배열
+  sectionTasks,
+  milestones,
   isExpanded,
   onToggle,
 }) {
@@ -37,10 +37,11 @@ export default function PersonalTodoProjectGroup({
     })
   }, [sectionTasks, milestones])
 
-  // F-11: 이 섹션에 task 0건이면 skip (hooks 호출 이후)
-  if (totalInSection === 0) return null
+  // R-04: 시스템 프로젝트는 0건에도 렌더 (placeholder 표시)
+  if (totalInSection === 0 && !project.isSystem) return null
 
-  const spanRows = isExpanded ? totalInSection : 1
+  const spanRows = isExpanded ? Math.max(totalInSection, 1) : 1
+  const isEmpty = totalInSection === 0
 
   return (
     <div
@@ -85,15 +86,34 @@ export default function PersonalTodoProjectGroup({
         </div>
       </div>
 
-      {/* Task rows (col 2 + col 3) */}
-      {isExpanded && tasksWithLabels.map(({ task, msLabel, isEtc }) => (
+      {/* R-05: 시스템 프로젝트 0건 placeholder (col 2-3 span, 클릭 동작은 Commit 8 에서 wire) */}
+      {isEmpty && project.isSystem && (
+        <div
+          data-sys-empty-placeholder
+          style={{
+            gridColumn: '2 / 4',
+            padding: '6px 8px',
+            fontSize: FONT.body,
+            color: COLOR.textTertiary,
+            fontStyle: 'italic',
+            opacity: 0.65,
+            cursor: 'pointer',
+          }}
+          title="클릭하여 할일 추가"
+        >
+          여기에 + 할일
+        </div>
+      )}
+
+      {/* Task rows (col 2 + col 3) — isEmpty 가 아닐 때만 */}
+      {!isEmpty && isExpanded && tasksWithLabels.map(({ task, msLabel, isEtc }) => (
         <React.Fragment key={task.id}>
           <PersonalTodoTaskRow task={task} msLabel={msLabel} isEtc={isEtc} />
         </React.Fragment>
       ))}
 
       {/* 접힘 상태: col 2/3 빈 placeholder (grid row balance) */}
-      {!isExpanded && (
+      {!isEmpty && !isExpanded && (
         <>
           <div />
           <div />

@@ -192,7 +192,8 @@ function TodaySection({ projects, tasks, milestones, isProjectExpanded, togglePr
       {/* Project blocks */}
       {projects.map(p => {
         const projTasks = tasks.filter(t => t.projectId === p.id)
-        if (projTasks.length === 0) return null // F-11
+        // Loop-47 R-03: 시스템 프로젝트는 0건에도 렌더 (+ 할일 placeholder 유도)
+        if (projTasks.length === 0 && !p.isSystem) return null
         return (
           <PersonalTodoProjectGroup
             key={p.id}
@@ -249,7 +250,8 @@ function CollapsibleSection({
         <div style={{ marginTop: 8 }}>
           {projects.map(p => {
             const projTasks = tasks.filter(t => t.projectId === p.id)
-            if (projTasks.length === 0) return null // F-11
+            // Loop-47 R-03: 시스템 프로젝트는 0건에도 렌더
+            if (projTasks.length === 0 && !p.isSystem) return null
             return (
               <PersonalTodoProjectGroup
                 key={p.id}
