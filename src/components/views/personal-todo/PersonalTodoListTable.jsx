@@ -114,28 +114,45 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
 /* ─── 지금 섹션 ─── */
 function TodaySection({ projects, tasks, milestones, isProjectExpanded, toggleProjectExpand, addTask, currentUserId, instantProjectId }) {
   const [adding, setAdding] = useState(false)
+  const [addText, setAddText] = useState('')
+  // R-08, R-09: 마지막 선택 프로젝트 id (localStorage)
+  const [selectedProjectId, setSelectedProjectId] = useState(() => {
+    try { return localStorage.getItem('lastAddProjectId') || null } catch { return null }
+  })
   const totalCount = tasks.length
 
-  const handleAddFinish = (value) => {
+  // R-08: 드롭다운 옵션 — 개인 뷰 projects (백로그와 동일, sortProjectsLocally 결과 그대로)
+  // 기본 선택: localStorage 저장값 → 현재 존재 확인 → 없으면 instantProjectId → 없으면 첫 프로젝트
+  const effectiveSelectedId = useMemo(() => {
+    const candidate = selectedProjectId || instantProjectId || (projects[0]?.id ?? null)
+    // stale 방어: 후보가 projects 배열에 없으면 fallback
+    if (candidate && projects.some(p => p.id === candidate)) return candidate
+    return instantProjectId || (projects[0]?.id ?? null)
+  }, [selectedProjectId, instantProjectId, projects])
+
+  const handleAddFinish = () => {
     setAdding(false)
-    const text = (value ?? '').trim()
+    const text = addText.trim()
+    setAddText('')
     if (!text) return
-    // F-13 + QA fix: '즉시' 프로젝트 기본 귀속.
-    // projectId 미지정 시 task.projectId=null → 프로젝트 그룹 렌더에서 필터링되어 안 보임.
-    // '즉시' seed 실패 상태면 경고만 하고 skip (UI 버튼 자체 유지, 다음 새로고침에 seed 재시도).
-    if (!instantProjectId) {
-      console.warn('[Loop-45] 즉시 프로젝트 미확보 — 빠른 추가 불가')
+    const targetId = effectiveSelectedId
+    if (!targetId) {
+      console.warn('[Loop-47] 프로젝트 미선택 — 빠른 추가 불가')
       return
     }
     addTask({
       text,
-      projectId: instantProjectId,
+      projectId: targetId,
       assigneeId: currentUserId,
       secondaryAssigneeId: null,
       keyMilestoneId: null,
       category: 'today',
       isFocus: false,
     })
+    // R-09: 성공 시 선택 프로젝트 저장
+    try { localStorage.setItem('lastAddProjectId', targetId) } catch {
+      // localStorage quota / private mode 무시
+    }
   }
 
   return (
@@ -168,22 +185,46 @@ function TodaySection({ projects, tasks, milestones, isProjectExpanded, togglePr
         )}
       </div>
 
-      {/* Inline add input */}
+      {/* R-08: Inline composer — project select + text input */}
       {adding && (
-        <div style={{ marginBottom: 8, padding: SPACE.cellPadding }}>
+        <div style={{
+          marginBottom: 8, padding: SPACE.cellPadding,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <select
+            value={effectiveSelectedId || ''}
+            onChange={e => setSelectedProjectId(e.target.value)}
+            style={{
+              fontSize: FONT.body, fontFamily: 'inherit',
+              padding: '4px 8px',
+              border: `1px solid ${COLOR.border}`, borderRadius: 4,
+              background: '#fff', color: COLOR.textPrimary,
+              outline: 'none', flexShrink: 0, maxWidth: 160,
+            }}
+          >
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <input
             autoFocus
+            value={addText}
+            onChange={e => setAddText(e.target.value)}
             placeholder="할일 입력 후 Enter"
             style={{
-              width: '100%', fontSize: FONT.body,
+              flex: 1, fontSize: FONT.body,
               border: `1px solid ${COLOR.border}`, borderRadius: 4,
               padding: '4px 8px', fontFamily: 'inherit',
               boxSizing: 'border-box',
+              outline: 'none',
             }}
-            onBlur={e => handleAddFinish(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter') handleAddFinish(e.target.value)
-              if (e.key === 'Escape') setAdding(false)
+              if (e.key === 'Enter') { e.preventDefault(); handleAddFinish() }
+              if (e.key === 'Escape') { setAdding(false); setAddText('') }
+            }}
+            onBlur={() => {
+              // 빈 입력 blur → 바로 취소. 값 있으면 유지 (Enter 로 완료)
+              if (!addText.trim()) { setAdding(false); setAddText('') }
             }}
           />
         </div>
