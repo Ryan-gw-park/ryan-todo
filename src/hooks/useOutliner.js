@@ -156,17 +156,27 @@ export default function useOutliner(nodes, setNodes, { onExitUp, onExitDown, vis
       if (getSelection()) clearSelection()
     }
 
-    // Alt+Shift+↑ — swap with above (including children)
+    // Alt+Shift+↑ — swap with above (including children, Option β: parent-boundary outdent)
     if (e.altKey && e.shiftKey && e.key === 'ArrowUp') {
       e.preventDefault()
       if (idx === 0) return
-      pushUndo()
       const childEnd = getChildrenEnd(nodes, idx)
       const block = nodes.slice(idx, childEnd + 1)
+      const myLevel = nodes[idx].level
+      // 위쪽으로 traverse — 같은 level 또는 더 작은 level 노드 찾기
+      let insertAt = -1
+      for (let j = idx - 1; j >= 0; j--) {
+        if (nodes[j].level <= myLevel) { insertAt = j; break }
+      }
+      if (insertAt === -1) return
+      pushUndo()
+      // Option β level 보정: 매치된 노드가 더 낮은 level 이면 block 전체 outdent (자식 간 상대 level 차 보존)
+      const targetLevel = nodes[insertAt].level
+      const delta = targetLevel - myLevel
+      const adjustedBlock = delta === 0 ? block : block.map(n => ({ ...n, level: n.level + delta }))
       const n = [...nodes]
       n.splice(idx, block.length)
-      const insertAt = Math.max(0, idx - 1)
-      n.splice(insertAt, 0, ...block)
+      n.splice(insertAt, 0, ...adjustedBlock)
       setNodes(n)
       focus(insertAt)
       return
