@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../../../hooks/useStore'
 import { COLOR, FONT, CHECKBOX, LIST, OPACITY } from '../../../../styles/designTokens'
+import { useSortableCard } from '../../../dnd/SortableTaskCard'
 
 /* ═══════════════════════════════════════════════
    PersonalTodoTaskRow (Loop-45)
@@ -22,11 +21,14 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc, sortableCont
   const updateTask = useStore(s => s.updateTask)
   const openDetail = useStore(s => s.openDetail)
 
-  // Loop-50 R-01: useDraggable → useSortable. data 에 sortableContextId 추가
-  // (Shell 의 sameContext 판단용). task 는 Loop-49 R-06 보존.
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  // team-tasks-band-dnd commit 8: useSortable 직접 호출 → useSortableCard hook.
+  // data 형태 보존 필수: { task, sortableContextId }
+  // dnd-kit이 자동으로 data.sortable.containerId 병합 → PersonalTodoShell sameContext 가드(Loop-50)가 그대로 작동.
+  // dragOpacity = 1로 두고 isDragging 처리는 자체 (isFocus dim과 결합 필요).
+  const { setNodeRef, attributes, listeners, style: sortableStyle, isDragging } = useSortableCard({
     id: `bl-task:${task.id}`,
     data: { task, sortableContextId },
+    dragOpacity: 1,  // 자체 opacity 계산 사용
   })
 
   const [hover, setHover] = useState(false)
@@ -37,8 +39,7 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc, sortableCont
   const rowOpacity = isDragging ? 0.3 : (task.isFocus ? OPACITY.projectDimmed : 1)
 
   const dragStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    ...sortableStyle,
     opacity: rowOpacity,
   }
 
