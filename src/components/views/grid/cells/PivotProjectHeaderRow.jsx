@@ -58,7 +58,7 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
       style={{
         cursor: 'pointer',
         borderBottom: `1px solid ${COLOR.border}`,
-        background: isOver ? COLOR.bgHover : '#fff',
+        background: isOver ? COLOR.dropTargetTint : '#fff',
         transition: 'background 0.15s',
       }}
     >
@@ -66,7 +66,7 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
         style={{
           position: 'sticky',
           left: 0,
-          background: isOver ? COLOR.bgHover : '#fff',
+          background: isOver ? COLOR.dropTargetTint : '#fff',
           zIndex: 2,
           padding: '5px 12px',
           fontSize: 13,

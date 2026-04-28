@@ -43,7 +43,7 @@ export default function PivotMilestoneBand({ milestone, count, colSpan, dim = fa
           color: COLOR.textSecondary,
           borderBottom: `1px solid ${COLOR.border}`,
           opacity,
-          background: isOver ? COLOR.bgHover : undefined,
+          background: isOver ? COLOR.dropTargetTint : undefined,
           transition: 'background 0.15s',
         }}
       >
