@@ -8,7 +8,7 @@ export default function DroppableCell({ id, activeId, children }) {
     <div ref={setNodeRef} style={{
       borderRight: `1px solid ${COLOR.border}`, borderBottom: `1px solid ${COLOR.border}`,
       transition: 'background 0.08s',
-      ...(showHighlight ? { background: 'rgba(49,130,206,0.06)', outline: `2px dashed #3182CE`, outlineOffset: -2 } : {}),
+      ...(showHighlight ? { background: COLOR.dropTargetTint, outline: `2px dashed ${COLOR.dropIndicator}`, outlineOffset: -2 } : {}),
     }}>
       {children}
     </div>

@@ -17,6 +17,9 @@ export const COLOR = {
   danger: '#ef4444',
   accent: '#2383e2',
   todayLine: '#e53935',
+  // team-tasks-band-dnd commit 12: DnD 시각 효과 토큰
+  dropIndicator: '#3182CE',                  // drop 영역 outline / 1.5px line (DroppableCell legacy 색 유지)
+  dropTargetTint: 'rgba(49,130,206,0.06)',   // drop 영역 hover 배경 (accent ~6% alpha)
 };
 
 // ─── 폰트 ───
