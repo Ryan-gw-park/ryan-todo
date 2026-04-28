@@ -11,6 +11,7 @@ import { EMPTY_OBJ, getMonday, fmtDate, getWeekNumber } from './grid/constants'
 // Pill removed (12f — top toggle removed)
 import PersonalMatrixGrid from './grid/grids/PersonalMatrixGrid'
 import TeamMatrixGrid from './grid/grids/TeamMatrixGrid'
+import { dispatch as dispatchDrop } from '../../utils/dnd/dispatcher'
 // 주간 플래너 제거됨 (PersonalWeeklyGrid, TeamWeeklyGrid)
 
 /* ═══════════════════════════════════════════════════════
@@ -169,6 +170,19 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
 
   const handleDragEnd = useCallback((e) => {
     setActiveId(null)
+
+    // team-tasks-band-dnd commit 9: dispatcher 우선 시도 (spec §12.1, §12.2)
+    // 등록된 type 핸들러가 처리하면 true → early return.
+    // 미등록 type 또는 type 없음 → false → 아래 string-prefix fallback 실행.
+    // 점진 마이그레이션 단계: 새 DnD 사용처는 data.current.type 등록 필수.
+    const ctx = {
+      tasks, projects, milestones, members,
+      currentTeamId, currentUserId: userId,
+      updateTask, reorderTasks, reorderMilestones, moveMilestoneWithTasks,
+    }
+    const handled = dispatchDrop(e, ctx)
+    if (handled) return
+
     const { active, over } = e
     if (!over) return
     const activeIdStr = String(active.id)
