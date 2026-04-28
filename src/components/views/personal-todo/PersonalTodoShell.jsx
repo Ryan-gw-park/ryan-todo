@@ -52,6 +52,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const currentUserId = getCachedUserId()
   const updateTask = useStore(s => s.updateTask)
   const reorderFocusTasks = useStore(s => s.reorderFocusTasks)
+  const reorderTasks = useStore(s => s.reorderTasks)
   const { setPivotCollapsed: setExpanded } = usePivotExpandState('focusCardExpanded')
 
   // Focus tasks — Shell 레벨에서도 계산 (DnD handler에서 max order / idx 조회용)
@@ -96,6 +97,41 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
         return
       }
 
+      // ═══ 1.3) 같은 project + same section task-on-task reorder (Loop-50 R-03) ═══
+      // 우선순위: focus drop 다음, project header 앞 (Q3 — task-on-task 우선)
+      if (overId.startsWith('bl-task:') && overId !== activeIdStr) {
+        // W2 (3차) 가드: dnd-kit v5+ useSortable 이 data.sortable = { containerId, index } 자동 병합
+        // 본 codebase 첫 사용 패턴이라 안전 가드 — 미정의 시 무시
+        const sourceContextId = active.data?.current?.sortableContextId
+        const overContextId = over.data?.current?.sortable?.containerId
+        // sameContext = 같은 project + same section. 다른 context 또는 undefined = 무시 (Spec C5)
+        if (!sourceContextId || !overContextId || sourceContextId !== overContextId) return
+
+        const sourceTask = active.data?.current?.task
+        if (!sourceTask) return
+
+        // ListTable 필터 chain 과 동기화된 5조건 (Spec R-02 검증):
+        // assigneeId === currentUserId && !done && !deletedAt && projectId 일치 && category 일치
+        const cellTasks = tasks
+          .filter(t =>
+            t.assigneeId === currentUserId &&
+            !t.done &&
+            !t.deletedAt &&
+            t.projectId === sourceTask.projectId &&
+            t.category === sourceTask.category)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        const sourceTaskId = activeIdStr.slice('bl-task:'.length)
+        const overTaskId = overId.slice('bl-task:'.length)
+        const oldIdx = cellTasks.findIndex(t => t.id === sourceTaskId)
+        const newIdx = cellTasks.findIndex(t => t.id === overTaskId)
+        if (oldIdx === -1 || newIdx === -1) return
+
+        const reordered = arrayMove(cellTasks, oldIdx, newIdx)
+        reorderTasks(reordered)
+        return
+      }
+
       // ═══ 1.5) 백로그 → 다른 프로젝트 (Loop-49 R-05) ═══
       if (overId.startsWith('bl-project:')) {
         const taskId = activeIdStr.slice('bl-task:'.length)
@@ -129,7 +165,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     }
 
     // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
-  }, [focusTasks, projects, updateTask, reorderFocusTasks, setExpanded])
+  }, [focusTasks, projects, tasks, currentUserId, updateTask, reorderFocusTasks, reorderTasks, setExpanded])
 
   return (
     <DndContext
