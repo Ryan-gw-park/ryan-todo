@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import useStore from '../../../../hooks/useStore'
 import { COLOR, PILL, PIVOT } from '../../../../styles/designTokens'
 
 /* ═════════════════════════════════════════════
@@ -5,21 +7,17 @@ import { COLOR, PILL, PIVOT } from '../../../../styles/designTokens'
 
    책임:
      - L-02: 멤버별 카운트 셀이 같은 행에 인라인 (별도 카운트 행 없음)
-     - L-05: hover 시 우측 끝에 `+ 마일스톤` dashed-border pill (commit 7에서 추가)
+     - L-05: hover 시 우측 끝에 `+ 마일스톤` dashed-border pill (commit 7)
 
    카운트 집계: Primary만 (R06)
    미배정 = assigneeId IS NULL AND secondaryAssigneeId IS NULL AND scope='team' (R31)
    5+ amber, 10+ coral (R13)
-
-   props:
-     - project: { id, name, ... }
-     - members: Array<{ userId, displayName }>
-     - tasks: 해당 프로젝트의 task 배열 (사전 필터됨)
-     - isExpanded: boolean
-     - onToggle: () => void
-     - onTotalClick?: (projectId) => void  (DELETE 후보 — 합계 컬럼과 함께 commit 14에서 삭제)
    ═════════════════════════════════════════════ */
 export default function PivotProjectHeaderRow({ project, members, tasks, isExpanded, onToggle, onTotalClick }) {
+  const addMilestoneInProject = useStore(s => s.addMilestoneInProject)
+  const [hover, setHover] = useState(false)
+  const [adding, setAdding] = useState(false)
+
   const countByMember = {}
   for (const m of members) {
     countByMember[m.userId] = tasks.filter(t => t.assigneeId === m.userId).length
@@ -29,9 +27,21 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
   ).length
   const total = tasks.length
 
+  const handleAddMs = (value) => {
+    setAdding(false)
+    setHover(false)
+    const title = (value ?? '').trim()
+    if (!title) return
+    // useStore.js:1087 시그니처 — addMilestoneInProject(projectId, { title }).
+    // pkm은 store가 select-or-insert 자동 처리.
+    addMilestoneInProject(project.id, { title })
+  }
+
   return (
     <tr
       onClick={onToggle}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { if (!adding) setHover(false) }}
       style={{
         cursor: 'pointer',
         borderBottom: `1px solid ${COLOR.border}`,
@@ -77,9 +87,55 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
           fontWeight: 600,
           color: COLOR.textSecondary,
           cursor: onTotalClick ? 'pointer' : 'default',
+          position: 'relative',
         }}
       >
-        {total}
+        {!adding && total}
+        {hover && !adding && isExpanded && (
+          <span
+            onClick={e => { e.stopPropagation(); setAdding(true) }}
+            style={{
+              position: 'absolute',
+              right: 4,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: 10,
+              padding: '2px 6px',
+              borderRadius: 10,
+              border: `1px dashed ${COLOR.textTertiary}`,
+              color: COLOR.textSecondary,
+              background: '#fff',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              fontWeight: 400,
+            }}
+            title="마일스톤 추가"
+          >+ MS</span>
+        )}
+        {adding && (
+          <input
+            autoFocus
+            placeholder="마일스톤 제목"
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+            onBlur={e => handleAddMs(e.target.value)}
+            onKeyDown={e => {
+              e.stopPropagation()
+              if (e.key === 'Enter') handleAddMs(e.target.value)
+              if (e.key === 'Escape') { setAdding(false); setHover(false) }
+            }}
+            style={{
+              width: '100%',
+              fontSize: 11,
+              border: `1px solid ${COLOR.border}`,
+              borderRadius: 4,
+              padding: '2px 6px',
+              fontFamily: 'inherit',
+              color: COLOR.textPrimary,
+              boxSizing: 'border-box',
+            }}
+          />
+        )}
       </td>
     </tr>
   )

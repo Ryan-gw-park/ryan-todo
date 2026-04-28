@@ -5,7 +5,6 @@ import { COLOR, PIVOT } from '../../../styles/designTokens'
 import PivotProjectHeaderRow from './cells/PivotProjectHeaderRow'
 import PivotMilestoneBand from './cells/PivotMilestoneBand'
 import PivotTaskCell from './cells/PivotTaskCell'
-import PivotAddMsRow from './cells/PivotAddMsRow'
 
 /* ═════════════════════════════════════════════
    PivotMatrixTable — 팀 매트릭스 피벗 테이블
@@ -176,13 +175,7 @@ export default function PivotMatrixTable({
                     </React.Fragment>
                   )
                 })}
-                {expanded && (
-                  <PivotAddMsRow
-                    key={`add-ms-${p.id}`}
-                    projectId={p.id}
-                    colSpan={members.length + 3}
-                  />
-                )}
+                {/* PivotAddMsRow 제거 — commit 7: + 마일스톤 호버 어포던스로 PivotProjectHeaderRow에 흡수 */}
                 {expanded && (
                   <React.Fragment key={`ungr-${p.id}`}>
                     <PivotMilestoneBand
