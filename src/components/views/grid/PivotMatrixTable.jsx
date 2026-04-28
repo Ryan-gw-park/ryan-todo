@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import useStore from '../../../hooks/useStore'
 import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR, PIVOT } from '../../../styles/designTokens'
-import PivotProjectRow from './cells/PivotProjectRow'
+import PivotProjectHeaderRow from './cells/PivotProjectHeaderRow'
 import PivotMilestoneBand from './cells/PivotMilestoneBand'
 import PivotTaskCell from './cells/PivotTaskCell'
 import PivotAddMsRow from './cells/PivotAddMsRow'
@@ -133,7 +133,7 @@ export default function PivotMatrixTable({
             const expanded = isExpanded(p.id)
             return (
               <React.Fragment key={p.id}>
-                <PivotProjectRow
+                <PivotProjectHeaderRow
                   project={p}
                   members={members}
                   tasks={projTasks}
