@@ -3,8 +3,8 @@ import useStore from '../../../hooks/useStore'
 import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR, PIVOT } from '../../../styles/designTokens'
 import PivotProjectRow from './cells/PivotProjectRow'
-import PivotMsSubRow from './cells/PivotMsSubRow'
-import PivotUngroupedSubRow from './cells/PivotUngroupedSubRow'
+import PivotMilestoneBand from './cells/PivotMilestoneBand'
+import PivotTaskCell from './cells/PivotTaskCell'
 import PivotAddMsRow from './cells/PivotAddMsRow'
 
 /* ═════════════════════════════════════════════
@@ -141,14 +141,41 @@ export default function PivotMatrixTable({
                   onToggle={() => toggleProject(p.id)}
                   onTotalClick={handleProjectDrawer}
                 />
-                {expanded && projMilestones.map(ms => (
-                  <PivotMsSubRow
-                    key={`ms-${ms.id}`}
-                    milestone={ms}
-                    members={members}
-                    tasks={projTasks.filter(t => t.keyMilestoneId === ms.id)}
-                  />
-                ))}
+                {expanded && projMilestones.map(ms => {
+                  const msTasks = projTasks.filter(t => t.keyMilestoneId === ms.id)
+                  return (
+                    <React.Fragment key={`ms-${ms.id}`}>
+                      <PivotMilestoneBand
+                        milestone={ms}
+                        count={msTasks.length}
+                        colSpan={members.length + 3}
+                        projectId={p.id}
+                      />
+                      <tr style={{ background: PIVOT.msSubRowBg }}>
+                        <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
+                        {members.map(m => (
+                          <td key={m.userId} style={{ borderBottom: `1px solid ${COLOR.border}`, verticalAlign: 'top' }}>
+                            <PivotTaskCell
+                              tasks={msTasks}
+                              memberId={m.userId}
+                              projectId={p.id}
+                              milestoneId={ms.id}
+                            />
+                          </td>
+                        ))}
+                        <td style={{ borderBottom: `1px solid ${COLOR.border}`, verticalAlign: 'top' }}>
+                          <PivotTaskCell
+                            tasks={msTasks}
+                            memberId={null}
+                            projectId={p.id}
+                            milestoneId={ms.id}
+                          />
+                        </td>
+                        <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
+                      </tr>
+                    </React.Fragment>
+                  )
+                })}
                 {expanded && (
                   <PivotAddMsRow
                     key={`add-ms-${p.id}`}
@@ -157,12 +184,37 @@ export default function PivotMatrixTable({
                   />
                 )}
                 {expanded && (
-                  <PivotUngroupedSubRow
-                    key={`ungr-${p.id}`}
-                    project={p}
-                    members={members}
-                    tasks={ungrouped}
-                  />
+                  <React.Fragment key={`ungr-${p.id}`}>
+                    <PivotMilestoneBand
+                      milestone={null}
+                      count={ungrouped.length}
+                      colSpan={members.length + 3}
+                      dim={true}
+                      projectId={p.id}
+                    />
+                    <tr style={{ background: PIVOT.msSubRowBg }}>
+                      <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
+                      {members.map(m => (
+                        <td key={m.userId} style={{ borderBottom: `1px solid ${COLOR.border}`, verticalAlign: 'top' }}>
+                          <PivotTaskCell
+                            tasks={ungrouped}
+                            memberId={m.userId}
+                            projectId={p.id}
+                            milestoneId={null}
+                          />
+                        </td>
+                      ))}
+                      <td style={{ borderBottom: `1px solid ${COLOR.border}`, verticalAlign: 'top' }}>
+                        <PivotTaskCell
+                          tasks={ungrouped}
+                          memberId={null}
+                          projectId={p.id}
+                          milestoneId={null}
+                        />
+                      </td>
+                      <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
+                    </tr>
+                  </React.Fragment>
                 )}
               </React.Fragment>
             )
