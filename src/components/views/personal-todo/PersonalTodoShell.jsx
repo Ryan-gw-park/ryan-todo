@@ -8,7 +8,7 @@ import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR } from '../../../styles/designTokens'
 import PersonalTodoListTable from './PersonalTodoListTable'
 import FocusPanel from './FocusPanel'
-import { canMoveTaskToProject } from './cells/PersonalTodoProjectGroup'
+import { canMoveTaskToProject } from '../../../utils/dnd/guards'
 
 /* ═══════════════════════════════════════════════
    PersonalTodoShell (Loop-45 → Loop-47)

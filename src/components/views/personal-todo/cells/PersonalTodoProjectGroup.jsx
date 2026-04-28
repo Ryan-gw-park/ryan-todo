@@ -3,19 +3,11 @@ import { useDroppable, useDndContext } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../../hooks/useStore'
 import { COLOR, FONT, LIST, SPACE, OPACITY } from '../../../../styles/designTokens'
+import { canMoveTaskToProject } from '../../../../utils/dnd/guards'
 import PersonalTodoTaskRow from './PersonalTodoTaskRow'
 
-/* ── R-05/R-07: same-type drop validation (Loop-49 Option 2A) ──
-   Private task → personal/system project (둘 다 !teamId)
-   Team task → same-team project (teamId 일치)
-   같은 project 자기 자신 = false (no-op, V5 가드)
-   Spec §4-2 8가지 매트릭스 참조 */
-export function canMoveTaskToProject(task, targetProject) {
-  if (!task || !targetProject) return false
-  if (task.projectId === targetProject.id) return false
-  if (!task.teamId) return !targetProject.teamId
-  return task.teamId === targetProject.teamId
-}
+/* canMoveTaskToProject (Loop-49 Option 2A — same-type drop validation):
+   src/utils/dnd/guards.js 로 이전됨 (team matrix DnD 공유). */
 
 /* ═══════════════════════════════════════════════
    PersonalTodoProjectGroup (Loop-47 R-06/R-07)
