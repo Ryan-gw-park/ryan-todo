@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDraggable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../../../hooks/useStore'
 import { COLOR, FONT, CHECKBOX, LIST, OPACITY } from '../../../../styles/designTokens'
@@ -17,14 +17,16 @@ import { COLOR, FONT, CHECKBOX, LIST, OPACITY } from '../../../../styles/designT
      · useSortable은 SortableContext 필수 전제인데 backlog는 미포함 → useDraggable이 정답
    - 체크박스 = TaskRow 패턴 (custom div + SVG)
    ═══════════════════════════════════════════════ */
-export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
+export default function PersonalTodoTaskRow({ task, msLabel, isEtc, sortableContextId }) {
   const toggleDone = useStore(s => s.toggleDone)
   const updateTask = useStore(s => s.updateTask)
   const openDetail = useStore(s => s.openDetail)
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  // Loop-50 R-01: useDraggable → useSortable. data 에 sortableContextId 추가
+  // (Shell 의 sameContext 판단용). task 는 Loop-49 R-06 보존.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `bl-task:${task.id}`,
-    data: { task },  // R-06: ProjectGroup 의 isOver 시각 피드백 + Shell 의 cross-project drop 의존
+    data: { task, sortableContextId },
   })
 
   const [hover, setHover] = useState(false)
@@ -35,7 +37,8 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
   const rowOpacity = isDragging ? 0.3 : (task.isFocus ? OPACITY.projectDimmed : 1)
 
   const dragStyle = {
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Transform.toString(transform),
+    transition,
     opacity: rowOpacity,
   }
 

@@ -94,6 +94,7 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
         onToggle={() => toggleSection('next')}
         isProjectExpanded={isProjectExpanded}
         toggleProjectExpand={toggleProjectExpand}
+        section="next"
       />
 
       {/* ── 남은 할일 섹션 (F-02) ── */}
@@ -106,6 +107,7 @@ export default function PersonalTodoListTable({ projects, tasks, milestones }) {
         onToggle={() => toggleSection('backlog')}
         isProjectExpanded={isProjectExpanded}
         toggleProjectExpand={toggleProjectExpand}
+        section="backlog"
       />
     </div>
   )
@@ -243,6 +245,7 @@ function TodaySection({ projects, tasks, milestones, isProjectExpanded, togglePr
             milestones={milestones}
             isExpanded={isProjectExpanded(p.id)}
             onToggle={() => toggleProjectExpand(p.id)}
+            section="today"
           />
         )
       })}
@@ -258,7 +261,7 @@ function TodaySection({ projects, tasks, milestones, isProjectExpanded, togglePr
 
 /* ─── 접힘 섹션 (다음/남은) ─── */
 function CollapsibleSection({
-  label, tasks, projects, milestones,
+  label, tasks, projects, milestones, section,
   isExpanded, onToggle,
   isProjectExpanded, toggleProjectExpand,
 }) {
@@ -301,6 +304,7 @@ function CollapsibleSection({
                 milestones={milestones}
                 isExpanded={isProjectExpanded(p.id)}
                 onToggle={() => toggleProjectExpand(p.id)}
+                section={section}
               />
             )
           })}
