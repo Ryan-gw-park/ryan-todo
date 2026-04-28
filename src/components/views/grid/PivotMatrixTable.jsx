@@ -149,6 +149,7 @@ export default function PivotMatrixTable({
                         count={msTasks.length}
                         colSpan={members.length + 3}
                         projectId={p.id}
+                        members={members}
                       />
                       <tr style={{ background: PIVOT.msSubRowBg }}>
                         <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
@@ -184,6 +185,7 @@ export default function PivotMatrixTable({
                       colSpan={members.length + 3}
                       dim={true}
                       projectId={p.id}
+                      members={members}
                     />
                     <tr style={{ background: PIVOT.msSubRowBg }}>
                       <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />

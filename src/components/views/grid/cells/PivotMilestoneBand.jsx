@@ -1,21 +1,38 @@
+import { useDroppable } from '@dnd-kit/core'
 import { COLOR, PIVOT, FONT, OPACITY } from '../../../../styles/designTokens'
 
 /* ═════════════════════════════════════════════
-   PivotMilestoneBand — 풀폭 MS 가로 밴드 (spec §3.2 L-03 / L-04)
+   PivotMilestoneBand — 풀폭 MS 가로 밴드 (spec §3.2 L-03 / L-04 / D-06)
 
    props:
      - milestone: { id, title, ... } | null  (null = 미분류 밴드)
-     - count: number  (밴드 우측 표시)
-     - colSpan: number  (caller가 직접 주입 — members.length + N)
+     - count: number
+     - colSpan: number  (caller가 직접 주입)
      - dim: boolean  (미분류일 때 true → OPACITY.projectDimmed)
-     - projectId: string  (commit 11에서 droppable 등록 시 사용 — 현재는 unused)
+     - projectId: string
+     - members: Array<{ userId, displayName }>  (commit 11: resolveMemberFromX 입력)
+
+   commit 11: useDroppable 등록 → dispatcher가 type='team-matrix-band'로 분기.
    ═════════════════════════════════════════════ */
-export default function PivotMilestoneBand({ milestone, count, colSpan, dim = false, projectId }) {
+export default function PivotMilestoneBand({ milestone, count, colSpan, dim = false, projectId, members }) {
+  const msId = milestone?.id ?? null
   const label = milestone ? milestone.title : '미분류'
   const opacity = dim ? OPACITY.projectDimmed : 1
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: `team-matrix-band:${projectId}:${msId ?? 'null'}`,
+    data: {
+      type: 'team-matrix-band',
+      projectId,
+      msId,
+      members,
+    },
+  })
+
   return (
     <tr style={{ background: PIVOT.msSubRowBg }}>
       <td
+        ref={setNodeRef}
         colSpan={colSpan}
         style={{
           paddingLeft: 24,
@@ -26,6 +43,8 @@ export default function PivotMilestoneBand({ milestone, count, colSpan, dim = fa
           color: COLOR.textSecondary,
           borderBottom: `1px solid ${COLOR.border}`,
           opacity,
+          background: isOver ? COLOR.bgHover : undefined,
+          transition: 'background 0.15s',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>

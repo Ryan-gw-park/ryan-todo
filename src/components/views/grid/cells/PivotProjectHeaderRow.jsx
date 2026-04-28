@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
 import useStore from '../../../../hooks/useStore'
 import { COLOR, PILL, PIVOT } from '../../../../styles/designTokens'
 
@@ -17,6 +18,17 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
   const addMilestoneInProject = useStore(s => s.addMilestoneInProject)
   const [hover, setHover] = useState(false)
   const [adding, setAdding] = useState(false)
+
+  // commit 11: 프로젝트 헤더 행을 droppable로 등록 (D-07).
+  // task drop 시 dispatcher가 type='team-matrix-project-header' 분기 → 가상 backlog 안착.
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `team-matrix-project-header:${project.id}`,
+    data: {
+      type: 'team-matrix-project-header',
+      projectId: project.id,
+      members,
+    },
+  })
 
   const countByMember = {}
   for (const m of members) {
@@ -39,20 +51,22 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
 
   return (
     <tr
+      ref={setDropRef}
       onClick={onToggle}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { if (!adding) setHover(false) }}
       style={{
         cursor: 'pointer',
         borderBottom: `1px solid ${COLOR.border}`,
-        background: '#fff',
+        background: isOver ? COLOR.bgHover : '#fff',
+        transition: 'background 0.15s',
       }}
     >
       <td
         style={{
           position: 'sticky',
           left: 0,
-          background: '#fff',
+          background: isOver ? COLOR.bgHover : '#fff',
           zIndex: 2,
           padding: '5px 12px',
           fontSize: 13,

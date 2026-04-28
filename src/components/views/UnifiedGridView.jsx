@@ -11,7 +11,18 @@ import { EMPTY_OBJ, getMonday, fmtDate, getWeekNumber } from './grid/constants'
 // Pill removed (12f — top toggle removed)
 import PersonalMatrixGrid from './grid/grids/PersonalMatrixGrid'
 import TeamMatrixGrid from './grid/grids/TeamMatrixGrid'
-import { dispatch as dispatchDrop } from '../../utils/dnd/dispatcher'
+import { dispatch as dispatchDrop, registerHandler } from '../../utils/dnd/dispatcher'
+import {
+  handleTeamMatrixTaskDrop,
+  handleTeamMatrixBandDrop,
+  handleTeamMatrixProjectHeaderDrop,
+} from './grid/dnd/teamMatrixHandlers'
+
+// team-tasks-band-dnd commit 11: team matrix handlers 등록.
+// 모듈 import 시점 1회 등록 (HANDLERS map은 dispatcher 모듈 스코프).
+registerHandler('team-matrix-task', handleTeamMatrixTaskDrop)
+registerHandler('team-matrix-band', handleTeamMatrixBandDrop)
+registerHandler('team-matrix-project-header', handleTeamMatrixProjectHeaderDrop)
 // 주간 플래너 제거됨 (PersonalWeeklyGrid, TeamWeeklyGrid)
 
 /* ═══════════════════════════════════════════════════════
