@@ -44,10 +44,12 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
           left: 0,
           background: '#fff',
           zIndex: 2,
-          padding: '8px 12px',
+          padding: '5px 12px',
           fontSize: 13,
           fontWeight: 500,
           color: COLOR.textPrimary,
+          wordBreak: 'keep-all',
+          overflowWrap: 'break-word',
         }}
       >
         <span style={{ display: 'inline-block', width: 12, color: COLOR.textSecondary }}>

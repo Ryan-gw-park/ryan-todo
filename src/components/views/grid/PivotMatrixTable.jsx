@@ -61,7 +61,7 @@ export default function PivotMatrixTable({
     return tasks
   }, [tasks, filter])
 
-  const minWidth = PIVOT.colWidthProject + (members.length + 1) * PIVOT.colWidthMember + PIVOT.colWidthTotal
+  const minWidth = PIVOT.colWidthLabelGutter + (members.length + 1) * PIVOT.colWidthMember + PIVOT.colWidthTotal
 
   return (
     <div style={{ width: '100%', overflowX: 'auto', overflowY: 'auto', maxHeight: '100%' }}>
@@ -75,7 +75,7 @@ export default function PivotMatrixTable({
         }}
       >
         <colgroup>
-          <col style={{ width: PIVOT.colWidthProject }} />
+          <col style={{ width: PIVOT.colWidthLabelGutter }} />
           {members.map(m => <col key={m.userId} style={{ width: PIVOT.colWidthMember }} />)}
           <col style={{ width: PIVOT.colWidthMember }} />
           <col style={{ width: PIVOT.colWidthTotal }} />

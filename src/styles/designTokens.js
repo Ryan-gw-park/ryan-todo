@@ -104,15 +104,16 @@ export const PILL = {
   coral: { bg: '#FAECE7', fg: '#993C1D', borderRadius: 10, padding: '1px 8px', fontWeight: 500 },
 };
 
-// ─── 피벗 매트릭스 (Loop 42) ───
+// ─── 피벗 매트릭스 (Loop 42 / team-tasks-band-dnd) ───
 export const PIVOT = {
   msSubRowBg: '#FAFAF7',
   emptyCellColor: '#a09f99',
   emptyCellMarker: '·',
   emptyCellFontSize: 13,
-  colWidthProject: 170,
+  colWidthProject: 170,         // legacy — 사용처 0건. commit 14 정리 후보.
+  colWidthLabelGutter: 130,     // team-tasks-band-dnd L-06: 좌측 라벨 거터
   colWidthMember: 115,
-  colWidthTotal: 55,
+  colWidthTotal: 55,            // team-tasks-band-dnd commit 14에서 합계 컬럼과 함께 정리 후보
 };
 
 // ─── 개인 할일 리스트 (Loop-45, Loop-47 튜닝) ───
