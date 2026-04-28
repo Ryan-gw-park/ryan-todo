@@ -42,12 +42,6 @@ export default function PivotMatrixTable({
     setView('team-members')
   }
 
-  const handleProjectDrawer = (projectId) => {
-    // R25 최소 이행: 기존 ProjectView로 이동
-    useStore.getState().setView?.('project')
-    useStore.getState().setSelectedProjectId?.(projectId)
-  }
-
   const filteredTasks = useMemo(() => {
     if (filter === 'unassigned') {
       return tasks.filter(t =>
@@ -60,7 +54,7 @@ export default function PivotMatrixTable({
     return tasks
   }, [tasks, filter])
 
-  const minWidth = PIVOT.colWidthLabelGutter + (members.length + 1) * PIVOT.colWidthMember + PIVOT.colWidthTotal
+  const minWidth = PIVOT.colWidthLabelGutter + (members.length + 1) * PIVOT.colWidthMember
 
   return (
     <div style={{ width: '100%', overflowX: 'auto', overflowY: 'auto', maxHeight: '100%' }}>
@@ -77,7 +71,6 @@ export default function PivotMatrixTable({
           <col style={{ width: PIVOT.colWidthLabelGutter }} />
           {members.map(m => <col key={m.userId} style={{ width: PIVOT.colWidthMember }} />)}
           <col style={{ width: PIVOT.colWidthMember }} />
-          <col style={{ width: PIVOT.colWidthTotal }} />
         </colgroup>
         <thead>
           <tr>
@@ -111,13 +104,6 @@ export default function PivotMatrixTable({
                 borderBottom: `1px solid ${COLOR.border}`,
               }}
             >미배정</th>
-            <th
-              style={{
-                position: 'sticky', top: 0, zIndex: 3, background: '#fff',
-                padding: '8px 6px', fontSize: 11, fontWeight: 600, color: COLOR.textSecondary,
-                borderBottom: `1px solid ${COLOR.border}`,
-              }}
-            >합계</th>
           </tr>
         </thead>
         <tbody>
@@ -138,7 +124,6 @@ export default function PivotMatrixTable({
                   tasks={projTasks}
                   isExpanded={expanded}
                   onToggle={() => toggleProject(p.id)}
-                  onTotalClick={handleProjectDrawer}
                 />
                 {expanded && projMilestones.map(ms => {
                   const msTasks = projTasks.filter(t => t.keyMilestoneId === ms.id)
@@ -147,7 +132,7 @@ export default function PivotMatrixTable({
                       <PivotMilestoneBand
                         milestone={ms}
                         count={msTasks.length}
-                        colSpan={members.length + 3}
+                        colSpan={members.length + 2}
                         projectId={p.id}
                         members={members}
                       />
@@ -171,7 +156,6 @@ export default function PivotMatrixTable({
                             milestoneId={ms.id}
                           />
                         </td>
-                        <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
                       </tr>
                     </React.Fragment>
                   )
@@ -182,7 +166,7 @@ export default function PivotMatrixTable({
                     <PivotMilestoneBand
                       milestone={null}
                       count={ungrouped.length}
-                      colSpan={members.length + 3}
+                      colSpan={members.length + 2}
                       dim={true}
                       projectId={p.id}
                       members={members}
@@ -207,7 +191,6 @@ export default function PivotMatrixTable({
                           milestoneId={null}
                         />
                       </td>
-                      <td style={{ borderBottom: `1px solid ${COLOR.border}` }} />
                     </tr>
                   </React.Fragment>
                 )}
@@ -216,7 +199,7 @@ export default function PivotMatrixTable({
           })}
           {projects.length === 0 && (
             <tr>
-              <td colSpan={members.length + 3} style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: 13 }}>
+              <td colSpan={members.length + 2} style={{ padding: 40, textAlign: 'center', color: COLOR.textTertiary, fontSize: 13 }}>
                 표시할 프로젝트가 없습니다
               </td>
             </tr>

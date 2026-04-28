@@ -14,7 +14,7 @@ import { COLOR, PILL, PIVOT } from '../../../../styles/designTokens'
    미배정 = assigneeId IS NULL AND secondaryAssigneeId IS NULL AND scope='team' (R31)
    5+ amber, 10+ coral (R13)
    ═════════════════════════════════════════════ */
-export default function PivotProjectHeaderRow({ project, members, tasks, isExpanded, onToggle, onTotalClick }) {
+export default function PivotProjectHeaderRow({ project, members, tasks, isExpanded, onToggle }) {
   const addMilestoneInProject = useStore(s => s.addMilestoneInProject)
   const [hover, setHover] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -90,21 +90,8 @@ export default function PivotProjectHeaderRow({ project, members, tasks, isExpan
           <CountCell n={countByMember[m.userId]} />
         </td>
       ))}
-      <td style={{ textAlign: 'center' }}>
-        <CountCell n={unassignedCount} />
-      </td>
-      <td
-        onClick={e => { e.stopPropagation(); onTotalClick?.(project.id) }}
-        style={{
-          textAlign: 'center',
-          fontSize: 12,
-          fontWeight: 600,
-          color: COLOR.textSecondary,
-          cursor: onTotalClick ? 'pointer' : 'default',
-          position: 'relative',
-        }}
-      >
-        {!adding && total}
+      <td style={{ textAlign: 'center', position: 'relative' }}>
+        {!adding && <CountCell n={unassignedCount} />}
         {hover && !adding && isExpanded && (
           <span
             onClick={e => { e.stopPropagation(); setAdding(true) }}

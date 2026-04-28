@@ -113,10 +113,9 @@ export const PIVOT = {
   emptyCellColor: '#a09f99',
   emptyCellMarker: '·',
   emptyCellFontSize: 13,
-  colWidthProject: 170,         // legacy — 사용처 0건. commit 14 정리 후보.
   colWidthLabelGutter: 130,     // team-tasks-band-dnd L-06: 좌측 라벨 거터
   colWidthMember: 115,
-  colWidthTotal: 55,            // team-tasks-band-dnd commit 14에서 합계 컬럼과 함께 정리 후보
+  // colWidthProject (170) / colWidthTotal (55) — team-tasks-band-dnd commit 14에서 사용처 0건 확인 후 제거
 };
 
 // ─── 개인 할일 리스트 (Loop-45, Loop-47 튜닝) ───
