@@ -401,7 +401,7 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
       if (task.assigneeId === targetMemberId && task.dueDate === targetDate) return
       updateTask(taskId, { assigneeId: targetMemberId, dueDate: targetDate, scope: 'assigned' })
     }
-  }, [tasks, milestones, moveTaskTo, updateTask, moveMilestoneWithTasks, userId, reorderTasks, reorderMilestones])
+  }, [tasks, projects, milestones, currentTeamId, moveTaskTo, updateTask, moveMilestoneWithTasks, userId, reorderTasks, reorderMilestones])
 
   // ─── Date strings ───
   const today = new Date()
