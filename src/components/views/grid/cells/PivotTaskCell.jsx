@@ -145,7 +145,6 @@ export default function PivotTaskCell({ tasks, memberId, projectId, milestoneId 
                 type="checkbox"
                 checked={!!task.done}
                 onChange={() => toggleDone(task.id)}
-                onMouseDown={e => e.stopPropagation()}
                 style={{ flexShrink: 0 }}
               />
               {isEditing
@@ -168,14 +167,12 @@ export default function PivotTaskCell({ tasks, memberId, projectId, milestoneId 
                 : (
                   <span
                     onClick={() => setEditingId(task.id)}
-                    onMouseDown={e => e.stopPropagation()}
                     style={{ cursor: 'pointer', flex: 1, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'break-word' }}
                   >{task.text}</span>
                 )}
               {hoverTaskId === task.id && !isEditing && (
                 <div
                   onClick={e => { e.stopPropagation(); openDetail(task) }}
-                  onMouseDown={e => e.stopPropagation()}
                   style={{
                     width: 16, height: 16, borderRadius: 3, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
