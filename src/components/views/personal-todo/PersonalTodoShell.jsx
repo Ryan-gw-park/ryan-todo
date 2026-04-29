@@ -97,38 +97,50 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
         return
       }
 
-      // ═══ 1.3) 같은 project + same section task-on-task reorder (Loop-50 R-03) ═══
-      // 우선순위: focus drop 다음, project header 앞 (Q3 — task-on-task 우선)
+      // ═══ 1.3) task-on-task drop ═══
+      // P0-2 hotfix: sameContext (sortableContextId) 가드 → task data 기반 비교로 변경.
+      //   - Loop-50의 SortableContext per project가 cross-container drag와 호환 안 됨 →
+      //     PersonalTodoTaskRow를 useDraggable로 복귀, sortableContextId 제거.
+      //   - 같은-project + 같은-category → reorder (Loop-50 의도 보존, sortableContextId 없이 task data로 판정)
+      //   - 다른 project → cross-project move (Loop-49 동작 복구. 이전엔 silently return으로 누락)
       if (overId.startsWith('bl-task:') && overId !== activeIdStr) {
-        // W2 (3차) 가드: dnd-kit v5+ useSortable 이 data.sortable = { containerId, index } 자동 병합
-        // 본 codebase 첫 사용 패턴이라 안전 가드 — 미정의 시 무시
-        const sourceContextId = active.data?.current?.sortableContextId
-        const overContextId = over.data?.current?.sortable?.containerId
-        // sameContext = 같은 project + same section. 다른 context 또는 undefined = 무시 (Spec C5)
-        if (!sourceContextId || !overContextId || sourceContextId !== overContextId) return
+        const overTaskId = overId.slice('bl-task:'.length)
+        const overTask = tasks.find(t => t.id === overTaskId)
+        if (!overTask) return
 
         const sourceTask = active.data?.current?.task
         if (!sourceTask) return
 
-        // ListTable 필터 chain 과 동기화된 5조건 (Spec R-02 검증):
-        // assigneeId === currentUserId && !done && !deletedAt && projectId 일치 && category 일치
-        const cellTasks = tasks
-          .filter(t =>
-            t.assigneeId === currentUserId &&
-            !t.done &&
-            !t.deletedAt &&
-            t.projectId === sourceTask.projectId &&
-            t.category === sourceTask.category)
-          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        // 같은 project + 같은 category → same-section reorder
+        if (sourceTask.projectId === overTask.projectId && sourceTask.category === overTask.category) {
+          // ListTable 필터 chain과 동기화된 5조건:
+          // assigneeId === currentUserId && !done && !deletedAt && projectId 일치 && category 일치
+          const cellTasks = tasks
+            .filter(t =>
+              t.assigneeId === currentUserId &&
+              !t.done &&
+              !t.deletedAt &&
+              t.projectId === sourceTask.projectId &&
+              t.category === sourceTask.category)
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
-        const sourceTaskId = activeIdStr.slice('bl-task:'.length)
-        const overTaskId = overId.slice('bl-task:'.length)
-        const oldIdx = cellTasks.findIndex(t => t.id === sourceTaskId)
-        const newIdx = cellTasks.findIndex(t => t.id === overTaskId)
-        if (oldIdx === -1 || newIdx === -1) return
+          const sourceTaskId = activeIdStr.slice('bl-task:'.length)
+          const oldIdx = cellTasks.findIndex(t => t.id === sourceTaskId)
+          const newIdx = cellTasks.findIndex(t => t.id === overTaskId)
+          if (oldIdx === -1 || newIdx === -1) return
 
-        const reordered = arrayMove(cellTasks, oldIdx, newIdx)
-        reorderTasks(reordered)
+          const reordered = arrayMove(cellTasks, oldIdx, newIdx)
+          reorderTasks(reordered)
+          return
+        }
+
+        // 다른 project → cross-project move (over task의 project로)
+        const taskId = activeIdStr.slice('bl-task:'.length)
+        const targetProject = projects.find(p => p.id === overTask.projectId)
+        if (!targetProject) return
+        if (!canMoveTaskToProject(sourceTask, targetProject)) return
+        // applyTransitionRules R5: projectId 변경 → keyMilestoneId 자동 초기화
+        updateTask(taskId, { projectId: overTask.projectId })
         return
       }
 

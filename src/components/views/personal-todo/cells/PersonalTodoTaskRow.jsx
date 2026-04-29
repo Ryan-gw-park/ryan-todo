@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import useStore from '../../../../hooks/useStore'
 import { COLOR, FONT, CHECKBOX, LIST, OPACITY } from '../../../../styles/designTokens'
-import { useSortableCard } from '../../../dnd/SortableTaskCard'
 
 /* ═══════════════════════════════════════════════
    PersonalTodoTaskRow (Loop-45)
@@ -16,19 +17,21 @@ import { useSortableCard } from '../../../dnd/SortableTaskCard'
      · useSortable은 SortableContext 필수 전제인데 backlog는 미포함 → useDraggable이 정답
    - 체크박스 = TaskRow 패턴 (custom div + SVG)
    ═══════════════════════════════════════════════ */
-export default function PersonalTodoTaskRow({ task, msLabel, isEtc, sortableContextId }) {
+export default function PersonalTodoTaskRow({ task, msLabel, isEtc }) {
   const toggleDone = useStore(s => s.toggleDone)
   const updateTask = useStore(s => s.updateTask)
   const openDetail = useStore(s => s.openDetail)
 
-  // team-tasks-band-dnd commit 8: useSortable 직접 호출 → useSortableCard hook.
-  // data 형태 보존 필수: { task, sortableContextId }
-  // dnd-kit이 자동으로 data.sortable.containerId 병합 → PersonalTodoShell sameContext 가드(Loop-50)가 그대로 작동.
-  // dragOpacity = 1로 두고 isDragging 처리는 자체 (isFocus dim과 결합 필요).
-  const { setNodeRef, attributes, listeners, style: sortableStyle, isDragging } = useSortableCard({
+  // P0-2 hotfix: useSortableCard → useDraggable 복귀 (Loop-49 패턴).
+  // 사유: Loop-50의 per-project SortableContext + verticalListSortingStrategy가
+  //       cross-container drag와 호환되지 않아 (1) cross-project task-on-task drop이
+  //       silently 무시되고 (2) drag가 project 경계에서 해제되는 회귀 발생.
+  //       multi-container DnD를 onDragOver 없이 운영하면 dnd-kit이 active 추적을 잃음.
+  // data: { task } 만 — sortableContextId는 더 이상 필요 없음 (Shell branch 1.3이
+  //        task.projectId/category 기반으로 변경됨).
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `bl-task:${task.id}`,
-    data: { task, sortableContextId },
-    dragOpacity: 1,  // 자체 opacity 계산 사용
+    data: { task },
   })
 
   const [hover, setHover] = useState(false)
@@ -39,7 +42,7 @@ export default function PersonalTodoTaskRow({ task, msLabel, isEtc, sortableCont
   const rowOpacity = isDragging ? 0.3 : (task.isFocus ? OPACITY.projectDimmed : 1)
 
   const dragStyle = {
-    ...sortableStyle,
+    transform: CSS.Translate.toString(transform),
     opacity: rowOpacity,
   }
 

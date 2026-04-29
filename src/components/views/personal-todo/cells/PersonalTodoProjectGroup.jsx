@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { useDroppable, useDndContext } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../../hooks/useStore'
 import { COLOR, FONT, LIST, SPACE, OPACITY } from '../../../../styles/designTokens'
 import { canMoveTaskToProject } from '../../../../utils/dnd/guards'
@@ -54,19 +53,12 @@ export default function PersonalTodoProjectGroup({
 
   const totalInSection = sectionTasks.length
 
-  // Loop-50 R-02: sectionTasks 명시 정렬 (store reorderTasks 가 sortOrder 만 갱신, array 순서 미변경 → 직접 sort 필수)
+  // sectionTasks 명시 정렬 (store reorderTasks 가 sortOrder 만 갱신, array 순서 미변경 → 직접 sort 필수)
+  // P0-2 hotfix: SortableContext + verticalListSortingStrategy 제거 (Loop-50 회귀 복구).
+  // 표시용 sort는 유지. 같은-project reorder는 PersonalTodoShell branch 1.3에서 task data 기반으로 직접 처리.
   const sortedTasks = useMemo(
     () => [...sectionTasks].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [sectionTasks]
-  )
-
-  // Loop-50 R-04 #3: SortableContext id (project + section unique)
-  const sortableContextId = `bl-project-sortable:${project.id}:${section}`
-
-  // Loop-50 I1 (3차): SortableContext items 도 useMemo (매트릭스 CellContent.jsx:100 패턴 일관성)
-  const taskIds = useMemo(
-    () => sortedTasks.map(t => `bl-task:${t.id}`),
-    [sortedTasks]
   )
 
   const tasksWithLabels = useMemo(() => {
@@ -195,16 +187,12 @@ export default function PersonalTodoProjectGroup({
         </div>
       )}
 
-      {/* Loop-50 R-02: SortableContext 등록 (DOM 무생성, items + verticalListSortingStrategy)
-          Fragment 처럼 자식 div 가 직접 grid item 이 됨 */}
-      <SortableContext items={taskIds} id={sortableContextId} strategy={verticalListSortingStrategy}>
-      {/* Task rows (col 2 + col 3) */}
+      {/* P0-2 hotfix: SortableContext 제거 (Loop-50 회귀 복구). 자식 div가 직접 grid item. */}
       {!isEmpty && isExpanded && tasksWithLabels.map(({ task, msLabel, isEtc }) => (
         <React.Fragment key={task.id}>
-          <PersonalTodoTaskRow task={task} msLabel={msLabel} isEtc={isEtc} sortableContextId={sortableContextId} />
+          <PersonalTodoTaskRow task={task} msLabel={msLabel} isEtc={isEtc} />
         </React.Fragment>
       ))}
-      </SortableContext>
 
       {/* R-07: inline add input — col 2-3 span, 기존 task rows 아래 */}
       {adding && (
