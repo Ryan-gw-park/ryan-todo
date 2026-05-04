@@ -51,15 +51,26 @@ function AppShell({ mobile }) {
   useViewUrlSync()
 
   // Idle 프리로드 — 첫 화면 후 유휴 시간에 다른 뷰 미리 로드
+  // mobile-perf-01 R-02: 모바일은 MemoryView 만 (UnifiedGridView 는 entry render 시 자동 lazy)
+  // W6 cleanup, W5/v3 — { timeout: 3000 }, fallback 도 timeout 인자 honor
   useEffect(() => {
-    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
-    idle(() => {
-      import('./components/views/UnifiedGridView')
-      import('./components/views/ProjectView')
-      import('./components/views/InlineTimelineView')
-      import('./components/views/MemoryView')
-    })
-  }, [])
+    const idle = window.requestIdleCallback || ((cb, opts) => setTimeout(cb, opts?.timeout ?? 2000))
+    const handle = idle(() => {
+      if (mobile) {
+        import('./components/views/MemoryView')
+      } else {
+        import('./components/views/UnifiedGridView')
+        import('./components/views/ProjectView')
+        import('./components/views/InlineTimelineView')
+        import('./components/views/MemoryView')
+      }
+    }, { timeout: 3000 })
+
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(handle)
+      else clearTimeout(handle)
+    }
+  }, [mobile])
 
   // Keyboard shortcuts
   const VIEW_ORDER = ['personal-matrix', 'personal-weekly', 'personal-timeline', 'memory', 'team-matrix', 'team-weekly', 'team-weekly-schedule', 'team-timeline']
