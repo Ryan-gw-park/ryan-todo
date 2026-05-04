@@ -27,13 +27,29 @@ import OutlinerEditor from '../../../shared/OutlinerEditor'
 export default function FocusCard({ task, project, milestone }) {
   const toggleDone = useStore(s => s.toggleDone)
   const updateTask = useStore(s => s.updateTask)
+  const openDetail = useStore(s => s.openDetail)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `focus-card:${task.id}`,
   })
 
   const [hover, setHover] = useState(false)
+  const [editing, setEditing] = useState(false)
   const hasNotes = !isEmptyNotes(task.notes)
+
+  // Escape 취소 시 blur가 뒤따라 발화하면서 finishEdit가 저장하는 race 차단.
+  const cancelledRef = useRef(false)
+
+  const finishEdit = (v) => {
+    if (cancelledRef.current) {
+      cancelledRef.current = false
+      setEditing(false)
+      return
+    }
+    setEditing(false)
+    const text = (v ?? '').trim()
+    if (text && text !== task.text) updateTask(task.id, { text })
+  }
 
   // E-09: expanded 상태 — usePivotExpandState 'focusCardExpanded' 재사용
   const { pivotCollapsed: expandedMap, setPivotCollapsed: setExpanded } = usePivotExpandState('focusCardExpanded')
@@ -115,14 +131,16 @@ export default function FocusCard({ task, project, milestone }) {
           </svg>
         </div>
 
-        {/* E-06: Drag handle ⋮⋮ — listeners/attributes 여기에만 spread */}
+        {/* E-06: Drag handle ⋮⋮ — listeners/attributes 여기에만 spread.
+            editing 중에는 pointerEvents 차단으로 input blur 유도 방지. */}
         <div
-          {...attributes}
-          {...listeners}
+          {...(editing ? {} : { ...attributes, ...listeners })}
           style={{
-            cursor: 'grab', color: COLOR.textTertiary,
+            cursor: editing ? 'default' : 'grab', color: COLOR.textTertiary,
             fontSize: 14, lineHeight: 1, userSelect: 'none',
             padding: '2px 2px', flexShrink: 0, marginTop: 1,
+            pointerEvents: editing ? 'none' : 'auto',
+            opacity: editing ? 0.3 : 1,
           }}
           title="드래그하여 이동"
         >⋮⋮</div>
@@ -147,17 +165,38 @@ export default function FocusCard({ task, project, milestone }) {
 
         {/* Text + meta */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: FONT.body,
-              color: task.done ? COLOR.textTertiary : COLOR.textPrimary,
-              textDecoration: task.done ? 'line-through' : 'none',
-              lineHeight: 1.4,
-              wordBreak: 'break-word',
-            }}
-          >
-            {task.text}
-          </div>
+          {editing ? (
+            <input
+              autoFocus
+              defaultValue={task.text}
+              onBlur={e => finishEdit(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); finishEdit(e.target.value) }
+                if (e.key === 'Escape') { cancelledRef.current = true; setEditing(false) }
+              }}
+              onMouseDown={e => e.stopPropagation()}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                fontSize: FONT.body, border: 'none', outline: 'none',
+                background: 'transparent', color: COLOR.textPrimary, fontFamily: 'inherit',
+                padding: 0, lineHeight: 1.4,
+              }}
+            />
+          ) : (
+            <div
+              onClick={e => { e.stopPropagation(); e.preventDefault(); setEditing(true) }}
+              style={{
+                fontSize: FONT.body,
+                color: task.done ? COLOR.textTertiary : COLOR.textPrimary,
+                textDecoration: task.done ? 'line-through' : 'none',
+                lineHeight: 1.4,
+                wordBreak: 'break-word',
+                cursor: 'text',
+              }}
+            >
+              {task.text}
+            </div>
+          )}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 4,
             marginTop: 2, fontSize: FONT.ganttMs,
@@ -185,6 +224,25 @@ export default function FocusCard({ task, project, milestone }) {
             </svg>
           </div>
         </div>
+
+        {/* Detail arrow (hover && !editing) — PersonalTodoTaskRow:142-155 패턴 */}
+        {hover && !editing && (
+          <div
+            onClick={e => { e.stopPropagation(); e.preventDefault(); openDetail(task) }}
+            style={{
+              width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', opacity: 0.4,
+              color: COLOR.textTertiary,
+            }}
+            title="상세 패널 열기"
+          >
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none">
+              <path d="M6 3l5 5-5 5" stroke="#666" strokeWidth="1.5"
+                    strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        )}
 
         {/* × (포커스 해제) */}
         <div
