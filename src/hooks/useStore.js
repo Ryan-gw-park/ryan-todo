@@ -19,6 +19,8 @@ let _projectOrderLoaded = false
 let _msLoadSeq = 0
 // ─── mobile-perf-01 R-01 v4: optimistic delete 추적 (외부 추가와 구분) ───
 const _pendingDeleteMilestoneIds = new Set()
+// ─── mobile-perf-02 v3: stage 2 fire-and-forget race guard ───
+let _s2LoadSeq = 0
 
 /**
  * @typedef {Object} TaskAlarm
@@ -427,12 +429,12 @@ const useStore = create((set, get) => ({
         }
       }
 
-      const [pr, trResult, mr, uiR, taskSettings] = await Promise.all([
+      // mobile-perf-02 R-01: critical (tasks+projects+memos) 만 await — 첫 페인트 차단 해제
+      // ui_state + taskSettings 는 stage 2 fire-and-forget (set 직후, loadUserProjectOrder 이전)
+      const [pr, trResult, mr] = await Promise.all([
         projectsQuery,
         tasksQuery,
         d.from('memos').select(MEMO_COLUMNS).order('sort_order'),
-        d.from('ui_state').select('collapse_state').eq('id', 'default').maybeSingle(),
-        _fetchUserTaskSettings(teamId),
       ])
       if (pr.error) throw pr.error
 
@@ -460,21 +462,17 @@ const useStore = create((set, get) => ({
       }
       if (tr.error) throw tr.error
 
-      // Merge loaded collapse state with defaults — preserve snapshot values if already restored
+      // mobile-perf-02 R-01 C2 fix: snapshot path 여부를 boolean flag 로 (_defaultCollapseState 의존 제거).
+      //   csFromSnapshot=true  → snapshot/사용자 toggle 값. stage 2 무변경.
+      //   csFromSnapshot=false → default 사용. stage 2 도착 시 DB 값 적용.
       const currentCs = get().collapseState
-      const hasSnapshotCs = currentCs && Object.values(currentCs).some(v => v && Object.keys(v).length > 0)
+      const csFromSnapshot = currentCs && Object.values(currentCs).some(v => v && Object.keys(v).length > 0)
       let cs
-      if (hasSnapshotCs) {
-        // 스냅샷에서 이미 복원된 값이 있으면 유지 (DB 값은 다음 loadAll에서 적용)
+      if (csFromSnapshot) {
         cs = currentCs
       } else {
-        const loaded = uiR?.data?.collapse_state || {}
+        // stage 1 default. stage 2 가 DB 값으로 갱신
         cs = { ..._defaultCollapseState }
-        for (const key of Object.keys(cs)) {
-          if (loaded[key] && typeof loaded[key] === 'object') {
-            cs[key] = loaded[key]
-          }
-        }
       }
 
       const projects = pr.data.map(mapProject)
@@ -520,11 +518,9 @@ const useStore = create((set, get) => ({
 
       // 스냅샷 → 서버 전환 시 변경분만 set하여 불필요한 리렌더 방지
       const current = get()
-      // userTaskSettings: 스냅샷에서 이미 복원된 값이 있으면 유지
-      const currentUts = current.userTaskSettings
-      const mergedUts = (currentUts && currentUts.length > 0) ? currentUts : taskSettings
+      // mobile-perf-02 R-01 v4: userTaskSettings 는 stage 2 가 매 cycle 적용 (utsFromSnapshot guard 제거).
       // mobile-perf-01 R-01: milestones 별도 비동기 set() 으로 이동 (첫 페인트 차단 해제)
-      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: mergedUts }
+      const patch = { collapseState: cs, syncStatus: 'ok' }
       if (!isArrayEqual(current.tasks, tasks)) patch.tasks = tasks
       if (!isArrayEqual(current.projects, projects)) patch.projects = projects
       if (!isArrayEqual(current.memos, memos)) {
@@ -584,6 +580,34 @@ const useStore = create((set, get) => ({
             console.warn('[Ryan Todo] milestones (deferred) network:', e?.message || e)
           })
       }
+
+      // ── mobile-perf-02 R-01 v4: Stage 2 background — ui_state + taskSettings ──
+      // 첫 페인트 차단 안 함. csFromSnapshot=false 일 때만 collapseState 적용.
+      // userTaskSettings 는 매 cycle 무조건 적용 (utsFromSnapshot guard 제거 — same-team polling stale fix).
+      const stage2TeamId = teamId  // closure capture (W1 race guard)
+      const s2Seq = ++_s2LoadSeq    // v3 sequence guard
+      Promise.all([
+        d.from('ui_state').select('collapse_state').eq('id', 'default').maybeSingle(),
+        _fetchUserTaskSettings(teamId),
+      ]).then(([uiR2, taskSettings2]) => {
+        if (s2Seq !== _s2LoadSeq) return  // v3 — stale stage 2 폐기
+        if (get().currentTeamId !== stage2TeamId) return  // W1 — teamId race
+        const bgPatch = {}
+        if (!csFromSnapshot) {
+          const loaded = uiR2?.data?.collapse_state || {}
+          const cs2 = { ..._defaultCollapseState }
+          for (const key of Object.keys(cs2)) {
+            if (loaded[key] && typeof loaded[key] === 'object') cs2[key] = loaded[key]
+          }
+          bgPatch.collapseState = cs2
+        }
+        // v4: utsFromSnapshot guard 제거 — 매 cycle 무조건 적용
+        bgPatch.userTaskSettings = taskSettings2
+        if (Object.keys(bgPatch).length > 0) set(bgPatch)
+      }).catch(e => {
+        if (s2Seq !== _s2LoadSeq) return
+        console.warn('[Ryan Todo] loadAll stage2:', e?.message || e)
+      })
 
       // 12b: 사용자별 프로젝트 순서 로드 (최초 1회만, 내부에서 flag 체크)
       if (!_projectOrderLoaded) {
