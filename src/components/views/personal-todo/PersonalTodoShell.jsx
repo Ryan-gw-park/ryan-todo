@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import {
-  DndContext, PointerSensor, TouchSensor, useSensor, useSensors, rectIntersection, useDroppable,
+  DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter, useDroppable,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
@@ -20,6 +20,10 @@ import { canMoveTaskToProject } from '../../../utils/dnd/guards'
    Shell 함수 본체에서 직접 useDroppable 을 부르면 OUTER(UnifiedGridView) 에
    등록되어 inner(Shell) DndContext 의 드래그에 보이지 않음.
    → FocusColumn child 컴포넌트로 분리해 inner DndContext 내부에서 훅 호출.
+
+   ⚠ collisionDetection: closestCenter (codebase convention).
+   rectIntersection 사용 시 source project의 bl-project:*(자기 자신)이 항상 우승하여
+   branch 1.5 self-target gate에서 silent return 발생 — cross-project drop 회귀 원인.
 
    DnD 시나리오:
      1) 백로그 task → 포커스 패널 (focus-panel:root 또는 focus-card:*) (F-23)
@@ -103,6 +107,10 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
       //     PersonalTodoTaskRow를 useDraggable로 복귀, sortableContextId 제거.
       //   - 같은-project + 같은-category → reorder (Loop-50 의도 보존, sortableContextId 없이 task data로 판정)
       //   - 다른 project → cross-project move (Loop-49 동작 복구. 이전엔 silently return으로 누락)
+      //
+      // ⚠ hotfix-focus-and-dnd: closestCenter + useDraggable 전용 환경에서는 over.id가
+      //   'bl-task:'로 시작하지 않으므로 본 분기 진입 불가 (defensive dead code 보존).
+      //   향후 PersonalTodoTaskRow에 useSortable 복귀 시 자동으로 same-project reorder 부활.
       if (overId.startsWith('bl-task:') && overId !== activeIdStr) {
         const overTaskId = overId.slice('bl-task:'.length)
         const overTask = tasks.find(t => t.id === overTaskId)
@@ -182,7 +190,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={rectIntersection}
+      collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
       <div style={{
