@@ -14,7 +14,6 @@ import Toast from './components/shared/Toast'
 import UpdateToast from './components/shared/UpdateToast'
 import { ViewSkeleton, LoadingSpinner } from './components/shared/Skeleton'
 import { SyncProviderWrapper } from './sync/SyncContext'
-import Sidebar from './components/layout/Sidebar'
 import useViewUrlSync from './hooks/useViewUrlSync'
 
 // React.lazy 코드 스플리팅 — 뷰 컴포넌트 동적 import
@@ -39,6 +38,8 @@ const HelpPage = lazy(() => import('./components/shared/HelpPage'))
 const ModalRouter = lazy(() => import('./components/modals/ModalRouter'))
 const MembersView = lazy(() => import('./components/views/MembersView'))
 const WeeklyScheduleView = lazy(() => import('./components/views/WeeklyScheduleView'))
+// mobile-perf-03 R-02: Sidebar lazy 화 — 모바일 entry chunk 에서 dnd-kit 제거
+const Sidebar = lazy(() => import('./components/layout/Sidebar'))
 
 function isMobile() { return window.innerWidth < 768 }
 
@@ -117,8 +118,12 @@ function AppShell({ mobile }) {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#fff' }}>
-      {/* 사이드바 (데스크탑만) */}
-      {!mobile && <Sidebar />}
+      {/* 사이드바 (데스크탑만) — mobile-perf-03 R-02: lazy + Suspense (fallback width 210 = Sidebar.S.sidebarW) */}
+      {!mobile && (
+        <Suspense fallback={<div style={{ width: 210 }} />}>
+          <Sidebar />
+        </Suspense>
+      )}
 
       {/* 메인 영역 */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
