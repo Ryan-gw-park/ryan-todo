@@ -15,6 +15,10 @@ const SNAPSHOT_MAX_AGE = 24 * 60 * 60 * 1000 // 24시간
 let _loadAllRunning = false
 // ─── 12b: 프로젝트 순서 최초 1회만 로드 ───
 let _projectOrderLoaded = false
+// ─── mobile-perf-01 R-01 (W1): milestones fire-and-forget race guard ───
+let _msLoadSeq = 0
+// ─── mobile-perf-01 R-01 v4: optimistic delete 추적 (외부 추가와 구분) ───
+const _pendingDeleteMilestoneIds = new Set()
 
 /**
  * @typedef {Object} TaskAlarm
@@ -514,27 +518,13 @@ const useStore = create((set, get) => ({
         console.warn('[Ryan Todo] instant seed exception:', e)
       }
 
-      // 마일스톤: 프로젝트 ID 기반으로 한번에 로딩 (별도 렌더 사이클 방지)
-      let milestones = []
-      const projectIdsList = projects.map(p => p.id)
-      if (projectIdsList.length > 0) {
-        try {
-          const msResult = await d.from('key_milestones')
-            .select('id, pkm_id, project_id, title, color, sort_order, owner_id, secondary_owner_id, status, start_date, end_date, created_by, parent_id, depth, scheduled_date')
-            .in('project_id', projectIdsList)
-            .order('sort_order')
-          milestones = msResult.data || []
-        } catch (e) {
-          // 마일스톤 로딩 실패해도 다른 데이터 반영에 영향 없음
-        }
-      }
-
       // 스냅샷 → 서버 전환 시 변경분만 set하여 불필요한 리렌더 방지
       const current = get()
       // userTaskSettings: 스냅샷에서 이미 복원된 값이 있으면 유지
       const currentUts = current.userTaskSettings
       const mergedUts = (currentUts && currentUts.length > 0) ? currentUts : taskSettings
-      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: mergedUts, milestones }
+      // mobile-perf-01 R-01: milestones 별도 비동기 set() 으로 이동 (첫 페인트 차단 해제)
+      const patch = { collapseState: cs, syncStatus: 'ok', userTaskSettings: mergedUts }
       if (!isArrayEqual(current.tasks, tasks)) patch.tasks = tasks
       if (!isArrayEqual(current.projects, projects)) patch.projects = projects
       if (!isArrayEqual(current.memos, memos)) {
@@ -553,7 +543,47 @@ const useStore = create((set, get) => ({
           patch.memos = merged
         }
       }
-      set(patch)
+      // mobile-perf-01 v3 (W2): 팀 전환 감지 시 set(patch) 자체 skip — stale 팀 데이터 적용 차단
+      const prevTeamId = current.currentTeamId
+      if (teamId !== prevTeamId) {
+        set({ milestones: [], syncStatus: 'ok' })
+      } else {
+        set(patch)
+      }
+
+      // ── mobile-perf-01 R-01: milestones fire-and-forget — 첫 페인트 차단 해제 ──
+      const projectIdsList = projects.map(p => p.id)
+      if (projectIdsList.length === 0) {
+        // EC-1: project 모두 삭제 case — milestones 도 빈 배열로 sync
+        if (get().milestones.length > 0) set({ milestones: [] })
+      } else {
+        const mySeq = ++_msLoadSeq  // W1 race guard
+        d.from('key_milestones')
+          .select('id, pkm_id, project_id, title, color, sort_order, owner_id, secondary_owner_id, status, start_date, end_date, created_by, parent_id, depth, scheduled_date')
+          .in('project_id', projectIdsList)
+          .order('sort_order')
+          .then(res => {
+            if (mySeq !== _msLoadSeq) return  // W1 — stale 응답 무시
+            if (res.error) {
+              console.warn('[Ryan Todo] milestones (deferred):', res.error.message)
+              return
+            }
+            if (!res.data) return
+            // v4 — pendingDelete Set 으로 정확 merge (외부 추가 보존, optimistic delete 보존)
+            const cur = get().milestones
+            const dbFiltered = res.data.filter(m => !_pendingDeleteMilestoneIds.has(m.id))
+            const dbIds = new Set(dbFiltered.map(m => m.id))
+            const optimisticInserts = cur.filter(m => !dbIds.has(m.id) && !_pendingDeleteMilestoneIds.has(m.id))
+            const merged = new Map()
+            for (const m of dbFiltered) merged.set(m.id, m)
+            for (const m of optimisticInserts) if (!merged.has(m.id)) merged.set(m.id, m)
+            set({ milestones: Array.from(merged.values()) })
+          })
+          .catch(e => {  // W3 — Unhandled Promise Rejection 방지
+            if (mySeq !== _msLoadSeq) return
+            console.warn('[Ryan Todo] milestones (deferred) network:', e?.message || e)
+          })
+      }
 
       // 12b: 사용자별 프로젝트 순서 로드 (최초 1회만, 내부에서 flag 체크)
       if (!_projectOrderLoaded) {
@@ -1328,15 +1358,21 @@ const useStore = create((set, get) => ({
   deleteMilestone: async (id) => {
     const d = db()
     if (!d) return
+    // mobile-perf-01 v4: optimistic delete 추적 (deferred fetch merge 시 외부 추가와 구분)
+    _pendingDeleteMilestoneIds.add(id)
     // Loop 41: L1 flat. CASCADE 재귀 제거. 단일 MS만 삭제.
     set(s => ({
       milestones: s.milestones.filter(m => m.id !== id),
       tasks: s.tasks.map(t => t.keyMilestoneId === id ? { ...t, keyMilestoneId: null } : t),
     }))
-    const { error } = await d.from('key_milestones').delete().eq('id', id)
-    if (error) console.error('[useStore] deleteMilestone:', error)
-    // DB에서도 연결된 task의 key_milestone_id 초기화
-    await d.from('tasks').update({ key_milestone_id: null, updated_at: new Date().toISOString() }).eq('key_milestone_id', id)
+    try {
+      const { error } = await d.from('key_milestones').delete().eq('id', id)
+      if (error) console.error('[useStore] deleteMilestone:', error)
+      // DB에서도 연결된 task의 key_milestone_id 초기화
+      await d.from('tasks').update({ key_milestone_id: null, updated_at: new Date().toISOString() }).eq('key_milestone_id', id)
+    } finally {
+      _pendingDeleteMilestoneIds.delete(id)
+    }
   },
 
   reorderMilestones: async (reordered) => {
