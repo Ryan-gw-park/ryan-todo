@@ -146,7 +146,8 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
         const taskId = activeIdStr.slice('bl-task:'.length)
         const targetProject = projects.find(p => p.id === overTask.projectId)
         if (!targetProject) return
-        if (!canMoveTaskToProject(sourceTask, targetProject)) return
+        const sourceProject = projects.find(p => p.id === sourceTask.projectId)
+        if (!canMoveTaskToProject(sourceTask, targetProject, sourceProject)) return
         // applyTransitionRules R5: projectId 변경 → keyMilestoneId 자동 초기화
         updateTask(taskId, { projectId: overTask.projectId })
         return

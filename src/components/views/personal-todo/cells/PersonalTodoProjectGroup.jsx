@@ -38,10 +38,15 @@ export default function PersonalTodoProjectGroup({
 
   // R-07: drag 중인 source task 와 비교하여 drop 가능 여부 판정
   const { active } = useDndContext()
+  const allProjects = useStore(s => s.projects)
   const dragSourceTask = active?.data?.current?.task
   const isDragActive = !!active && String(active.id).startsWith('bl-task:')
+  // hotfix-focus-and-dnd v2: source project 조회 후 system project 예외 판정
+  const dragSourceProject = isDragActive && dragSourceTask
+    ? allProjects.find(p => p.id === dragSourceTask.projectId)
+    : null
   const isAllowedDrop = isDragActive && dragSourceTask
-    ? canMoveTaskToProject(dragSourceTask, project)
+    ? canMoveTaskToProject(dragSourceTask, project, dragSourceProject)
     : false
   const isSelfTarget = isDragActive && dragSourceTask?.projectId === project.id
 

@@ -78,7 +78,8 @@ function applyCrossCell(task, srcCellKey, dstCellKey, ctx) {
 
   if (srcCellKey.projectId !== dstCellKey.projectId) {
     const dstProject = ctx.projects.find(p => p.id === dstCellKey.projectId)
-    if (!canMoveTaskToProject(task, dstProject)) return  // D-09
+    const srcProject = ctx.projects.find(p => p.id === srcCellKey.projectId)
+    if (!canMoveTaskToProject(task, dstProject, srcProject)) return  // D-09
     patch.projectId = dstCellKey.projectId
     patch.keyMilestoneId = dstCellKey.msId  // R5 차단용 명시 보존
   }
