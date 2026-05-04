@@ -182,17 +182,6 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   const handleDragEnd = useCallback((e) => {
     setActiveId(null)
 
-    // [diag-dnd] outer DndContext가 bl-task: 드래그를 가로채는지 확인
-    // 정상 시: bl-task: 드래그는 inner Shell DndContext에서만 처리, outer는 발화 안 됨
-    const _diagActiveId = String(e.active?.id || '')
-    if (_diagActiveId.startsWith('bl-task:') || _diagActiveId.startsWith('bl-ms:')) {
-      console.log('[diag-dnd] outer-end-CAUGHT-BL', {
-        activeIdStr: _diagActiveId,
-        overId: e.over ? String(e.over.id) : null,
-        warning: 'outer가 backlog drag를 가로챘습니다 — nested DndContext 분리 실패 의심',
-      })
-    }
-
     // team-tasks-band-dnd commit 9: dispatcher 우선 시도 (spec §12.1, §12.2)
     // 등록된 type 핸들러가 처리하면 true → early return.
     // 미등록 type 또는 type 없음 → false → 아래 string-prefix fallback 실행.

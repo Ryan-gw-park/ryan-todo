@@ -83,15 +83,6 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     const { active, over } = e
     const activeIdStr = String(active?.id || '')
 
-    // [diag-dnd] inner DndContext 진입 확인 + over resolution 결과
-    console.log('[diag-dnd] inner-end', {
-      activeIdStr,
-      overId: over ? String(over.id) : null,
-      hasTask: !!active?.data?.current?.task,
-      taskTeamId: active?.data?.current?.task?.teamId ?? null,
-      taskProjectId: active?.data?.current?.task?.projectId ?? null,
-    })
-
     if (!over) return  // F-24 revised: 포커스 해제는 × 버튼만
 
     const overId = String(over.id)
@@ -168,22 +159,13 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
         // R-06 으로 active.data 항상 첨부됨
         const task = active.data?.current?.task
         const targetProject = projects.find(p => p.id === targetProjectId)
-        // [diag-dnd] branch 1.5 진입 + 가드 통과 여부
-        const canMove = canMoveTaskToProject(task, targetProject)
-        console.log('[diag-dnd] branch-1.5', {
-          taskId, targetProjectId,
-          hasTask: !!task,
-          hasTargetProject: !!targetProject,
-          taskProjectId: task?.projectId,
-          targetProjectTeamId: targetProject?.teamId ?? null,
-          taskTeamId: task?.teamId ?? null,
-          canMoveTaskToProject: canMove,
-        })
         if (!task || !targetProject) return
         // same-type validation (Spec §4-2 매트릭스). self-target 도 false 처리
-        if (!canMove) return
+        // hotfix-focus-and-dnd v2: 시스템 프로젝트(즉시 등) 경유 시 cross-boundary 허용.
+        const sourceProject = projects.find(p => p.id === task.projectId)
+        if (!canMoveTaskToProject(task, targetProject, sourceProject)) return
         // applyTransitionRules R5: projectId 변경 → keyMilestoneId 자동 초기화
-        // useStore.js:621 personal-target 가드 자동 적용 (private 보호)
+        // useStore.js:675 personal-target 가드 자동 적용 (team→personal/system 시 scope=private 자동 변환)
         updateTask(taskId, { projectId: targetProjectId })
         return
       }
@@ -211,13 +193,6 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragOver={(e) => {
-        // [diag-dnd] 드래그 중 collision resolution 추적 (over.id 변동 캡처)
-        const aId = String(e.active?.id || '')
-        if (aId.startsWith('bl-task:')) {
-          console.log('[diag-dnd] inner-over', { activeIdStr: aId, overId: e.over ? String(e.over.id) : null })
-        }
-      }}
       onDragEnd={handleDragEnd}
     >
       <div style={{
