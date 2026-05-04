@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import { useDroppable, useDndContext } from '@dnd-kit/core'
 import useStore, { getCachedUserId } from '../../../../hooks/useStore'
 import { COLOR, FONT, LIST, SPACE, OPACITY } from '../../../../styles/designTokens'
@@ -35,6 +35,14 @@ export default function PersonalTodoProjectGroup({
     id: `bl-project:${project.id}`,
     data: { projectId: project.id, teamId: project.teamId, isSystem: project.isSystem },
   })
+
+  // [diag-dnd] droppable 등록 확인 (mount 시 1회) + isOver 변동 추적
+  useEffect(() => {
+    console.log('[diag-dnd] bl-project mounted', { id: `bl-project:${project.id}`, projectName: project.name, teamId: project.teamId, isSystem: project.isSystem })
+  }, [project.id, project.name, project.teamId, project.isSystem])
+  useEffect(() => {
+    if (isOver) console.log('[diag-dnd] bl-project isOver=true', { id: `bl-project:${project.id}`, name: project.name })
+  }, [isOver, project.id, project.name])
 
   // R-07: drag 중인 source task 와 비교하여 drop 가능 여부 판정
   const { active } = useDndContext()
