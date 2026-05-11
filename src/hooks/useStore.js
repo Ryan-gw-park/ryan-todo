@@ -653,7 +653,8 @@ const useStore = create((set, get) => ({
       : { scope: 'private', createdBy: userId }
     const t = { id: uid(), done: false, notes: '', sortOrder: Date.now(), category: 'today', alarm: null, ...teamDefaults, ...task }
     // 개인 프로젝트 강제 보정 — ...task spread 후에도 scope/teamId 보장
-    if (isPersonalProject) { t.scope = 'private'; t.teamId = null; t.assigneeId = userId }
+    // valid_scope CHECK: scope='private' 은 assignee_id IS NULL 이어야 함
+    if (isPersonalProject) { t.scope = 'private'; t.teamId = null; t.assigneeId = null }
     set(s => ({ tasks: [...s.tasks, t] }))
     const d = db()
     if (!d) { set({ syncStatus: 'error' }); return }
@@ -673,9 +674,10 @@ const useStore = create((set, get) => ({
     const targetProjectId = resolvedPatch.projectId || currentTask.projectId
     const targetProject = targetProjectId ? get().projects.find(p => p.id === targetProjectId) : null
     if (targetProject && !targetProject.teamId) {
+      // valid_scope CHECK: scope='private' 은 assignee_id IS NULL 이어야 함
       resolvedPatch.scope = 'private'
       resolvedPatch.teamId = null
-      resolvedPatch.assigneeId = _cachedUserId
+      resolvedPatch.assigneeId = null
     }
     set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...resolvedPatch } : t) }))
     const t = get().tasks.find(x => x.id === id)
