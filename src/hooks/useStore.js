@@ -140,6 +140,8 @@ function taskToRow(t) {
     // ↓ Loop-45: 포커스 ↓
     is_focus: t.isFocus === true,
     focus_sort_order: t.focusSortOrder ?? 0,
+    // ↓ Spec r2 R-STORE-3: agenda matrix N:M (text[]) ↓
+    agendas: t.agendas || [],
   }
   if (_alarmColExists) row.alarm = t.alarm ?? null
   return row
@@ -205,6 +207,8 @@ function mapTask(r) {
     // ↓ Loop-45: 포커스 ↓
     isFocus: r.is_focus === true,
     focusSortOrder: r.focus_sort_order ?? 0,
+    // ↓ Spec r2 R-STORE-2: agenda matrix N:M (text[]) ↓
+    agendas: r.agendas || [],
   }
 }
 
@@ -274,6 +278,9 @@ const useStore = create((set, get) => ({
   syncStatus: 'ok',
   currentView: 'personal-matrix',
   detailTask: null,
+  // ─── Spec r2 R-STORE-5: agenda matrix cross-cell hover 강조 ───
+  hoveredTaskId: null,
+  setHoveredTaskId: (id) => set({ hoveredTaskId: id }),
   showProjectMgr: false,
   // Loop-33: 모달 상태
   activeModal: null,        // { type: 'projectSettings', projectId } | { type: 'milestoneDetail', milestoneId, returnTo } | null
