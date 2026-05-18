@@ -6,9 +6,20 @@ import { arrayMove } from '@dnd-kit/sortable'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
 import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { COLOR } from '../../../styles/designTokens'
-import PersonalTodoListTable from './PersonalTodoListTable'
+import PersonalAgendaMatrixTable from '../grid/PersonalAgendaMatrixTable'
 import FocusPanel from './FocusPanel'
 import { canMoveTaskToProject } from '../../../utils/dnd/guards'
+import { dispatch as dispatchDrop, registerHandler } from '../../../utils/dnd/dispatcher'
+import {
+  handleAgendaMatrixTaskDrop,
+  handleAgendaMatrixRowDrop,
+} from '../grid/dnd/personalAgendaHandlers'
+
+// Spec r2 R-DND-1: inner DndContext용 dispatcher 등록 (import 시점 1회).
+// useDroppable/useSortable은 nearest React Context에 등록되므로 PersonalTodoShell
+// 모듈 최상단에서 등록해야 inner DndContext의 onDragEnd → dispatchDrop이 매칭함.
+registerHandler('agenda-matrix-task', handleAgendaMatrixTaskDrop)
+registerHandler('agenda-matrix-row', handleAgendaMatrixRowDrop)
 
 /* ═══════════════════════════════════════════════
    PersonalTodoShell (Loop-45 → Loop-47)
@@ -86,6 +97,14 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     if (!over) return  // F-24 revised: 포커스 해제는 × 버튼만
 
     const overId = String(over.id)
+
+    // ═══ Spec r2 B2: agenda matrix dispatcher (inner context) ═══
+    // 매트릭스 cell/row drop은 dispatcher 패턴으로 처리. 미매칭이면 fallthrough.
+    const dispatchCtx = {
+      tasks, projects, milestones, currentUserId,
+      updateTask, reorderTasks,
+    }
+    if (dispatchDrop(e, dispatchCtx)) return
 
     // ═══ 1) 백로그 → 포커스 패널 (F-23) ═══
     if (activeIdStr.startsWith('bl-task:')) {
@@ -188,7 +207,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     }
 
     // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
-  }, [focusTasks, projects, tasks, currentUserId, updateTask, reorderFocusTasks, reorderTasks, setExpanded])
+  }, [focusTasks, projects, tasks, milestones, currentUserId, updateTask, reorderFocusTasks, reorderTasks, setExpanded])
 
   return (
     <DndContext
@@ -198,13 +217,13 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     >
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(420px, 1.5fr) minmax(280px, 1fr)',
+        gridTemplateColumns: 'minmax(420px, 2fr) minmax(280px, 1fr)',
         gap: 20,
         width: '100%',
       }}>
-        {/* Column 1: 백로그 3섹션 */}
+        {/* Column 1: 개인 할일 매트릭스 (Spec r2 D3 외과적 교체) */}
         <div style={{ minWidth: 0 }}>
-          <PersonalTodoListTable
+          <PersonalAgendaMatrixTable
             projects={projects}
             tasks={tasks}
             milestones={milestones}
