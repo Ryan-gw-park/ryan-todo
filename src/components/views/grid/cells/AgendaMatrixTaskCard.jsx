@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import useStore from '../../../../hooks/useStore'
 import SortableTaskCard from '../../../dnd/SortableTaskCard'
 import { COLOR, HIGHLIGHT, PILL } from '../../../../styles/designTokens'
-import { taskMatchesAnyMention } from '../../../../utils/mentions'
+import { matchingMentions, getMentionColor } from '../../../../utils/mentions'
 
 /* AgendaMatrixTaskCard — Spec r2 C4b / C7 / C8.5
  *
@@ -24,8 +24,12 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
   const [editing, setEditing] = useState(false)
   const [localHover, setLocalHover] = useState(false)
 
-  // Hotfix r4: 활성 mention 매칭 시 카드 강조
-  const isMentionHit = taskMatchesAnyMention(task, activeMentions)
+  // Hotfix r6: 활성 mention 매칭 시 mention별 색상으로 카드 강조
+  // - 다중 매칭 task는 첫 번째 등장한 mention 색상으로 background 표시
+  // - 추가 매칭은 좌측 stripe 색상 막대로 누적 시각화
+  const hitMentions = matchingMentions(task, activeMentions)
+  const isMentionHit = hitMentions.length > 0
+  const primaryHitColor = isMentionHit ? getMentionColor(hitMentions[0]) : null
   const showCategoryChip = task.category && task.category !== 'today'
   const categoryLabel = (
     task.category === 'next' ? '다음'
@@ -49,16 +53,18 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
   }
 
   // 우선순위: hover(cross-cell) > mention 강조 > 기본
+  // mention 강조: primaryHitColor 의 chipBg + dot outline + chipText 사용
   const wrapStyle = isHovered
     ? {
         background: HIGHLIGHT.crossCell.bg,
         outline: `1px solid ${HIGHLIGHT.crossCell.outline}`,
         color: HIGHLIGHT.crossCell.text,
       }
-    : isMentionHit
+    : primaryHitColor
       ? {
-          background: '#FFFBE6',     // 옅은 노랑 — mention 강조
-          outline: '1px solid #F0C419',
+          background: primaryHitColor.chipBg,
+          outline: `1px solid ${primaryHitColor.dot}`,
+          color: primaryHitColor.chipText,
         }
       : undefined
 
@@ -91,6 +97,31 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
             marginTop: 1,
           }}
         >★</span>
+      )}
+
+      {/* Hotfix r6: 다중 mention 매칭 시 좌측에 추가 dot 누적 (primary는 outline으로 표시됨) */}
+      {hitMentions.length > 1 && (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 2,
+          flexShrink: 0,
+          marginTop: 3,
+        }}>
+          {hitMentions.slice(1).map(name => {
+            const c = getMentionColor(name)
+            return (
+              <span
+                key={name}
+                title={`@${name}`}
+                style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: c.dot,
+                }}
+              />
+            )
+          })}
+        </span>
       )}
 
       {/* checkbox (4-zone) */}

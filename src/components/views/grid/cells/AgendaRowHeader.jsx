@@ -1,20 +1,15 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { COLOR, FONT } from '../../../../styles/designTokens'
-import { getColor } from '../../../../utils/colors'
 import { makeRowId } from '../../../../utils/dnd/cellKeys/personalAgenda'
 
-/* AgendaRowHeader — Hotfix r4
+/* AgendaRowHeader — Hotfix r6 (project color dot 제거)
  *
  * 역할:
- *   - project 정보 표시 (color dot + name + task 카운트)
+ *   - project 이름 + task 카운트 표시
  *   - droppable: task 카드 drop 시 projectId 재할당
  *   - sortable: row 헤더 자체 drag 시 row 순서 변경
  *   - 접기/펼치기 토글 (chevron 버튼)
- *
- * UX:
- *   - 헤더 본문(드래그 영역) — 좌측 grip + project 표시. listener 부착.
- *   - 우측 chevron 버튼 — onMouseDown stopPropagation으로 drag listener 차단, onClick으로 toggle.
  */
 export default function AgendaRowHeader({ project, taskCount, isCollapsed, onToggle }) {
   const rowId = makeRowId(project.id)
@@ -35,8 +30,6 @@ export default function AgendaRowHeader({ project, taskCount, isCollapsed, onTog
     },
   })
 
-  const color = getColor(project.color)
-
   // Hotfix r5: 접힌 행은 헤더가 전체 너비 차지 (cell filler 제거 → 회색 띠 사라짐)
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -55,10 +48,6 @@ export default function AgendaRowHeader({ project, taskCount, isCollapsed, onTog
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <span style={{
-        width: 10, height: 10, borderRadius: 2,
-        background: color.dot, flexShrink: 0,
-      }} />
       <span style={{
         fontSize: FONT.body,
         fontWeight: 600,

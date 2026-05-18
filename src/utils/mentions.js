@@ -56,6 +56,13 @@ export function taskMatchesAnyMention(task, activeMentions) {
   return false
 }
 
+/* task에서 활성 mention과 매칭되는 이름들 (text 등장 순서) */
+export function matchingMentions(task, activeMentions) {
+  if (!activeMentions || activeMentions.size === 0) return []
+  if (!task || !task.text) return []
+  return parseMentions(task.text).filter(n => activeMentions.has(n))
+}
+
 /* 일관된 mention 색상 — 이름 해시 기반 (COLOR_OPTIONS 8개 순환) */
 const MENTION_PALETTE = [
   { dot: '#d4a039', chipBg: '#FBF1DE', chipText: '#7A5512' },  // yellow
