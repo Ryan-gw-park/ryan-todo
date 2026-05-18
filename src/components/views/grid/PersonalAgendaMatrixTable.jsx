@@ -168,19 +168,18 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
                     isCollapsed={isCollapsed}
                     onToggle={toggleRow}
                   />
-                  {isCollapsed
-                    ? <CollapsedFiller key={`filler-${project.id}`} />
-                    : AGENDA_TYPES.map(agendaType => (
-                      <AgendaMatrixCell
-                        key={`${project.id}-${agendaType}`}
-                        cellKey={makeCellKey(project.id, agendaType)}
-                        tasks={tasks}
-                        hideDone={hideDone}
-                        currentUserId={currentUserId}
-                        project={project}
-                        activeMentions={activeMentions}
-                      />
-                    ))}
+                  {/* Hotfix r5: 접힌 행은 row header가 5 columns 전부 차지 (filler 불필요) */}
+                  {!isCollapsed && AGENDA_TYPES.map(agendaType => (
+                    <AgendaMatrixCell
+                      key={`${project.id}-${agendaType}`}
+                      cellKey={makeCellKey(project.id, agendaType)}
+                      tasks={tasks}
+                      hideDone={hideDone}
+                      currentUserId={currentUserId}
+                      project={project}
+                      activeMentions={activeMentions}
+                    />
+                  ))}
                 </RowGroup>
               )
             })}
@@ -207,16 +206,4 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
 
 function RowGroup({ children }) {
   return <>{children}</>
-}
-
-/* 접힌 행의 cells 자리에 grid columns 채우는 빈 div (4개 컬럼 span) */
-function CollapsedFiller() {
-  return (
-    <div style={{
-      gridColumn: 'span 4',
-      background: '#fff',
-      minHeight: 0,
-      height: 4,
-    }} />
-  )
 }

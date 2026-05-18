@@ -37,6 +37,7 @@ export default function AgendaRowHeader({ project, taskCount, isCollapsed, onTog
 
   const color = getColor(project.color)
 
+  // Hotfix r5: 접힌 행은 헤더가 전체 너비 차지 (cell filler 제거 → 회색 띠 사라짐)
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -45,10 +46,11 @@ export default function AgendaRowHeader({ project, taskCount, isCollapsed, onTog
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    borderRight: `1px solid ${COLOR.border}`,
+    borderRight: isCollapsed ? 'none' : `1px solid ${COLOR.border}`,
     opacity: isDragging ? 0.4 : 1,
     cursor: 'grab',
     userSelect: 'none',
+    ...(isCollapsed ? { gridColumn: '1 / -1' } : null),
   }
 
   return (

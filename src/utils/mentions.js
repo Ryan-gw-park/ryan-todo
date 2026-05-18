@@ -1,13 +1,15 @@
-/* @멘션 자동 인식 유틸 — Hotfix r4
+/* @멘션 자동 인식 유틸 — Hotfix r5
  *
- * 사용자는 task.text에 "@이름" 형태로 담당자를 태깅. 본 유틸이 정규식으로 추출 후
- * 매트릭스 헤더에 토글 칩으로 노출 + 카드 강조.
+ * task.text의 "@이름" 형태 담당자 태그를 추출.
  *
- * 패턴: '@' 직후 문자/숫자/한글 연속. 구두점/공백/'@'에서 종료.
- *   - 매칭: "@김", "@John", "@홍길동", "@user_1"
- *   - 비매칭: "email@example.com" (이메일은 의도적으로 제외 — 이메일은 '@' 앞에 문자 있음)
+ * 패턴:
+ *   - 단일: "@김", "@John", "@홍길동", "@user_1"
+ *   - 다중('+' 구분): "@Ethan+Ash" → ['Ethan', 'Ash'],
+ *                     "@Ethan+Ash+Bob" → ['Ethan', 'Ash', 'Bob'],
+ *                     "@김+이" → ['김', '이']
+ *   - 비매칭: "email@example.com" (이메일 — '@' 앞에 문자 있으면 제외)
  */
-const MENTION_RE = /(?:^|[^\wㄱ-힝])@([\wㄱ-힝][\wㄱ-힝\d_]*)/g
+const MENTION_RE = /(?:^|[^\wㄱ-힝])@([\wㄱ-힝][\wㄱ-힝\d_]*(?:\+[\wㄱ-힝][\wㄱ-힝\d_]*)*)/g
 
 export function parseMentions(text) {
   if (!text) return []
@@ -16,10 +18,13 @@ export function parseMentions(text) {
   let m
   MENTION_RE.lastIndex = 0
   while ((m = MENTION_RE.exec(text)) !== null) {
-    const name = m[1]
-    if (!seen.has(name)) {
-      seen.add(name)
-      out.push(name)
+    // '+' 구분 다중 태그 지원: "Ethan+Ash" → ["Ethan", "Ash"]
+    const names = m[1].split('+')
+    for (const name of names) {
+      if (name && !seen.has(name)) {
+        seen.add(name)
+        out.push(name)
+      }
     }
   }
   return out
