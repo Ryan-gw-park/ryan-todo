@@ -107,6 +107,29 @@ export const PILL = {
   coral: { bg: '#FAECE7', fg: '#993C1D', borderRadius: 10, padding: '1px 8px', fontWeight: 500 },
 };
 
+// ─── 아젠다 색상 (Spec r2 R-TOKEN-1) ───
+export const AGENDA = {
+  jasonWeekly:    { dot: '#7F77DD', chipBg: '#EEEDFE', chipText: '#3C3489' },
+  planningWeekly: { dot: '#1D9E75', chipBg: '#E1F5EE', chipText: '#085041' },
+  decisionNeeded: { dot: '#D85A30', chipBg: '#FAECE7', chipText: '#712B13' },
+  personal:       { dot: '#888780', chipBg: '#F1EFE8', chipText: '#444441' },
+};
+
+// ─── 크로스셀 하이라이트 (Spec r2 R-TOKEN-2) ───
+export const HIGHLIGHT = {
+  crossCell: {
+    bg:      '#FAEEDA',  // amber 50
+    outline: '#EF9F27',  // amber 400
+    text:    '#633806',  // amber 800
+  },
+};
+
+// ─── 매트릭스 추가 토큰 (Spec r2 R-TOKEN-3) ───
+export const MATRIX = {
+  inboxRowBg: '#FAF8F2',
+  stripedPattern: 'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(0,0,0,0.015) 6px, rgba(0,0,0,0.015) 7px)',
+};
+
 // ─── 피벗 매트릭스 (Loop 42 / team-tasks-band-dnd) ───
 export const PIVOT = {
   msSubRowBg: '#FAFAF7',
