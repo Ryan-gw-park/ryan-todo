@@ -9,7 +9,7 @@ import { matchingMentions, getMentionColorByIndex } from '../../../../utils/ment
  * R-COMP-8: SortableTaskCard 수정 0건 wrapper.
  *
  * Responsibilities:
- *   C4b: 카드 본체 (checkbox, 제목, 화살표) + ⭐ is_focus 뱃지 + category 칩
+ *   C4b: 카드 본체 (checkbox, 제목, 화살표) + category 칩
  *   C7:  cross-cell hover 강조 (store.hoveredTaskId selector)
  *   C8.5: hover 시 우측 X 버튼 → 셀의 agendaType 제거 (단일 태그 삭제)
  *
@@ -103,21 +103,8 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
         ...wrapStyle,
       }}
     >
-      {/* ⭐ is_focus 뱃지 (R-UX-5) */}
-      {task.isFocus && (
-        <span
-          aria-label="focus"
-          style={{
-            fontSize: 10,
-            color: '#D85A30',
-            flexShrink: 0,
-            pointerEvents: 'none',
-            marginTop: 1,
-          }}
-        >★</span>
-      )}
-
       {/* Hotfix r8: 다중 매칭은 카드 background 색 컬럼 분할로 표현 (별도 dot 누적 불필요) */}
+      {/* Hotfix r10: is_focus ★ 뱃지 제거 — FocusPanel 폐지로 set/toggle UI 부재, 의미 잃은 잔재. DB의 is_focus 컬럼은 보존. */}
 
       {/* checkbox (4-zone) */}
       <input
