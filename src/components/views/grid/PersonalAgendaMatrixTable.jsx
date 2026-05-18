@@ -1,53 +1,46 @@
 import { useMemo, useState } from 'react'
-import { getCachedUserId } from '../../../hooks/useStore'
-import { COLOR, FONT, MATRIX } from '../../../styles/designTokens'
+import useStore, { getCachedUserId } from '../../../hooks/useStore'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { COLOR, FONT } from '../../../styles/designTokens'
 import {
   AGENDA_TYPES,
   makeCellKey,
-  getVisibleMilestones,
+  makeRowId,
+  getVisibleProjects,
 } from '../../../utils/dnd/cellKeys/personalAgenda'
 import AgendaColHeader from './cells/AgendaColHeader'
 import AgendaRowHeader from './cells/AgendaRowHeader'
 import AgendaMatrixCell from './cells/AgendaMatrixCell'
-import AgendaInboxRow from './cells/AgendaInboxRow'
 
-/* PersonalAgendaMatrixTable — Spec r2 C4a / C4b / C5 / C6 / C7 / C8.5 / C9
+/* PersonalAgendaMatrixTable — Hotfix r3
  *
- * 행 = key_milestone (uuid), 열 = 4 agenda (고정)
+ * 행 = top-level project (모든 미아카이브 프로젝트 표시).
+ * 열 = 4 고정 agenda.
+ * Inbox 행 폐지. agendas 미지정 task는 'personal' 컬럼에 가상 표시 (getCellTasks 내부 처리).
  *
- * D5 평탄화: milestone sub-row 없음.
- * 행 필터: 현재 사용자에게 할당된 미완료 task가 ≥1개인 milestone (변동 행 수).
- *
- * H-5 대응: 컨테이너 overflow-x: auto (가로 스크롤 대비).
- * H-6 대응: hideDone toggle 헤더에 노출.
+ * Row reorder: SortableContext + AgendaRowHeader(useSortable).
+ *   - row 자체 drag → 다른 row 위에 drop → reorderProjects
+ *   - task 카드 drag → row 헤더 drop → task.projectId 재할당
+ *   - handler가 active.id 패턴으로 분기
  */
-export default function PersonalAgendaMatrixTable({ projects, tasks, milestones }) {
+export default function PersonalAgendaMatrixTable({ projects, tasks }) {
   const currentUserId = getCachedUserId()
   const [hideDone, setHideDone] = useState(true)
+  const localProjectOrder = useStore(s => s.localProjectOrder)
 
-  const visibleMs = useMemo(
-    () => getVisibleMilestones(milestones, tasks, projects, currentUserId),
-    [milestones, tasks, projects, currentUserId]
+  const visibleProjects = useMemo(
+    () => getVisibleProjects(projects, localProjectOrder),
+    [projects, localProjectOrder]
   )
 
-  // inbox row의 instant project (InlineAdd projectId용)
-  const instantProject = useMemo(() => {
-    return (projects || []).find(p =>
-      p.userId === currentUserId &&
-      (p.systemKey === 'instant' || p.isSystem === true)
-    ) || null
-  }, [projects, currentUserId])
-
-  // milestone.project_id → project 조회 맵
-  const projectById = useMemo(() => {
-    const m = new Map()
-    for (const p of projects || []) m.set(p.id, p)
-    return m
-  }, [projects])
+  const rowIds = useMemo(
+    () => visibleProjects.map(p => makeRowId(p.id)),
+    [visibleProjects]
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-      {/* 헤더 (제목 + hideDone 토글) */}
+      {/* 헤더 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -74,7 +67,7 @@ export default function PersonalAgendaMatrixTable({ projects, tasks, milestones 
         </button>
       </div>
 
-      {/* 매트릭스 본체 */}
+      {/* 본체 */}
       <div style={{
         overflowX: 'auto',
         overflowY: 'visible',
@@ -87,9 +80,9 @@ export default function PersonalAgendaMatrixTable({ projects, tasks, milestones 
           gridTemplateColumns: '200px repeat(4, minmax(160px, 1fr))',
           gap: 1,
           background: COLOR.divider,
-          minWidth: 200 + 4 * 160 + 4, // 가로 스크롤 보장
+          minWidth: 200 + 4 * 160 + 4,
         }}>
-          {/* Header row */}
+          {/* Column headers */}
           <div style={{
             background: '#fff',
             padding: '10px 12px',
@@ -97,35 +90,21 @@ export default function PersonalAgendaMatrixTable({ projects, tasks, milestones 
             fontSize: FONT.label,
             color: COLOR.textSecondary,
           }}>
-            프로젝트 / 마일스톤
+            프로젝트
           </div>
           {AGENDA_TYPES.map(agendaType => (
             <AgendaColHeader key={agendaType} agendaType={agendaType} />
           ))}
 
-          {/* Inbox row (C5) — 항상 표시 */}
-          <AgendaInboxRow tasks={tasks} currentUserId={currentUserId} />
-          {AGENDA_TYPES.map(agendaType => (
-            <AgendaMatrixCell
-              key={`inbox-${agendaType}`}
-              cellKey={makeCellKey(null, agendaType)}
-              tasks={tasks}
-              hideDone={hideDone}
-              currentUserId={currentUserId}
-              project={instantProject}
-            />
-          ))}
-
-          {/* Milestone rows */}
-          {visibleMs.map(ms => {
-            const project = projectById.get(ms.project_id) || null
-            return (
-              <RowGroup key={ms.id}>
-                <AgendaRowHeader milestone={ms} project={project} />
+          {/* Project rows — SortableContext for row reorder */}
+          <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
+            {visibleProjects.map(project => (
+              <RowGroup key={project.id}>
+                <AgendaRowHeader project={project} />
                 {AGENDA_TYPES.map(agendaType => (
                   <AgendaMatrixCell
-                    key={`${ms.id}-${agendaType}`}
-                    cellKey={makeCellKey(ms.id, agendaType)}
+                    key={`${project.id}-${agendaType}`}
+                    cellKey={makeCellKey(project.id, agendaType)}
                     tasks={tasks}
                     hideDone={hideDone}
                     currentUserId={currentUserId}
@@ -133,11 +112,11 @@ export default function PersonalAgendaMatrixTable({ projects, tasks, milestones 
                   />
                 ))}
               </RowGroup>
-            )
-          })}
+            ))}
+          </SortableContext>
 
-          {/* 빈 상태 안내 */}
-          {visibleMs.length === 0 && (
+          {/* 빈 상태 */}
+          {visibleProjects.length === 0 && (
             <div style={{
               gridColumn: '1 / -1',
               padding: '24px 12px',
@@ -147,7 +126,7 @@ export default function PersonalAgendaMatrixTable({ projects, tasks, milestones 
               color: COLOR.textTertiary,
               fontStyle: 'italic',
             }}>
-              아직 마일스톤에 배정된 미완료 할일이 없습니다. 신규 할일에 추가해 보세요.
+              표시할 프로젝트가 없습니다.
             </div>
           )}
         </div>
@@ -156,7 +135,6 @@ export default function PersonalAgendaMatrixTable({ projects, tasks, milestones 
   )
 }
 
-// 단일 grid row를 같은 위치에 배치하기 위한 Fragment wrapper
 function RowGroup({ children }) {
   return <>{children}</>
 }

@@ -10,26 +10,22 @@ import {
 import InlineAdd from '../../../shared/InlineAdd'
 import AgendaMatrixTaskCard from './AgendaMatrixTaskCard'
 
-/* AgendaMatrixCell — Spec r2 C4b / C6
+/* AgendaMatrixCell — Hotfix r3 (cellKey = { projectId, agendaType })
  *
- * 한 셀 = (msId, agendaType). 셀 내부 = task list + InlineAdd ("+ 추가").
+ * 한 셀 = (projectId, agendaType). 셀 내부 = 본인 task 목록 + InlineAdd.
  *
- * Cell droppable data: { type: 'agenda-matrix-task', cellKey } → dispatcher 매칭용
- * SortableContext id: agenda-cell-sortable:{msId|inbox}:{agendaType}
- *
- * H-5 대응: 외부 컨테이너에 overflow 처리 위임. 본 셀은 padding/min-height만 책임.
- * B-3 수정: InlineAdd는 색 객체(getColor 결과)를 요구. milestone의 project 또는 inbox의 instant project 색 사용.
+ * Cell droppable data: { type: 'agenda-matrix-task', cellKey }
  */
 export default function AgendaMatrixCell({
   cellKey,
   tasks,
   hideDone,
   currentUserId,
-  project,         // milestone이 속한 project (inbox일 땐 instant project)
+  project,
 }) {
   const cellTasks = getCellTasks(tasks, cellKey, { currentUserId, hideDone })
-  const cellId = makeCellId(cellKey.msId, cellKey.agendaType)
-  const sortableId = makeSortableId(cellKey.msId, cellKey.agendaType)
+  const cellId = makeCellId(cellKey.projectId, cellKey.agendaType)
+  const sortableId = makeSortableId(cellKey.projectId, cellKey.agendaType)
 
   const { setNodeRef, isOver } = useDroppable({
     id: cellId,
@@ -38,7 +34,6 @@ export default function AgendaMatrixCell({
 
   const isEmpty = cellTasks.length === 0
   const colorObj = project ? getColor(project.color) : getColor(null)
-  const projectId = project?.id || null
 
   return (
     <div
@@ -69,15 +64,15 @@ export default function AgendaMatrixCell({
         ))}
       </SortableContext>
 
-      {/* C6: InlineAdd — 항상 마운트, 사용자가 "+ 추가" 클릭으로 활성화 */}
-      {projectId && (
+      {/* InlineAdd: "+ 추가" 버튼 (사용자 클릭 시 input 활성) */}
+      {project && (
         <InlineAdd
-          projectId={projectId}
+          projectId={project.id}
           category="today"
           color={colorObj}
           extraFields={{
             agendas: [cellKey.agendaType],
-            keyMilestoneId: cellKey.msId,  // null = inbox
+            keyMilestoneId: null,
           }}
         />
       )}

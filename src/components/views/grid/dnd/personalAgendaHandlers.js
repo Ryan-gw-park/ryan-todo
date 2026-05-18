@@ -1,23 +1,39 @@
-/* Personal agenda matrix DnD handlers — Spec r2 C8 / C9
+/* Personal agenda matrix DnD handlers — Hotfix r3 (row = project)
  *
- * Dispatcher types (PersonalTodoShell 모듈 최상단에서 registerHandler 호출):
- *   - 'agenda-matrix-task' : task 카드 → 셀 또는 다른 task 카드 (cross-cell / same-cell)
- *   - 'agenda-matrix-row'  : task 카드 → row 헤더 (milestone 재할당)
+ * Dispatcher types:
+ *   - 'agenda-matrix-task'       : task 카드 → cell drop (cross-cell / same-cell reorder)
+ *   - 'agenda-matrix-row'        : task 카드 → row 헤더 drop (projectId 재할당)
+ *                                  (over.data.current.type='agenda-matrix-row-reorder'이지만
+ *                                   active가 cell-task일 때 task-to-row로 분기 처리)
+ *   - 'agenda-matrix-row-reorder': row 헤더 → row 헤더 drop (project 순서 변경)
  *
- * 행 = key_milestone (Spec r2 D5+). cross-cell 시 keyMilestoneId만 변경.
- *
- * B-2 결정: cross-project milestone drag 금지 (silent return).
- *   - 시나리오: ABI Korea의 task → SAP 산하 milestone 행에 drag
- *   - 처리: task.projectId !== dstMs.project_id 이면 no-op
- *   - 이유: 데이터 무결성 (project_id ↔ milestone.project_id 불일치 방지)
- *   - 사용자는 detail panel에서 명시적으로 project를 먼저 이동해야 cross-project 가능
+ * 행 = top-level project. cross-row drag = cross-project drag → R5 자연 발동
+ * (keyMilestoneId 자동 nullify 수용 — milestone 정보가 매트릭스에 표시되지 않으므로 영향 없음).
  */
 import { arrayMove } from '@dnd-kit/sortable'
-import { getCellTasks, sameCellKey } from '../../../../utils/dnd/cellKeys/personalAgenda'
+import {
+  getCellTasks,
+  parseRowId,
+  sameCellKey,
+} from '../../../../utils/dnd/cellKeys/personalAgenda'
 
-/* C8 — cell→cell drag (agenda 추가 모드 + 행 이동 시 milestone 변경) */
+const TASK_ID_PREFIX = 'cell-task:'
+
+function isTaskId(idStr) {
+  return String(idStr || '').startsWith(TASK_ID_PREFIX)
+}
+
+function getTaskFromActive(active, ctx) {
+  if (active.data?.current?.task) return active.data.current.task
+  const idStr = String(active.id || '')
+  if (!isTaskId(idStr)) return null
+  const taskId = idStr.slice(TASK_ID_PREFIX.length)
+  return ctx.tasks.find(t => t.id === taskId) || null
+}
+
+/* C8 — cell-to-cell drag (agenda 추가 모드 + 행 이동 시 projectId 재할당) */
 export function handleAgendaMatrixTaskDrop(e, ctx) {
-  const task = e.active.data?.current?.task
+  const task = getTaskFromActive(e.active, ctx)
   if (!task) return
 
   const srcCellKey = e.active.data?.current?.cellKey
@@ -26,7 +42,7 @@ export function handleAgendaMatrixTaskDrop(e, ctx) {
 
   const cellCtx = { currentUserId: ctx.currentUserId, hideDone: false }
 
-  // Same cell reorder
+  // same-cell reorder
   if (sameCellKey(srcCellKey, dstCellKey)) {
     const cellTasks = getCellTasks(ctx.tasks, srcCellKey, cellCtx)
     const oldIdx = cellTasks.findIndex(t => t.id === task.id)
@@ -34,64 +50,77 @@ export function handleAgendaMatrixTaskDrop(e, ctx) {
     const newIdx = overTask
       ? cellTasks.findIndex(t => t.id === overTask.id)
       : cellTasks.length - 1
-    if (oldIdx === -1 || newIdx === -1) return
-    if (oldIdx === newIdx) return
+    if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return
     ctx.reorderTasks(arrayMove(cellTasks, oldIdx, newIdx))
     return
   }
 
-  // Cross-cell move
   applyAgendaCrossCell(task, srcCellKey, dstCellKey, ctx)
 }
 
-/* C9 — task → row 헤더 drag (milestone 재할당, agendas는 유지) */
+/* C9 / row drop:
+ *   - active가 task 카드 (cell-task:...) → projectId 재할당
+ *   - active가 row 헤더 (agenda-row:...) → row 순서 변경 (reorderProjects)
+ *
+ * dispatcher가 over.data.current.type === 'agenda-matrix-row-reorder' 매칭하여 본 핸들러 호출.
+ */
 export function handleAgendaMatrixRowDrop(e, ctx) {
-  const task = e.active.data?.current?.task
-  if (!task) return
+  const activeIdStr = String(e.active.id || '')
 
-  const dstMsId = e.over.data?.current?.msId ?? null  // null = inbox
-  if ((task.keyMilestoneId ?? null) === dstMsId) return  // no-op
-
-  // B-2 guard: cross-project 금지
-  if (dstMsId) {
-    const dstMs = (ctx.milestones || []).find(m => m.id === dstMsId)
-    if (!dstMs) return
-    const dstProjectId = dstMs.project_id
-    if (task.projectId && dstProjectId && task.projectId !== dstProjectId) {
-      // 다른 프로젝트의 milestone — 데이터 무결성 보호, no-op
-      return
-    }
+  // 1) Row reorder (row → row)
+  if (!isTaskId(activeIdStr) && activeIdStr.startsWith('agenda-row:')) {
+    handleAgendaRowReorder(e, ctx)
+    return
   }
 
-  ctx.updateTask(task.id, { keyMilestoneId: dstMsId })
+  // 2) Task → row (projectId 재할당)
+  const task = getTaskFromActive(e.active, ctx)
+  if (!task) return
+
+  const dstProjectId = e.over.data?.current?.projectId
+    || e.over.data?.current?.rowProjectId
+    || parseRowId(e.over.id)?.projectId
+  if (!dstProjectId) return
+
+  if (task.projectId === dstProjectId) return  // no-op
+
+  // R5 자연 발동: projectId 변경 → keyMilestoneId 자동 nullify (의도된 동작)
+  ctx.updateTask(task.id, { projectId: dstProjectId })
 }
 
-/* 공통 cross-cell 처리 (셀↔셀):
- *   - 도착 agendaType을 task.agendas에 추가 (R-DND-4 추가 모드)
- *   - 다른 milestone 행이면 keyMilestoneId 변경 (R-DND-5)
- *   - cross-project milestone 이동 금지 (B-2)
- *   - 행=key_milestone이라 projectId 변경 없음 → R5 우회 불필요
+/* row 자체 reorder — project sort_order 갱신 */
+function handleAgendaRowReorder(e, ctx) {
+  const srcRow = parseRowId(e.active.id)
+  const dstRow = parseRowId(e.over.id)
+  if (!srcRow || !dstRow) return
+  if (srcRow.projectId === dstRow.projectId) return
+
+  const projects = ctx.projects || []
+  const oldIdx = projects.findIndex(p => p.id === srcRow.projectId)
+  const newIdx = projects.findIndex(p => p.id === dstRow.projectId)
+  if (oldIdx === -1 || newIdx === -1) return
+
+  const reordered = arrayMove(projects, oldIdx, newIdx)
+  if (typeof ctx.reorderProjects === 'function') {
+    ctx.reorderProjects(reordered)
+  }
+}
+
+/* cross-cell 처리 (같은 행 다른 컬럼 or 다른 행):
+ *   - 도착 agendaType을 task.agendas에 추가 (기존 태그 유지)
+ *   - 다른 행이면 projectId 재할당 (R5는 자연 발동 — 매트릭스에 milestone 미표시이므로 영향 없음)
  */
 function applyAgendaCrossCell(task, srcCellKey, dstCellKey, ctx) {
   const patch = {}
 
-  // 도착 agendaType 추가 (기존 태그 유지)
   const currentAgendas = Array.isArray(task.agendas) ? task.agendas : []
   if (!currentAgendas.includes(dstCellKey.agendaType)) {
     patch.agendas = [...currentAgendas, dstCellKey.agendaType]
   }
 
-  // 행 이동: keyMilestoneId 변경
-  if (srcCellKey.msId !== dstCellKey.msId) {
-    // B-2 guard: cross-project milestone 금지
-    if (dstCellKey.msId) {
-      const dstMs = (ctx.milestones || []).find(m => m.id === dstCellKey.msId)
-      if (!dstMs) return
-      if (task.projectId && dstMs.project_id && task.projectId !== dstMs.project_id) {
-        return  // 데이터 무결성 보호 — silent no-op
-      }
-    }
-    patch.keyMilestoneId = dstCellKey.msId  // null = inbox
+  if (srcCellKey.projectId !== dstCellKey.projectId) {
+    patch.projectId = dstCellKey.projectId
+    // R5 자연 발동 허용 — keyMilestoneId 자동 nullify (UX 영향 없음)
   }
 
   if (Object.keys(patch).length === 0) return

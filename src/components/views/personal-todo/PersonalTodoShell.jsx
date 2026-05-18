@@ -18,8 +18,17 @@ import {
 // Spec r2 R-DND-1: inner DndContext용 dispatcher 등록 (import 시점 1회).
 // useDroppable/useSortable은 nearest React Context에 등록되므로 PersonalTodoShell
 // 모듈 최상단에서 등록해야 inner DndContext의 onDragEnd → dispatchDrop이 매칭함.
+//
+// Hotfix r3 — row reorder 신규 type 추가:
+//   - 'agenda-matrix-task'       : cell ↔ cell drag (task)
+//   - 'agenda-matrix-row'        : task → row 헤더 drop (projectId 재할당)
+//   - 'agenda-matrix-row-reorder': row 헤더 → row 헤더 drop (project 순서 변경)
+//   Row 헤더 useSortable의 data.type은 'agenda-matrix-row-reorder' 하나만 노출되지만
+//   handler가 active.id 패턴으로 task/row를 분기 처리. dispatcher 측에서 두 type 모두
+//   같은 handler에 매핑.
 registerHandler('agenda-matrix-task', handleAgendaMatrixTaskDrop)
 registerHandler('agenda-matrix-row', handleAgendaMatrixRowDrop)
+registerHandler('agenda-matrix-row-reorder', handleAgendaMatrixRowDrop)
 
 /* ═══════════════════════════════════════════════
    PersonalTodoShell (Loop-45 → Loop-47)
@@ -68,6 +77,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
   const updateTask = useStore(s => s.updateTask)
   const reorderFocusTasks = useStore(s => s.reorderFocusTasks)
   const reorderTasks = useStore(s => s.reorderTasks)
+  const reorderProjects = useStore(s => s.reorderProjects)
   const { setPivotCollapsed: setExpanded } = usePivotExpandState('focusCardExpanded')
 
   // Focus tasks — Shell 레벨에서도 계산 (DnD handler에서 max order / idx 조회용)
@@ -98,11 +108,12 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
 
     const overId = String(over.id)
 
-    // ═══ Spec r2 B2: agenda matrix dispatcher (inner context) ═══
+    // ═══ Spec r2 B2 + Hotfix r3: agenda matrix dispatcher (inner context) ═══
     // 매트릭스 cell/row drop은 dispatcher 패턴으로 처리. 미매칭이면 fallthrough.
+    // Hotfix r3: row reorder를 위해 reorderProjects 포함.
     const dispatchCtx = {
       tasks, projects, milestones, currentUserId,
-      updateTask, reorderTasks,
+      updateTask, reorderTasks, reorderProjects,
     }
     if (dispatchDrop(e, dispatchCtx)) return
 
@@ -207,7 +218,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
     }
 
     // focus-card → focus-panel:root 또는 외부: no-op (× 버튼으로만 해제)
-  }, [focusTasks, projects, tasks, milestones, currentUserId, updateTask, reorderFocusTasks, reorderTasks, setExpanded])
+  }, [focusTasks, projects, tasks, milestones, currentUserId, updateTask, reorderFocusTasks, reorderTasks, reorderProjects, setExpanded])
 
   return (
     <DndContext
