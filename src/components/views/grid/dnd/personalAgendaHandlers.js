@@ -31,7 +31,11 @@ function getTaskFromActive(active, ctx) {
   return ctx.tasks.find(t => t.id === taskId) || null
 }
 
-/* C8 — cell-to-cell drag (agenda 추가 모드 + 행 이동 시 projectId 재할당) */
+/* C8 — cell-to-cell drag (agenda 추가 모드 + 행 이동 시 projectId 재할당)
+ *
+ * mention 모드(over.data.columnMode === 'mention')에서는 column 변경의 의미가 모호하므로
+ * cross-cell column 변경은 비활성. 같은 셀 reorder와 cross-row(projectId 재할당)은 유지.
+ */
 export function handleAgendaMatrixTaskDrop(e, ctx) {
   const task = getTaskFromActive(e.active, ctx)
   if (!task) return
@@ -40,7 +44,8 @@ export function handleAgendaMatrixTaskDrop(e, ctx) {
   const dstCellKey = e.over.data?.current?.cellKey
   if (!srcCellKey || !dstCellKey) return
 
-  const cellCtx = { currentUserId: ctx.currentUserId, hideDone: false }
+  const dstColumnMode = e.over.data?.current?.columnMode || 'agenda'
+  const cellCtx = { currentUserId: ctx.currentUserId, hideDone: false, columnMode: dstColumnMode }
 
   // same-cell reorder
   if (sameCellKey(srcCellKey, dstCellKey)) {
@@ -52,6 +57,15 @@ export function handleAgendaMatrixTaskDrop(e, ctx) {
       : cellTasks.length - 1
     if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return
     ctx.reorderTasks(arrayMove(cellTasks, oldIdx, newIdx))
+    return
+  }
+
+  // mention 모드: cross-cell 컬럼 변경 무시 (text 자동 수정 위험)
+  // 다른 행이면 projectId만 재할당, 같은 행 다른 컬럼은 no-op
+  if (dstColumnMode === 'mention') {
+    if (srcCellKey.projectId !== dstCellKey.projectId) {
+      ctx.updateTask(task.id, { projectId: dstCellKey.projectId })
+    }
     return
   }
 

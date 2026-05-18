@@ -1,22 +1,16 @@
-/* Personal Agenda Matrix cellKey utility — Hotfix r3 (row = project)
+/* Personal Agenda Matrix cellKey utility — Hotfix r9 (column mode toggle)
  *
- * 변경 사유 (사용자 피드백 — 2026-05-18):
- *   - 사용자는 매트릭스에 모든 프로젝트가 행으로 보이길 원함 (이전: milestone 행, task ≥1인 milestone만)
- *   - 행 간 상하 reorder 가능해야 함 (project sort_order)
- *   - keyMilestoneId IS NULL task는 "내 개인할일" 컬럼에 자동 분류
- *
- * 변경 결과:
- *   - 행 = top-level project (`tasks.project_id`)
- *   - inbox 행 폐지 (모든 task는 어떤 project에 속함)
- *   - agendas가 비어있는 task → 'personal' 컬럼에 가상 표시 (DB 변경 없음)
- *
- * cellKey 구조: { projectId: string, agendaType: string }
+ * cellKey: { projectId, agendaType }
+ *   - agendaType은 generic columnKey 역할.
+ *     · columnMode='agenda': agendas enum 값 (weekly_jason / ...)
+ *     · columnMode='mention': mention 이름 (Ethan / Ash / ...)
  *
  * droppable id:
- *   - `agenda-cell:{projectId}:{agendaType}`           — cell drop 영역
- *   - `agenda-cell-sortable:{projectId}:{agendaType}`  — SortableContext
- *   - `agenda-row:{projectId}`                          — row 헤더 drop + sortable
+ *   - `agenda-cell:{projectId}:{columnKey}`
+ *   - `agenda-cell-sortable:{projectId}:{columnKey}`
+ *   - `agenda-row:{projectId}`
  */
+import { parseMentions } from '../../mentions'
 
 export const AGENDA_TYPES = ['weekly_jason', 'weekly_planning', 'decision_needed', 'personal']
 
@@ -69,26 +63,35 @@ export function sameCellKey(a, b) {
 
 /* 셀 한 칸의 task 목록 + 정렬
  *
- * 필터:
- *   - assigneeId === currentUserId (D10)
+ * ctx.columnMode:
+ *   - 'agenda' (기본): cellKey.agendaType이 agendas 배열 중 하나
+ *     · 가상 분류: agendaType='personal' && task.agendas 비어있음 → 표시
+ *   - 'mention': cellKey.agendaType이 task.text의 @mention 이름과 일치
+ *
+ * 공통 필터:
+ *   - assigneeId === currentUserId
  *   - !deletedAt
  *   - hideDone ? !done : true
  *   - t.projectId === cellKey.projectId
- *   - agenda 매칭:
- *       (a) agendas 배열에 agendaType이 명시되어 있거나
- *       (b) cellKey.agendaType === 'personal' AND task.agendas가 비어있음 (가상 fallback)
  */
 export function getCellTasks(tasks, cellKey, ctx) {
-  const { currentUserId, hideDone } = ctx || {}
+  const { currentUserId, hideDone, columnMode } = ctx || {}
+  const mode = columnMode || 'agenda'
   return tasks
     .filter(t => {
       if (t.assigneeId !== currentUserId) return false
       if (t.deletedAt) return false
       if (hideDone && t.done) return false
       if (t.projectId !== cellKey.projectId) return false
+
+      if (mode === 'mention') {
+        const names = parseMentions(t.text || '')
+        return names.includes(cellKey.agendaType)
+      }
+
+      // agenda 모드 (기본)
       const agendas = Array.isArray(t.agendas) ? t.agendas : []
       if (agendas.includes(cellKey.agendaType)) return true
-      // 가상 분류: agendas 미지정 task → 'personal' 컬럼에 표시
       if (cellKey.agendaType === 'personal' && agendas.length === 0) return true
       return false
     })

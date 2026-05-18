@@ -24,14 +24,17 @@ export default function AgendaMatrixCell({
   project,
   activeMentions,
   mentionColorMap,
+  columnMode = 'agenda',
 }) {
-  const cellTasks = getCellTasks(tasks, cellKey, { currentUserId, hideDone })
+  const cellTasks = getCellTasks(tasks, cellKey, { currentUserId, hideDone, columnMode })
   const cellId = makeCellId(cellKey.projectId, cellKey.agendaType)
   const sortableId = makeSortableId(cellKey.projectId, cellKey.agendaType)
 
+  // mention 모드에서는 cell drag(컬럼 변경)가 의미 없으므로 droppable data에 mode 동봉.
+  // handler가 mode 검사 후 cross-cell column 변경은 silent return.
   const { setNodeRef, isOver } = useDroppable({
     id: cellId,
-    data: { type: 'agenda-matrix-task', cellKey },
+    data: { type: 'agenda-matrix-task', cellKey, columnMode },
   })
 
   const colorObj = project ? getColor(project.color) : getColor(null)
@@ -62,12 +65,13 @@ export default function AgendaMatrixCell({
             cellKey={cellKey}
             activeMentions={activeMentions}
             mentionColorMap={mentionColorMap}
+            columnMode={columnMode}
           />
         ))}
       </SortableContext>
 
-      {/* InlineAdd: "+ 추가" 버튼 (사용자 클릭 시 input 활성) */}
-      {project && (
+      {/* InlineAdd: agenda 모드에서만 신규 task의 agenda를 자동 태깅 가능 */}
+      {project && columnMode === 'agenda' && (
         <InlineAdd
           projectId={project.id}
           category="today"

@@ -15,7 +15,7 @@ import { matchingMentions, getMentionColorByIndex } from '../../../../utils/ment
  *
  * H-2 결정: data.type='agenda-matrix-task' 사용. FocusPanel drop은 의도되지 않은 시나리오 (no-op).
  */
-const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, cellKey, activeMentions, mentionColorMap }) {
+const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, cellKey, activeMentions, mentionColorMap, columnMode = 'agenda' }) {
   const isHovered = useStore(s => s.hoveredTaskId === task.id)
   const setHoveredTaskId = useStore(s => s.setHoveredTaskId)
   const updateTask = useStore(s => s.updateTask)
@@ -200,18 +200,20 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
           >
             <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button
-            onClick={handleRemoveAgenda}
-            onMouseDown={e => e.stopPropagation()}
-            aria-label="아젠다 태그 제거"
-            style={{
-              background: 'transparent', border: 0, padding: 0,
-              width: 14, height: 14, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: COLOR.textTertiary,
-              fontSize: 12, lineHeight: 1,
-            }}
-          >×</button>
+          {columnMode === 'agenda' && (
+            <button
+              onClick={handleRemoveAgenda}
+              onMouseDown={e => e.stopPropagation()}
+              aria-label="아젠다 태그 제거"
+              style={{
+                background: 'transparent', border: 0, padding: 0,
+                width: 14, height: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: COLOR.textTertiary,
+                fontSize: 12, lineHeight: 1,
+              }}
+            >×</button>
+          )}
         </span>
       )}
     </div>
