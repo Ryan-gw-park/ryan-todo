@@ -10,6 +10,7 @@ const KEYS = {
   personal: 'personalMatrixPivotExpanded',
   personalSection: 'personalSectionExpanded',  // Loop-45 F-12: 다음/남은 섹션 접기 상태
   focusCardExpanded: 'focusCardExpanded',       // Loop-47 E-09: 포커스 카드 인라인 펼침 상태
+  agendaMatrix: 'agendaMatrixRowCollapsed',     // Hotfix r4: 매트릭스 행 접기 (project-level)
 }
 
 function readLS(key) {

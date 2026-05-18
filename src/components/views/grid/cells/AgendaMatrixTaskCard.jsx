@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import useStore from '../../../../hooks/useStore'
 import SortableTaskCard from '../../../dnd/SortableTaskCard'
 import { COLOR, HIGHLIGHT, PILL } from '../../../../styles/designTokens'
+import { taskMatchesAnyMention } from '../../../../utils/mentions'
 
 /* AgendaMatrixTaskCard — Spec r2 C4b / C7 / C8.5
  *
@@ -14,7 +15,7 @@ import { COLOR, HIGHLIGHT, PILL } from '../../../../styles/designTokens'
  *
  * H-2 결정: data.type='agenda-matrix-task' 사용. FocusPanel drop은 의도되지 않은 시나리오 (no-op).
  */
-const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, cellKey }) {
+const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, cellKey, activeMentions }) {
   const isHovered = useStore(s => s.hoveredTaskId === task.id)
   const setHoveredTaskId = useStore(s => s.setHoveredTaskId)
   const updateTask = useStore(s => s.updateTask)
@@ -23,6 +24,8 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
   const [editing, setEditing] = useState(false)
   const [localHover, setLocalHover] = useState(false)
 
+  // Hotfix r4: 활성 mention 매칭 시 카드 강조
+  const isMentionHit = taskMatchesAnyMention(task, activeMentions)
   const showCategoryChip = task.category && task.category !== 'today'
   const categoryLabel = (
     task.category === 'next' ? '다음'
@@ -45,11 +48,19 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
     }
   }
 
-  const wrapStyle = isHovered ? {
-    background: HIGHLIGHT.crossCell.bg,
-    outline: `1px solid ${HIGHLIGHT.crossCell.outline}`,
-    color: HIGHLIGHT.crossCell.text,
-  } : undefined
+  // 우선순위: hover(cross-cell) > mention 강조 > 기본
+  const wrapStyle = isHovered
+    ? {
+        background: HIGHLIGHT.crossCell.bg,
+        outline: `1px solid ${HIGHLIGHT.crossCell.outline}`,
+        color: HIGHLIGHT.crossCell.text,
+      }
+    : isMentionHit
+      ? {
+          background: '#FFFBE6',     // 옅은 노랑 — mention 강조
+          outline: '1px solid #F0C419',
+        }
+      : undefined
 
   const cardContent = (
     <div

@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { COLOR, MATRIX } from '../../../../styles/designTokens'
+import { COLOR } from '../../../../styles/designTokens'
 import { getColor } from '../../../../utils/colors'
 import {
   getCellTasks,
@@ -22,6 +22,7 @@ export default function AgendaMatrixCell({
   hideDone,
   currentUserId,
   project,
+  activeMentions,
 }) {
   const cellTasks = getCellTasks(tasks, cellKey, { currentUserId, hideDone })
   const cellId = makeCellId(cellKey.projectId, cellKey.agendaType)
@@ -32,16 +33,14 @@ export default function AgendaMatrixCell({
     data: { type: 'agenda-matrix-task', cellKey },
   })
 
-  const isEmpty = cellTasks.length === 0
   const colorObj = project ? getColor(project.color) : getColor(null)
 
+  // Hotfix r4: 빈 셀 흰색 (이전: 빗금 패턴)
   return (
     <div
       ref={setNodeRef}
       style={{
-        background: isOver
-          ? COLOR.bgHover
-          : (isEmpty ? MATRIX.stripedPattern : '#fff'),
+        background: isOver ? COLOR.bgHover : '#fff',
         minHeight: 60,
         padding: 4,
         display: 'flex',
@@ -60,6 +59,7 @@ export default function AgendaMatrixCell({
             key={task.id}
             task={task}
             cellKey={cellKey}
+            activeMentions={activeMentions}
           />
         ))}
       </SortableContext>

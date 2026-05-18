@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
+import usePivotExpandState from '../../../hooks/usePivotExpandState'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { COLOR, FONT } from '../../../styles/designTokens'
 import {
@@ -7,26 +8,36 @@ import {
   makeCellKey,
   makeRowId,
   getVisibleProjects,
+  getCellTasks,
 } from '../../../utils/dnd/cellKeys/personalAgenda'
+import { extractAllMentions } from '../../../utils/mentions'
 import AgendaColHeader from './cells/AgendaColHeader'
 import AgendaRowHeader from './cells/AgendaRowHeader'
 import AgendaMatrixCell from './cells/AgendaMatrixCell'
+import AgendaMentionFilter from './cells/AgendaMentionFilter'
 
-/* PersonalAgendaMatrixTable — Hotfix r3
+/* PersonalAgendaMatrixTable — Hotfix r4
  *
- * 행 = top-level project (모든 미아카이브 프로젝트 표시).
- * 열 = 4 고정 agenda.
- * Inbox 행 폐지. agendas 미지정 task는 'personal' 컬럼에 가상 표시 (getCellTasks 내부 처리).
- *
- * Row reorder: SortableContext + AgendaRowHeader(useSortable).
- *   - row 자체 drag → 다른 row 위에 drop → reorderProjects
- *   - task 카드 drag → row 헤더 drop → task.projectId 재할당
- *   - handler가 active.id 패턴으로 분기
+ * 행 = top-level project (모든 미아카이브). 열 = 4 고정 agenda.
+ * 빈 셀 흰색. 행 접기/펼치기. @멘션 토글 강조.
  */
 export default function PersonalAgendaMatrixTable({ projects, tasks }) {
   const currentUserId = getCachedUserId()
   const [hideDone, setHideDone] = useState(true)
   const localProjectOrder = useStore(s => s.localProjectOrder)
+  const { pivotCollapsed, setPivotCollapsed } = usePivotExpandState('agendaMatrix')
+
+  // @멘션 활성 set (다중 선택)
+  const [activeMentions, setActiveMentions] = useState(() => new Set())
+  const toggleMention = useCallback((name) => {
+    setActiveMentions(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }, [])
+  const clearMentions = useCallback(() => setActiveMentions(new Set()), [])
 
   const visibleProjects = useMemo(
     () => getVisibleProjects(projects, localProjectOrder),
@@ -38,6 +49,45 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
     [visibleProjects]
   )
 
+  // 본인 task만 대상으로 mention 추출 (매트릭스에 실제 보이는 범위)
+  const myVisibleTasks = useMemo(
+    () => (tasks || []).filter(t =>
+      t.assigneeId === currentUserId &&
+      !t.deletedAt &&
+      (hideDone ? !t.done : true)
+    ),
+    [tasks, currentUserId, hideDone]
+  )
+
+  const mentions = useMemo(
+    () => extractAllMentions(myVisibleTasks),
+    [myVisibleTasks]
+  )
+
+  const toggleRow = useCallback((pid) => {
+    const cur = pivotCollapsed[pid] === true
+    setPivotCollapsed(pid, !cur)
+  }, [pivotCollapsed, setPivotCollapsed])
+
+  // 행별 task 수 (모든 cell 합산, 가상 personal 분기 포함)
+  const taskCountByProject = useMemo(() => {
+    const m = new Map()
+    for (const p of visibleProjects) {
+      let cnt = 0
+      // 4 셀 합산하되 중복 task 없도록 set
+      const ids = new Set()
+      for (const a of AGENDA_TYPES) {
+        const ts = getCellTasks(tasks, { projectId: p.id, agendaType: a }, {
+          currentUserId, hideDone,
+        })
+        for (const t of ts) ids.add(t.id)
+      }
+      cnt = ids.size
+      m.set(p.id, cnt)
+    }
+    return m
+  }, [visibleProjects, tasks, currentUserId, hideDone])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       {/* 헤더 */}
@@ -45,7 +95,9 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 8,
         padding: '4px 2px',
+        flexWrap: 'wrap',
       }}>
         <span style={{ fontSize: FONT.label, fontWeight: 600, color: COLOR.textSecondary }}>
           개인 할일 매트릭스
@@ -67,6 +119,14 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
         </button>
       </div>
 
+      {/* @멘션 토글 그룹 */}
+      <AgendaMentionFilter
+        mentions={mentions}
+        active={activeMentions}
+        onToggle={toggleMention}
+        onClear={clearMentions}
+      />
+
       {/* 본체 */}
       <div style={{
         overflowX: 'auto',
@@ -77,10 +137,10 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
       }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '200px repeat(4, minmax(160px, 1fr))',
+          gridTemplateColumns: '220px repeat(4, minmax(160px, 1fr))',
           gap: 1,
           background: COLOR.divider,
-          minWidth: 200 + 4 * 160 + 4,
+          minWidth: 220 + 4 * 160 + 4,
         }}>
           {/* Column headers */}
           <div style={{
@@ -96,26 +156,36 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
             <AgendaColHeader key={agendaType} agendaType={agendaType} />
           ))}
 
-          {/* Project rows — SortableContext for row reorder */}
+          {/* Project rows */}
           <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
-            {visibleProjects.map(project => (
-              <RowGroup key={project.id}>
-                <AgendaRowHeader project={project} />
-                {AGENDA_TYPES.map(agendaType => (
-                  <AgendaMatrixCell
-                    key={`${project.id}-${agendaType}`}
-                    cellKey={makeCellKey(project.id, agendaType)}
-                    tasks={tasks}
-                    hideDone={hideDone}
-                    currentUserId={currentUserId}
+            {visibleProjects.map(project => {
+              const isCollapsed = pivotCollapsed[project.id] === true
+              return (
+                <RowGroup key={project.id}>
+                  <AgendaRowHeader
                     project={project}
+                    taskCount={taskCountByProject.get(project.id) || 0}
+                    isCollapsed={isCollapsed}
+                    onToggle={toggleRow}
                   />
-                ))}
-              </RowGroup>
-            ))}
+                  {isCollapsed
+                    ? <CollapsedFiller key={`filler-${project.id}`} />
+                    : AGENDA_TYPES.map(agendaType => (
+                      <AgendaMatrixCell
+                        key={`${project.id}-${agendaType}`}
+                        cellKey={makeCellKey(project.id, agendaType)}
+                        tasks={tasks}
+                        hideDone={hideDone}
+                        currentUserId={currentUserId}
+                        project={project}
+                        activeMentions={activeMentions}
+                      />
+                    ))}
+                </RowGroup>
+              )
+            })}
           </SortableContext>
 
-          {/* 빈 상태 */}
           {visibleProjects.length === 0 && (
             <div style={{
               gridColumn: '1 / -1',
@@ -137,4 +207,16 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
 
 function RowGroup({ children }) {
   return <>{children}</>
+}
+
+/* 접힌 행의 cells 자리에 grid columns 채우는 빈 div (4개 컬럼 span) */
+function CollapsedFiller() {
+  return (
+    <div style={{
+      gridColumn: 'span 4',
+      background: '#fff',
+      minHeight: 0,
+      height: 4,
+    }} />
+  )
 }

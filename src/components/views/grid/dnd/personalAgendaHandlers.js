@@ -106,21 +106,36 @@ function handleAgendaRowReorder(e, ctx) {
   }
 }
 
-/* cross-cell 처리 (같은 행 다른 컬럼 or 다른 행):
- *   - 도착 agendaType을 task.agendas에 추가 (기존 태그 유지)
- *   - 다른 행이면 projectId 재할당 (R5는 자연 발동 — 매트릭스에 milestone 미표시이므로 영향 없음)
+/* cross-cell 처리 — Hotfix r4: 복사 → 이동 (사용자 피드백 2026-05-18)
+ *   - 출발 agendaType은 task.agendas에서 *제거*
+ *   - 도착 agendaType은 task.agendas에 추가 (없으면)
+ *   - 다른 행이면 projectId 재할당 (R5 자연 발동 허용)
+ *
+ *   가상 분기 ('agendas 비어있음 → personal 표시') 호환:
+ *     src.agendaType='personal'이고 task.agendas=[]인 task를 weekly_jason 셀에 drop →
+ *     filter는 no-op (이미 비어있음) → push 'weekly_jason' → agendas=['weekly_jason'].
+ *     이제 personal 가상 분기 미해당, weekly_jason 명시 표시. 의도된 이동.
  */
 function applyAgendaCrossCell(task, srcCellKey, dstCellKey, ctx) {
   const patch = {}
 
   const currentAgendas = Array.isArray(task.agendas) ? task.agendas : []
-  if (!currentAgendas.includes(dstCellKey.agendaType)) {
-    patch.agendas = [...currentAgendas, dstCellKey.agendaType]
+  // src 제거 + dst 추가 (set 의미)
+  let nextAgendas = currentAgendas.filter(a => a !== srcCellKey.agendaType)
+  if (!nextAgendas.includes(dstCellKey.agendaType)) {
+    nextAgendas = [...nextAgendas, dstCellKey.agendaType]
+  }
+  // 변경 있을 때만 patch에 포함
+  const changed =
+    nextAgendas.length !== currentAgendas.length ||
+    nextAgendas.some((a, i) => a !== currentAgendas[i])
+  if (changed) {
+    patch.agendas = nextAgendas
   }
 
   if (srcCellKey.projectId !== dstCellKey.projectId) {
     patch.projectId = dstCellKey.projectId
-    // R5 자연 발동 허용 — keyMilestoneId 자동 nullify (UX 영향 없음)
+    // R5 자연 발동 허용 — keyMilestoneId 자동 nullify
   }
 
   if (Object.keys(patch).length === 0) return

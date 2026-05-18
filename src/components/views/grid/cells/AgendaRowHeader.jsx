@@ -4,17 +4,19 @@ import { COLOR, FONT } from '../../../../styles/designTokens'
 import { getColor } from '../../../../utils/colors'
 import { makeRowId } from '../../../../utils/dnd/cellKeys/personalAgenda'
 
-/* AgendaRowHeader — Hotfix r3 (row = project)
+/* AgendaRowHeader — Hotfix r4
  *
- * 책임:
- *   - project 정보 표시 (color dot + name)
- *   - droppable: task 카드 drop 시 `type='agenda-matrix-row'` → projectId 재할당
- *   - sortable: 행 헤더 자체 drag 시 `type='agenda-matrix-row-reorder'` → row 순서 변경
+ * 역할:
+ *   - project 정보 표시 (color dot + name + task 카운트)
+ *   - droppable: task 카드 drop 시 projectId 재할당
+ *   - sortable: row 헤더 자체 drag 시 row 순서 변경
+ *   - 접기/펼치기 토글 (chevron 버튼)
  *
- * useSortable이 자체 useDroppable + useDraggable 둘 다 제공하므로 두 시나리오를 함께 처리.
- * Handler가 active.id 패턴 (cell-task: vs agenda-row:) 으로 분기.
+ * UX:
+ *   - 헤더 본문(드래그 영역) — 좌측 grip + project 표시. listener 부착.
+ *   - 우측 chevron 버튼 — onMouseDown stopPropagation으로 drag listener 차단, onClick으로 toggle.
  */
-export default function AgendaRowHeader({ project }) {
+export default function AgendaRowHeader({ project, taskCount, isCollapsed, onToggle }) {
   const rowId = makeRowId(project.id)
   const {
     setNodeRef,
@@ -29,7 +31,6 @@ export default function AgendaRowHeader({ project }) {
     data: {
       type: 'agenda-matrix-row-reorder',
       projectId: project.id,
-      // task drop 시 fallback type — dispatcher가 over.type 우선 매칭
       rowProjectId: project.id,
     },
   })
@@ -67,6 +68,47 @@ export default function AgendaRowHeader({ project }) {
       }}>
         {project.name || '(이름 없음)'}
       </span>
+      {taskCount > 0 && (
+        <span style={{
+          fontSize: FONT.caption,
+          color: COLOR.textTertiary,
+          flexShrink: 0,
+        }}>{taskCount}</span>
+      )}
+      <button
+        type="button"
+        onMouseDown={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
+        onClick={e => {
+          e.stopPropagation()
+          onToggle?.(project.id)
+        }}
+        aria-label={isCollapsed ? '행 펼치기' : '행 접기'}
+        style={{
+          flexShrink: 0,
+          width: 20,
+          height: 20,
+          padding: 0,
+          background: 'transparent',
+          border: 0,
+          color: COLOR.textTertiary,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'inherit',
+        }}
+      >
+        <svg
+          width="10" height="10" viewBox="0 0 16 16"
+          style={{
+            transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.12s',
+          }}
+        >
+          <path d="M3 5l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
     </div>
   )
 }
