@@ -1,18 +1,19 @@
 import { COLOR, FONT } from '../../../../styles/designTokens'
-import { getMentionColor } from '../../../../utils/mentions'
+import { getMentionColorByIndex } from '../../../../utils/mentions'
 
-/* AgendaMentionFilter — Hotfix r4
+/* AgendaMentionFilter — Hotfix r7 (영구 매핑)
  *
  * 매트릭스 헤더에 노출되는 멘션 토글 칩 그룹.
- * task.text에서 자동 추출된 @멘션 목록을 다중 선택 토글.
+ * 색상은 useMentionColorMap이 부여한 인덱스 사용.
  *
  * Props:
- *   - mentions: [{ name, count }] (extractAllMentions 결과)
+ *   - mentions: [{ name, count }]
  *   - active: Set<string>
  *   - onToggle: (name) => void
  *   - onClear: () => void
+ *   - colorMap: { [name]: paletteIndex }
  */
-export default function AgendaMentionFilter({ mentions, active, onToggle, onClear }) {
+export default function AgendaMentionFilter({ mentions, active, onToggle, onClear, colorMap }) {
   if (!mentions || mentions.length === 0) return null
 
   return (
@@ -30,7 +31,7 @@ export default function AgendaMentionFilter({ mentions, active, onToggle, onClea
       }}>담당자 강조:</span>
       {mentions.map(({ name, count }) => {
         const isActive = active.has(name)
-        const c = getMentionColor(name)
+        const c = getMentionColorByIndex(colorMap?.[name] ?? 0)
         return (
           <button
             key={name}

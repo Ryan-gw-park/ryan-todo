@@ -23,6 +23,7 @@ export default function AgendaMatrixCell({
   currentUserId,
   project,
   activeMentions,
+  mentionColorMap,
 }) {
   const cellTasks = getCellTasks(tasks, cellKey, { currentUserId, hideDone })
   const cellId = makeCellId(cellKey.projectId, cellKey.agendaType)
@@ -60,6 +61,7 @@ export default function AgendaMatrixCell({
             task={task}
             cellKey={cellKey}
             activeMentions={activeMentions}
+            mentionColorMap={mentionColorMap}
           />
         ))}
       </SortableContext>

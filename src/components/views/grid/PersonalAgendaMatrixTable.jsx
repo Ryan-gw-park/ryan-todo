@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import useStore, { getCachedUserId } from '../../../hooks/useStore'
 import usePivotExpandState from '../../../hooks/usePivotExpandState'
+import useMentionColorMap from '../../../hooks/useMentionColorMap'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { COLOR, FONT } from '../../../styles/designTokens'
 import {
@@ -64,6 +65,9 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
     [myVisibleTasks]
   )
 
+  // Hotfix r7: 담당자별 영구 고유 색상 매핑 (localStorage)
+  const mentionColorMap = useMentionColorMap(mentions)
+
   const toggleRow = useCallback((pid) => {
     const cur = pivotCollapsed[pid] === true
     setPivotCollapsed(pid, !cur)
@@ -125,6 +129,7 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
         active={activeMentions}
         onToggle={toggleMention}
         onClear={clearMentions}
+        colorMap={mentionColorMap}
       />
 
       {/* 본체 */}
@@ -178,6 +183,7 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
                       currentUserId={currentUserId}
                       project={project}
                       activeMentions={activeMentions}
+                      mentionColorMap={mentionColorMap}
                     />
                   ))}
                 </RowGroup>

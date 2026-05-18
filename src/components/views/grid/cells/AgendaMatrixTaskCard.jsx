@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import useStore from '../../../../hooks/useStore'
 import SortableTaskCard from '../../../dnd/SortableTaskCard'
 import { COLOR, HIGHLIGHT, PILL } from '../../../../styles/designTokens'
-import { matchingMentions, getMentionColor } from '../../../../utils/mentions'
+import { matchingMentions, getMentionColorByIndex } from '../../../../utils/mentions'
 
 /* AgendaMatrixTaskCard — Spec r2 C4b / C7 / C8.5
  *
@@ -15,7 +15,7 @@ import { matchingMentions, getMentionColor } from '../../../../utils/mentions'
  *
  * H-2 결정: data.type='agenda-matrix-task' 사용. FocusPanel drop은 의도되지 않은 시나리오 (no-op).
  */
-const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, cellKey, activeMentions }) {
+const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, cellKey, activeMentions, mentionColorMap }) {
   const isHovered = useStore(s => s.hoveredTaskId === task.id)
   const setHoveredTaskId = useStore(s => s.setHoveredTaskId)
   const updateTask = useStore(s => s.updateTask)
@@ -24,12 +24,14 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
   const [editing, setEditing] = useState(false)
   const [localHover, setLocalHover] = useState(false)
 
-  // Hotfix r6: 활성 mention 매칭 시 mention별 색상으로 카드 강조
+  // Hotfix r7: 활성 mention 매칭 시 mention별 영구 색상으로 카드 강조
   // - 다중 매칭 task는 첫 번째 등장한 mention 색상으로 background 표시
-  // - 추가 매칭은 좌측 stripe 색상 막대로 누적 시각화
+  // - 추가 매칭은 좌측 dot로 누적 시각화
   const hitMentions = matchingMentions(task, activeMentions)
   const isMentionHit = hitMentions.length > 0
-  const primaryHitColor = isMentionHit ? getMentionColor(hitMentions[0]) : null
+  const primaryHitColor = isMentionHit
+    ? getMentionColorByIndex(mentionColorMap?.[hitMentions[0]] ?? 0)
+    : null
   const showCategoryChip = task.category && task.category !== 'today'
   const categoryLabel = (
     task.category === 'next' ? '다음'
@@ -109,7 +111,7 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
           marginTop: 3,
         }}>
           {hitMentions.slice(1).map(name => {
-            const c = getMentionColor(name)
+            const c = getMentionColorByIndex(mentionColorMap?.[name] ?? 0)
             return (
               <span
                 key={name}
