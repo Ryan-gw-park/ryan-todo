@@ -24,14 +24,15 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
   const [editing, setEditing] = useState(false)
   const [localHover, setLocalHover] = useState(false)
 
-  // Hotfix r7: 활성 mention 매칭 시 mention별 영구 색상으로 카드 강조
-  // - 다중 매칭 task는 첫 번째 등장한 mention 색상으로 background 표시
-  // - 추가 매칭은 좌측 dot로 누적 시각화
+  // Hotfix r8: 활성 mention 매칭 시 카드 배경을 N등분 색 컬럼으로 분할
+  //   - 1명 매칭: 단일 chipBg + dot outline + chipText
+  //   - 2명 이상: linear-gradient hard-stop으로 카드 배경 가로 N등분 (각자 색상 영역)
   const hitMentions = matchingMentions(task, activeMentions)
-  const isMentionHit = hitMentions.length > 0
-  const primaryHitColor = isMentionHit
-    ? getMentionColorByIndex(mentionColorMap?.[hitMentions[0]] ?? 0)
-    : null
+  const hitColors = hitMentions.map(name =>
+    getMentionColorByIndex(mentionColorMap?.[name] ?? 0)
+  )
+  const isMentionHit = hitColors.length > 0
+  const isMultiMention = hitColors.length >= 2
   const showCategoryChip = task.category && task.category !== 'today'
   const categoryLabel = (
     task.category === 'next' ? '다음'
@@ -55,20 +56,35 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
   }
 
   // 우선순위: hover(cross-cell) > mention 강조 > 기본
-  // mention 강조: primaryHitColor 의 chipBg + dot outline + chipText 사용
-  const wrapStyle = isHovered
-    ? {
-        background: HIGHLIGHT.crossCell.bg,
-        outline: `1px solid ${HIGHLIGHT.crossCell.outline}`,
-        color: HIGHLIGHT.crossCell.text,
-      }
-    : primaryHitColor
-      ? {
-          background: primaryHitColor.chipBg,
-          outline: `1px solid ${primaryHitColor.dot}`,
-          color: primaryHitColor.chipText,
-        }
-      : undefined
+  // 다중 매칭: linear-gradient hard-stop으로 균등 분할 (담당자별 색 컬럼)
+  let wrapStyle
+  if (isHovered) {
+    wrapStyle = {
+      background: HIGHLIGHT.crossCell.bg,
+      outline: `1px solid ${HIGHLIGHT.crossCell.outline}`,
+      color: HIGHLIGHT.crossCell.text,
+    }
+  } else if (isMultiMention) {
+    const n = hitColors.length
+    const segments = hitColors.map((c, i) => {
+      const from = (i / n) * 100
+      const to = ((i + 1) / n) * 100
+      return `${c.chipBg} ${from}% ${to}%`
+    }).join(', ')
+    wrapStyle = {
+      background: `linear-gradient(to right, ${segments})`,
+      outline: `1px solid ${hitColors[0].dot}`,
+      // 다중 색 배경 위 텍스트는 검정 (chipBg는 모두 옅은 톤)
+      color: '#1f2937',
+    }
+  } else if (isMentionHit) {
+    const c = hitColors[0]
+    wrapStyle = {
+      background: c.chipBg,
+      outline: `1px solid ${c.dot}`,
+      color: c.chipText,
+    }
+  }
 
   const cardContent = (
     <div
@@ -101,30 +117,7 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
         >★</span>
       )}
 
-      {/* Hotfix r6: 다중 mention 매칭 시 좌측에 추가 dot 누적 (primary는 outline으로 표시됨) */}
-      {hitMentions.length > 1 && (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 2,
-          flexShrink: 0,
-          marginTop: 3,
-        }}>
-          {hitMentions.slice(1).map(name => {
-            const c = getMentionColorByIndex(mentionColorMap?.[name] ?? 0)
-            return (
-              <span
-                key={name}
-                title={`@${name}`}
-                style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: c.dot,
-                }}
-              />
-            )
-          })}
-        </span>
-      )}
+      {/* Hotfix r8: 다중 매칭은 카드 background 색 컬럼 분할로 표현 (별도 dot 누적 불필요) */}
 
       {/* checkbox (4-zone) */}
       <input
