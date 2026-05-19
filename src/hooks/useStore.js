@@ -93,9 +93,35 @@ function db() {
   return d
 }
 
-// alarm 컬럼 존재 여부 캐시 (한 번 확인 후 재사용)
-let _alarmColChecked = false
-let _alarmColExists = true
+// 선택적(나중에 추가된) tasks 컬럼들 — 원격 DB 마이그레이션 누락 시
+// `Could not find the 'X' column ...` 응답을 감지하여 해당 키를 false 로 떨어뜨린다.
+// false 가 되면 이후 upsert 페이로드에서 자동 제외 → 다른 필드 저장은 계속 동작.
+// 키는 snake_case (실제 DB 컬럼명).
+const _optionalCols = {
+  alarm: true,
+  agendas: true,
+  is_today: true,
+  is_focus: true,
+  focus_sort_order: true,
+  secondary_assignee_id: true,
+  key_milestone_id: true,
+  deliverable_id: true,
+  scheduled_date: true,
+  highlight_color: true,
+}
+
+// PostgREST/PG 에러 메시지에서 누락 컬럼명 추출 — _optionalCols 에 등록된 키만 인정.
+function _detectMissingOptionalCol(error) {
+  if (!error) return null
+  const msg = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`
+  // PostgREST: "Could not find the 'is_today' column of 'tasks' in the schema cache"
+  let m = msg.match(/Could not find the ['"`]?([a-z_][a-z_0-9]*)['"`]?\s+column/i)
+  if (m && m[1] in _optionalCols && _optionalCols[m[1]]) return m[1]
+  // PG raw: column "is_today" of relation "tasks" does not exist
+  m = msg.match(/column ["'`]?([a-z_][a-z_0-9]*)["'`]?\s+(?:of relation\s+["'`]?\w+["'`]?\s+)?does not exist/i)
+  if (m && m[1] in _optionalCols && _optionalCols[m[1]]) return m[1]
+  return null
+}
 
 // Loop-23: deleted_at 컬럼 존재 여부 캐시
 let _deletedAtColChecked = false
@@ -120,6 +146,7 @@ export function getCachedUserId() {
 }
 
 function taskToRow(t) {
+  // 필수(항상 존재) 컬럼 — Loop-17 시점부터 보장됨
   const row = {
     id: t.id, text: t.text, project_id: t.projectId, category: t.category,
     done: t.done, due_date: t.dueDate || null, start_date: t.startDate || null,
@@ -128,43 +155,38 @@ function taskToRow(t) {
     team_id: t.teamId || null,
     scope: t.scope || 'private',
     assignee_id: t.assigneeId || null,
-    secondary_assignee_id: t.secondaryAssigneeId || null,
     created_by: t.createdBy || null,
-    highlight_color: t.highlightColor || null,
     updated_at: new Date().toISOString(),
-    // ↓ Loop-26: Key Milestone 연결 ↓
-    key_milestone_id: t.keyMilestoneId || null,
-    deliverable_id: t.deliverableId || null,
-    // ↓ weekly-schedule ↓
-    scheduled_date: t.scheduledDate || null,
-    // ↓ Loop-45: 포커스 ↓
-    is_focus: t.isFocus === true,
-    focus_sort_order: t.focusSortOrder ?? 0,
-    // ↓ Spec r2 R-STORE-3: agenda matrix N:M (text[]) ↓
-    agendas: t.agendas || [],
-    // ↓ hotfix r11: 'Today' 마커 ↓
-    is_today: t.isToday === true,
   }
-  if (_alarmColExists) row.alarm = t.alarm ?? null
+  // 선택 컬럼 — _optionalCols 가 false 이면 (원격 DB 미적용) 페이로드에서 제외.
+  // 처음에는 모두 true 라 기존 동작과 동일하지만, safeUpsertTask 가 누락 컬럼을 감지하면 false 로 떨어뜨림.
+  if (_optionalCols.secondary_assignee_id) row.secondary_assignee_id = t.secondaryAssigneeId || null
+  if (_optionalCols.highlight_color) row.highlight_color = t.highlightColor || null
+  if (_optionalCols.key_milestone_id) row.key_milestone_id = t.keyMilestoneId || null
+  if (_optionalCols.deliverable_id) row.deliverable_id = t.deliverableId || null
+  if (_optionalCols.scheduled_date) row.scheduled_date = t.scheduledDate || null
+  if (_optionalCols.is_focus) row.is_focus = t.isFocus === true
+  if (_optionalCols.focus_sort_order) row.focus_sort_order = t.focusSortOrder ?? 0
+  if (_optionalCols.agendas) row.agendas = t.agendas || []
+  if (_optionalCols.is_today) row.is_today = t.isToday === true
+  if (_optionalCols.alarm) row.alarm = t.alarm ?? null
   return row
 }
 
 async function safeUpsertTask(d, t) {
-  const row = taskToRow(t)
-  const { error } = await d.from('tasks').upsert(row)
-  // alarm 컬럼이 없으면 alarm 필드를 빼고 재시도
-  if (error && !_alarmColChecked && row.alarm !== undefined) {
-    _alarmColChecked = true
-    _alarmColExists = false
-    const { alarm, ...rowWithout } = row
-    const retry = await d.from('tasks').upsert(rowWithout)
-    return retry
+  // 선택 컬럼 누락(원격 DB 마이그레이션 미적용) 감지 → 해당 키만 비활성화 후 재시도.
+  // 한 번 호출에서 여러 컬럼이 동시에 누락된 경우를 대비해 최대 _optionalCols 키 수 만큼 재시도.
+  const maxRetries = Object.keys(_optionalCols).length
+  for (let i = 0; i <= maxRetries; i++) {
+    const row = taskToRow(t)
+    const { error } = await d.from('tasks').upsert(row)
+    if (!error) return { error: null }
+    const missing = _detectMissingOptionalCol(error)
+    if (!missing) return { error }
+    _optionalCols[missing] = false
+    console.warn(`[Ryan Todo] tasks.${missing} 컬럼이 원격 DB에 없습니다. 해당 필드 저장을 비활성화합니다.`)
   }
-  if (!error && !_alarmColChecked) {
-    _alarmColChecked = true
-    _alarmColExists = true
-  }
-  return { error }
+  return { error: new Error('safeUpsertTask: exhausted optional column retries') }
 }
 
 function mapMemo(r) {
