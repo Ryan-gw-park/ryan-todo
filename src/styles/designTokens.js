@@ -130,6 +130,15 @@ export const MATRIX = {
   stripedPattern: 'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(0,0,0,0.015) 6px, rgba(0,0,0,0.015) 7px)',
 };
 
+// ─── 'Today' 마커 (hotfix r11) ───
+// 카드 좌측 stripe + 옅은 빨강 배경 + hover 시 T 토글 버튼
+export const TODAY = {
+  stripe:   '#e53935',   // COLOR.todayLine과 동일 hex — 시각 의미 일관성
+  bg:       '#FFF5F5',   // 옅은 빨강 (mention 강조 없을 때 카드 본문 배경)
+  active:   '#e53935',   // 토글 버튼 활성 색
+  activeFg: '#ffffff',   // 활성 시 'T'/'✓' 글자 색
+};
+
 // ─── 피벗 매트릭스 (Loop 42 / team-tasks-band-dnd) ───
 export const PIVOT = {
   msSubRowBg: '#FAFAF7',
