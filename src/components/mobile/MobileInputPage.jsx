@@ -40,30 +40,6 @@ export default function MobileInputPage({ onGoPersonal }) {
     inputRef.current?.focus()
   }
 
-  const GoPersonalButton = (
-    <button
-      onClick={onGoPersonal}
-      style={{
-        width: '100%',
-        padding: '14px 16px',
-        borderRadius: 10,
-        background: '#fff',
-        color: '#37352f',
-        border: '1px solid #e5e5e5',
-        fontSize: 15,
-        fontWeight: 500,
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-      }}
-    >
-      개인 할일 보기 <span style={{ opacity: 0.5 }}>→</span>
-    </button>
-  )
-
   return (
     <div
       className="mobile-app"
@@ -80,8 +56,6 @@ export default function MobileInputPage({ onGoPersonal }) {
       <div style={{ fontSize: 13, color: '#999', textAlign: 'center', marginBottom: 4 }}>
         새 할일
       </div>
-
-      {GoPersonalButton}
 
       <div
         style={{
@@ -117,42 +91,42 @@ export default function MobileInputPage({ onGoPersonal }) {
           ))}
         </select>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            placeholder="할 일을 입력하세요"
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              borderRadius: 8,
-              border: '1px solid #e5e5e5',
-              fontSize: 16,
-              fontFamily: 'inherit',
-              outline: 'none',
-            }}
-          />
-          <button
-            onClick={handleAdd}
-            disabled={!text.trim()}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 8,
-              background: text.trim() ? '#37352f' : '#e5e5e5',
-              color: text.trim() ? '#fff' : '#bbb',
-              border: 'none',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: text.trim() ? 'pointer' : 'default',
-              fontFamily: 'inherit',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            추가
-          </button>
-        </div>
+        <input
+          ref={inputRef}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          placeholder="할 일을 입력하세요"
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: '1px solid #e5e5e5',
+            fontSize: 16,
+            fontFamily: 'inherit',
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+
+        <button
+          onClick={handleAdd}
+          disabled={!text.trim()}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            borderRadius: 8,
+            background: text.trim() ? '#37352f' : '#e5e5e5',
+            color: text.trim() ? '#fff' : '#bbb',
+            border: 'none',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: text.trim() ? 'pointer' : 'default',
+            fontFamily: 'inherit',
+          }}
+        >
+          추가
+        </button>
 
         <div
           style={{
@@ -167,7 +141,27 @@ export default function MobileInputPage({ onGoPersonal }) {
         </div>
       </div>
 
-      {GoPersonalButton}
+      <button
+        onClick={onGoPersonal}
+        style={{
+          width: '100%',
+          padding: '14px 16px',
+          borderRadius: 10,
+          background: '#fff',
+          color: '#37352f',
+          border: '1px solid #e5e5e5',
+          fontSize: 15,
+          fontWeight: 500,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+        }}
+      >
+        개인 할일 보기 <span style={{ opacity: 0.5 }}>→</span>
+      </button>
     </div>
   )
 }
