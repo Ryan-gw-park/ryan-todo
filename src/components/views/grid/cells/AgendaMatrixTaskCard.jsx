@@ -122,6 +122,31 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
       {/* Hotfix r8: 다중 매칭은 카드 background 색 컬럼 분할로 표현 (별도 dot 누적 불필요) */}
       {/* Hotfix r10: is_focus ★ 뱃지 제거 — FocusPanel 폐지로 set/toggle UI 부재, 의미 잃은 잔재. DB의 is_focus 컬럼은 보존. */}
 
+      {/* hotfix r12: 'T' Today 토글 — checkbox 왼편 (사용자 요청).
+       *   isToday=true: ✓로 항상 표시 (해제 가능)
+       *   isToday=false: hover 시에만 T 노출 — 비-hover 시 layout 깔끔히 유지 */}
+      {(task.isToday || localHover) && !editing && (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); updateTask(task.id, { isToday: !task.isToday }) }}
+          onMouseDown={e => e.stopPropagation()}
+          aria-label={task.isToday ? 'Today 해제' : 'Today 표시'}
+          style={{
+            width: 16, height: 16, padding: 0,
+            background: task.isToday ? TODAY.active : 'transparent',
+            color: task.isToday ? TODAY.activeFg : COLOR.textTertiary,
+            border: `1px solid ${task.isToday ? TODAY.active : COLOR.border}`,
+            borderRadius: 3,
+            fontSize: 9, fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            lineHeight: 1,
+            flexShrink: 0,
+            marginTop: 1,
+          }}
+        >{task.isToday ? '✓' : 'T'}</button>
+      )}
+
       {/* checkbox (4-zone) */}
       <input
         type="checkbox"
@@ -187,27 +212,10 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
         </span>
       )}
 
-      {/* hover 시: T(Today 토글) + 화살표 (detail) + X (agenda 제거) */}
+      {/* hover 시: 화살표 (detail) + X (agenda 제거)
+       *  hotfix r12: T(Today) 토글은 checkbox 왼편으로 이동했음 (위 참조) */}
       {localHover && !editing && (
         <span style={{ display: 'inline-flex', gap: 2, flexShrink: 0, marginTop: 1 }}>
-          {/* hotfix r11: 'T' Today 토글 — columnMode 분기 없음 (두 모드 모두 의미) */}
-          <button
-            type="button"
-            onClick={e => { e.stopPropagation(); updateTask(task.id, { isToday: !task.isToday }) }}
-            onMouseDown={e => e.stopPropagation()}
-            aria-label={task.isToday ? 'Today 해제' : 'Today 표시'}
-            style={{
-              width: 16, height: 16, padding: 0,
-              background: task.isToday ? TODAY.active : 'transparent',
-              color: task.isToday ? TODAY.activeFg : COLOR.textTertiary,
-              border: `1px solid ${task.isToday ? TODAY.active : COLOR.border}`,
-              borderRadius: 3,
-              fontSize: 9, fontWeight: 700,
-              cursor: 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              lineHeight: 1,
-            }}
-          >{task.isToday ? '✓' : 'T'}</button>
           <button
             onClick={e => { e.stopPropagation(); openDetail(task) }}
             onMouseDown={e => e.stopPropagation()}
