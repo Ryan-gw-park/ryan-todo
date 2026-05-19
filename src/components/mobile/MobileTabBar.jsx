@@ -1,4 +1,5 @@
 const TABS = [
+  { key: 'today', label: 'Today' },
   { key: 'project', label: '프로젝트별' },
   { key: 'agenda', label: '아젠다별' },
   { key: 'mention', label: '담당자별' },

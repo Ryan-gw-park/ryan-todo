@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import useStore, { getCachedUserId } from '../../hooks/useStore'
 import MobileTabBar from './MobileTabBar'
+import ByTodayTab from './tabs/ByTodayTab'
 import ByProjectTab from './tabs/ByProjectTab'
 import ByAgendaTab from './tabs/ByAgendaTab'
 import ByMentionTab from './tabs/ByMentionTab'
@@ -14,7 +15,7 @@ function sortProjects(projects, localProjectOrder) {
 }
 
 export default function MobilePersonalPage({ onGoInput }) {
-  const [tab, setTab] = useState('project')
+  const [tab, setTab] = useState('today')
   const currentUserId = getCachedUserId()
   const tasks = useStore(s => s.tasks)
   const projects = useStore(s => s.projects)
@@ -68,6 +69,7 @@ export default function MobilePersonalPage({ onGoInput }) {
       <MobileTabBar tab={tab} onChange={setTab} />
 
       <div key={tab}>
+        {tab === 'today'   && <ByTodayTab   projects={sortedProjects} tasks={myTasks} />}
         {tab === 'project' && <ByProjectTab projects={sortedProjects} tasks={myTasks} />}
         {tab === 'agenda'  && <ByAgendaTab  projects={sortedProjects} tasks={myTasks} />}
         {tab === 'mention' && <ByMentionTab projects={sortedProjects} tasks={myTasks} />}
