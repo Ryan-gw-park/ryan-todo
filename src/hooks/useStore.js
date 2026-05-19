@@ -142,6 +142,8 @@ function taskToRow(t) {
     focus_sort_order: t.focusSortOrder ?? 0,
     // ↓ Spec r2 R-STORE-3: agenda matrix N:M (text[]) ↓
     agendas: t.agendas || [],
+    // ↓ hotfix r11: 'Today' 마커 ↓
+    is_today: t.isToday === true,
   }
   if (_alarmColExists) row.alarm = t.alarm ?? null
   return row
@@ -209,6 +211,8 @@ function mapTask(r) {
     focusSortOrder: r.focus_sort_order ?? 0,
     // ↓ Spec r2 R-STORE-2: agenda matrix N:M (text[]) ↓
     agendas: r.agendas || [],
+    // ↓ hotfix r11: 'Today' 마커 ↓
+    isToday: r.is_today === true,
   }
 }
 
