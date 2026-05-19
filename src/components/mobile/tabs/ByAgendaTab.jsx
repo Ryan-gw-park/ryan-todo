@@ -1,16 +1,34 @@
-import { useLayoutEffect } from 'react'
-import PersonalAgendaMatrixTable from '../../views/grid/PersonalAgendaMatrixTable'
-
-const COLUMN_MODE_KEY = 'agendaMatrixColumnMode'
+import { useMemo } from 'react'
+import { AGENDA_TYPES, AGENDA_LABELS } from '../../../utils/dnd/cellKeys/personalAgenda'
+import MobileTaskListView from './MobileTaskListView'
 
 export default function ByAgendaTab({ projects, tasks }) {
-  // remount 시점에 PersonalAgendaMatrixTable 가 useState 초기화자에서
-  // localStorage 를 읽기 전에 강제로 'agenda' 로 설정 (useLayoutEffect 는 mount 직후 동기 실행).
-  // 실제로는 부모 MobilePersonalPage 의 handleTabChange 에서 이미 setItem 을 했지만,
-  // 페이지 직접 진입 등 모서리 케이스 방어용 백업.
-  useLayoutEffect(() => {
-    try { localStorage.setItem(COLUMN_MODE_KEY, 'agenda') } catch { /* noop */ }
-  }, [])
+  const activeTasks = useMemo(() => tasks.filter(t => !t.done), [tasks])
 
-  return <PersonalAgendaMatrixTable projects={projects} tasks={tasks} />
+  const sections = useMemo(() => AGENDA_TYPES.map(type => {
+    const tasksInAgenda = activeTasks.filter(t => {
+      const ag = t.agendas || []
+      // 빈 agendas → 'personal' 버킷 (PersonalAgendaMatrixTable 의 getCellTasks 동일 동작)
+      if (ag.length === 0) return type === 'personal'
+      return ag.includes(type)
+    })
+    const subGroups = projects
+      .map(p => ({
+        key: p.id,
+        title: p.name,
+        tasks: tasksInAgenda
+          .filter(t => t.projectId === p.id)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+      }))
+      .filter(g => g.tasks.length > 0)
+    return { key: type, title: AGENDA_LABELS[type], subGroups }
+  }), [activeTasks, projects])
+
+  return (
+    <MobileTaskListView
+      sections={sections}
+      expandScope="personalAgenda"
+      emptyStateText="아젠다가 없습니다"
+    />
+  )
 }
