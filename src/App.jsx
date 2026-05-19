@@ -8,8 +8,6 @@ import './styles/global.css'
 // 즉시 필요한 것만 정적 import
 import SetupScreen from './components/shared/SetupScreen'
 import LoginScreen from './components/shared/LoginScreen'
-import MobileTopBar from './components/layout/MobileTopBar'
-import FAB from './components/layout/FAB'
 import Toast from './components/shared/Toast'
 import UpdateToast from './components/shared/UpdateToast'
 import { ViewSkeleton, LoadingSpinner } from './components/shared/Skeleton'
@@ -40,6 +38,8 @@ const MembersView = lazy(() => import('./components/views/MembersView'))
 const WeeklyScheduleView = lazy(() => import('./components/views/WeeklyScheduleView'))
 // mobile-perf-03 R-02: Sidebar lazy 화 — 모바일 entry chunk 에서 dnd-kit 제거
 const Sidebar = lazy(() => import('./components/layout/Sidebar'))
+// 모바일 단순화: 별도 entry. 데스크탑 chunk 와 분리.
+const MobileApp = lazy(() => import('./components/mobile/MobileApp'))
 
 function isMobile() { return window.innerWidth < 768 }
 
@@ -116,20 +116,31 @@ function AppShell({ mobile }) {
     }
   }, [currentView, mobile])
 
+  // 모바일: 입력 화면 + 개인 할일 페이지(3-탭) 단순 라우터.
+  // 데스크탑 트리(Sidebar/뷰/단축키/오버레이) 는 모두 우회.
+  if (mobile) {
+    return (
+      <>
+        <Suspense fallback={<ViewSkeleton />}>
+          <MobileApp />
+        </Suspense>
+        {/* 모바일에서도 DetailPanel / ModalRouter / Toast 는 유지 (낙관적 업데이트 토스트 등). */}
+        {detailTask && <Suspense fallback={null}><DetailPanel /></Suspense>}
+        <Suspense fallback={null}><ModalRouter /></Suspense>
+        <Toast />
+      </>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#fff' }}>
       {/* 사이드바 (데스크탑만) — mobile-perf-03 R-02: lazy + Suspense (fallback width 210 = Sidebar.S.sidebarW) */}
-      {!mobile && (
-        <Suspense fallback={<div style={{ width: 210 }} />}>
-          <Sidebar />
-        </Suspense>
-      )}
+      <Suspense fallback={<div style={{ width: 210 }} />}>
+        <Sidebar />
+      </Suspense>
 
       {/* 메인 영역 */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* 모바일 상단바 */}
-        {mobile && <MobileTopBar />}
-
         {/* 뷰 컨텐츠 */}
         <div style={{ flex: 1, overflow: 'auto' }}>
           <Suspense fallback={<ViewSkeleton />}>
@@ -137,9 +148,6 @@ function AppShell({ mobile }) {
           </Suspense>
         </div>
       </div>
-
-      {/* 모바일 FAB */}
-      {mobile && <FAB />}
 
       {/* 오버레이 패널들 */}
       {detailTask && <Suspense fallback={null}><DetailPanel /></Suspense>}

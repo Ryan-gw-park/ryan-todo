@@ -1,0 +1,60 @@
+/* mobileReadonly.css
+   모바일 개인 할일 페이지의 read-only 시각 처리.
+   인터랙션 차단은 MobileReadonlyWrapper 의 JS 캡처 핸들러가 수행하고,
+   이 파일은 시각적 cruft (편집 인풋, 추가 버튼, 모드 토글) 만 숨긴다.
+*/
+
+/* iOS 자동 줌 방지 — input/select font-size 16px 이상 */
+.mobile-app input,
+.mobile-app select,
+.mobile-app textarea {
+  font-size: 16px;
+}
+
+/* read-only 영역에서 cursor 시각도 일반 포인터로 다운그레이드 */
+.mobile-readonly [draggable="true"],
+.mobile-readonly [style*="cursor: grab"],
+.mobile-readonly [style*="cursor:grab"] {
+  cursor: default !important;
+}
+
+/* PersonalTodoListTable "+ 새 할일" 인라인 추가 인풋 / 버튼 숨김 */
+.mobile-readonly input[placeholder*="새 할일"],
+.mobile-readonly input[placeholder*="할 일"],
+.mobile-readonly input[placeholder*="추가"] {
+  display: none !important;
+}
+
+/* "+ 추가" / "+ 새 할일" 텍스트 버튼류 — span/button 으로 렌더되는 경우 모바일에선 시각 숨김.
+   ProjectGroup / MsTaskTreeMode 등에서 cursor:pointer 인 span 으로 추가 트리거가 노출됨. */
+.mobile-readonly [class*="add"],
+.mobile-readonly [class*="Add"] {
+  /* 클래스 기반 매치는 false positive 위험이 커 비활성. 필요 시 실 DOM 확인 후 추가. */
+}
+
+/* PersonalAgendaMatrixTable 헤더 우측 컨트롤 그룹 (아젠다/담당자 토글 + 완료 숨김 토글) */
+/* DOM: root > div(헤더) > div(우측 컨트롤 그룹) > button x N
+   인라인 스타일이라 클래스가 없음 → 구조 셀렉터로 우측 컨트롤 그룹만 숨김. */
+.mobile-readonly > *:first-child > div:first-child > div:nth-child(2) {
+  /* 헤더의 우측 컨트롤 컨테이너만 정확히 숨기기 위한 구조 셀렉터.
+     실 DOM 검증 후 너무 광범위하면 좁힐 것. 광범위해도 capture 가 인터랙션 차단하므로
+     기능 영향은 없음. */
+  display: none !important;
+}
+
+/* DnD 표시되는 드래그 핸들 아이콘이 있다면 시각 숨김 */
+.mobile-readonly [aria-roledescription*="draggable"] {
+  /* dnd-kit 의 일부 패턴 */
+}
+
+/* 가로 스크롤 컨테이너가 mobile 좁은 화면에서 자연스럽게 보이도록 */
+.mobile-readonly {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* mobile-readonly 내부 텍스트 선택 허용 (기본은 read-only 라도 복사는 되도록) */
+.mobile-readonly {
+  user-select: text;
+  -webkit-user-select: text;
+}
