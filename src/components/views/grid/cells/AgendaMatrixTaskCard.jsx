@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import useStore from '../../../../hooks/useStore'
 import SortableTaskCard from '../../../dnd/SortableTaskCard'
-import { COLOR, HIGHLIGHT, PILL } from '../../../../styles/designTokens'
+import { COLOR, HIGHLIGHT, PILL, TODAY } from '../../../../styles/designTokens'
 import { matchingMentions, getMentionColorByIndex } from '../../../../utils/mentions'
 
 /* AgendaMatrixTaskCard — Spec r2 C4b / C7 / C8.5
@@ -55,15 +55,18 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
     }
   }
 
-  // 우선순위: hover(cross-cell) > mention 강조 > 기본
+  // 우선순위: hover(cross-cell) > mention multi > mention single > isToday > 기본
   // 다중 매칭: linear-gradient hard-stop으로 균등 분할 (담당자별 색 컬럼)
-  let wrapStyle
+  //
+  // hotfix r11: bgStyle(본문 div) + outlineStyle(외부 wrap div) 분리
+  //   - 카드 외부 wrap이 stripe + body를 flex로 묶음 (overflow: hidden)
+  //   - outline은 외부 wrap에 적용 → 둥근 모서리 + stripe 포함한 단일 outline
+  //   - bg/color는 내부 body div에 적용 → stripe 오른쪽 영역만 색칠
+  let bgStyle      // 내부 body div
+  let outlineStyle // 외부 wrap div
   if (isHovered) {
-    wrapStyle = {
-      background: HIGHLIGHT.crossCell.bg,
-      outline: `1px solid ${HIGHLIGHT.crossCell.outline}`,
-      color: HIGHLIGHT.crossCell.text,
-    }
+    bgStyle = { background: HIGHLIGHT.crossCell.bg, color: HIGHLIGHT.crossCell.text }
+    outlineStyle = { outline: `1px solid ${HIGHLIGHT.crossCell.outline}` }
   } else if (isMultiMention) {
     const n = hitColors.length
     const segments = hitColors.map((c, i) => {
@@ -71,19 +74,15 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
       const to = ((i + 1) / n) * 100
       return `${c.chipBg} ${from}% ${to}%`
     }).join(', ')
-    wrapStyle = {
-      background: `linear-gradient(to right, ${segments})`,
-      outline: `1px solid ${hitColors[0].dot}`,
-      // 다중 색 배경 위 텍스트는 검정 (chipBg는 모두 옅은 톤)
-      color: '#1f2937',
-    }
+    bgStyle = { background: `linear-gradient(to right, ${segments})`, color: '#1f2937' }
+    outlineStyle = { outline: `1px solid ${hitColors[0].dot}` }
   } else if (isMentionHit) {
     const c = hitColors[0]
-    wrapStyle = {
-      background: c.chipBg,
-      outline: `1px solid ${c.dot}`,
-      color: c.chipText,
-    }
+    bgStyle = { background: c.chipBg, color: c.chipText }
+    outlineStyle = { outline: `1px solid ${c.dot}` }
+  } else if (task.isToday) {
+    // isToday만 활성: 옅은 빨강 배경. stripe(좌측)로 강조 + outline 생략(stripe가 충분)
+    bgStyle = { background: TODAY.bg, color: '#1f2937' }
   }
 
   const cardContent = (
@@ -91,18 +90,35 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
       onMouseEnter={() => { setHoveredTaskId(task.id); setLocalHover(true) }}
       onMouseLeave={() => { setHoveredTaskId(null); setLocalHover(false) }}
       style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        borderRadius: 4,
+        overflow: 'hidden',  // stripe + body가 같은 radius 공유
+        minWidth: 0,
+        cursor: editing ? 'text' : 'grab',
+        ...outlineStyle,
+      }}
+    >
+      {/* hotfix r11: 'Today' 좌측 stripe (5px) — border-left 금지 룰 회피하여 flex 첫 자식 div */}
+      {task.isToday && (
+        <div style={{
+          width: 5,
+          flexShrink: 0,
+          background: TODAY.stripe,
+        }} />
+      )}
+
+      <div style={{
         position: 'relative',
+        flex: 1,
         display: 'flex',
         alignItems: 'flex-start',
         gap: 4,
         fontSize: 12,
         padding: '4px 6px',
-        borderRadius: 4,
         minWidth: 0,
-        cursor: editing ? 'text' : 'grab',
-        ...wrapStyle,
-      }}
-    >
+        ...bgStyle,
+      }}>
       {/* Hotfix r8: 다중 매칭은 카드 background 색 컬럼 분할로 표현 (별도 dot 누적 불필요) */}
       {/* Hotfix r10: is_focus ★ 뱃지 제거 — FocusPanel 폐지로 set/toggle UI 부재, 의미 잃은 잔재. DB의 is_focus 컬럼은 보존. */}
 
@@ -171,9 +187,27 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
         </span>
       )}
 
-      {/* hover 시: 화살표 (detail) + X (agenda 제거) */}
+      {/* hover 시: T(Today 토글) + 화살표 (detail) + X (agenda 제거) */}
       {localHover && !editing && (
         <span style={{ display: 'inline-flex', gap: 2, flexShrink: 0, marginTop: 1 }}>
+          {/* hotfix r11: 'T' Today 토글 — columnMode 분기 없음 (두 모드 모두 의미) */}
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); updateTask(task.id, { isToday: !task.isToday }) }}
+            onMouseDown={e => e.stopPropagation()}
+            aria-label={task.isToday ? 'Today 해제' : 'Today 표시'}
+            style={{
+              width: 16, height: 16, padding: 0,
+              background: task.isToday ? TODAY.active : 'transparent',
+              color: task.isToday ? TODAY.activeFg : COLOR.textTertiary,
+              border: `1px solid ${task.isToday ? TODAY.active : COLOR.border}`,
+              borderRadius: 3,
+              fontSize: 9, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >{task.isToday ? '✓' : 'T'}</button>
           <button
             onClick={e => { e.stopPropagation(); openDetail(task) }}
             onMouseDown={e => e.stopPropagation()}
@@ -203,6 +237,7 @@ const AgendaMatrixTaskCard = React.memo(function AgendaMatrixTaskCard({ task, ce
           )}
         </span>
       )}
+      </div>{/* inner body */}
     </div>
   )
 
