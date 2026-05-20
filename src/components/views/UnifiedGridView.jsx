@@ -117,7 +117,9 @@ export default function UnifiedGridView({ initialView = 'matrix', initialScope =
   }, [scope, currentTeamId, filteredProjects, sortProjectsLocally])
 
   const myTasks = useMemo(() => {
-    if (scope === 'personal') return tasks.filter(t => t.assigneeId === userId)
+    // 개인 뷰: 본인 배정 task + 개인 프로젝트 task (scope='private' → assigneeId=null).
+    // 후자는 RLS에서 owner에게만 전달되므로 로컬 store의 !teamId && !assigneeId task는 모두 본인 소유.
+    if (scope === 'personal') return tasks.filter(t => t.assigneeId === userId || (!t.teamId && !t.assigneeId))
     return filteredTasks
   }, [scope, tasks, filteredTasks, userId])
 

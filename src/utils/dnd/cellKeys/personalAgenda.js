@@ -69,7 +69,7 @@ export function sameCellKey(a, b) {
  *   - 'mention': cellKey.agendaType이 task.text의 @mention 이름과 일치
  *
  * 공통 필터:
- *   - assigneeId === currentUserId
+ *   - assigneeId === currentUserId OR 개인 프로젝트 task (scope='private' → assigneeId=null)
  *   - !deletedAt
  *   - hideDone ? !done : true
  *   - t.projectId === cellKey.projectId
@@ -79,7 +79,9 @@ export function getCellTasks(tasks, cellKey, ctx) {
   const mode = columnMode || 'agenda'
   return tasks
     .filter(t => {
-      if (t.assigneeId !== currentUserId) return false
+      // 개인 프로젝트 task는 assigneeId=null. RLS owner-only → 로컬에 들어왔다면 본인 소유.
+      const isMine = t.assigneeId === currentUserId || (!t.teamId && !t.assigneeId)
+      if (!isMine) return false
       if (t.deletedAt) return false
       if (hideDone && t.done) return false
       if (t.projectId !== cellKey.projectId) return false

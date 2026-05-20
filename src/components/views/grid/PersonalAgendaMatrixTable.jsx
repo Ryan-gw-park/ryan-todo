@@ -65,9 +65,10 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
   )
 
   // 본인 task만 대상으로 mention 추출 (매트릭스에 실제 보이는 범위)
+  // 개인 프로젝트 task는 scope='private' → assigneeId=null. RLS에서 owner에게만 전달되므로 본인 소유.
   const myVisibleTasks = useMemo(
     () => (tasks || []).filter(t =>
-      t.assigneeId === currentUserId &&
+      (t.assigneeId === currentUserId || (!t.teamId && !t.assigneeId)) &&
       !t.deletedAt &&
       (hideDone ? !t.done : true)
     ),
@@ -105,7 +106,7 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
     const m = new Map()
     for (const p of visibleProjects) {
       const cnt = (tasks || []).filter(t =>
-        t.assigneeId === currentUserId &&
+        (t.assigneeId === currentUserId || (!t.teamId && !t.assigneeId)) &&
         !t.deletedAt &&
         (hideDone ? !t.done : true) &&
         t.projectId === p.id
