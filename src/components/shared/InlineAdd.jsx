@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import useStore from '../../hooks/useStore'
 import { PlusIcon } from './Icons'
 import { parseDateFromText } from '../../utils/dateParser'
+import { parseMentions } from '../../utils/mentions'
 
-export default function InlineAdd({ projectId, category, color, extraFields }) {
+export default function InlineAdd({ projectId, category, color, extraFields, mention }) {
   const { addTask } = useStore()
   const [active, setActive] = useState(false)
   const [text, setText] = useState('')
@@ -13,8 +14,14 @@ export default function InlineAdd({ projectId, category, color, extraFields }) {
 
   const handleAdd = () => {
     if (!text.trim()) return
-    const { startDate, dueDate } = parseDateFromText(text.trim())
-    addTask({ text: text.trim(), projectId, category, startDate, dueDate, ...extraFields })
+    let finalText = text.trim()
+    // 담당자(mention) 모드: 셀의 @담당자를 텍스트에 자동 태깅 → 해당 컬럼에 노출.
+    // 이미 같은 멘션이 입력돼 있으면 중복 방지.
+    if (mention && !parseMentions(finalText).includes(mention)) {
+      finalText = `${finalText} @${mention}`
+    }
+    const { startDate, dueDate } = parseDateFromText(finalText)
+    addTask({ text: finalText, projectId, category, startDate, dueDate, ...extraFields })
     setText('')
   }
 

@@ -70,16 +70,21 @@ export default function AgendaMatrixCell({
         ))}
       </SortableContext>
 
-      {/* InlineAdd: agenda 모드에서만 신규 task의 agenda를 자동 태깅 가능 */}
-      {project && columnMode === 'agenda' && (
+      {/* InlineAdd
+       *  - agenda 모드: 셀의 agenda를 자동 태깅
+       *  - mention 모드: 셀의 @담당자를 텍스트에 자동 태깅 (cellKey.agendaType = 담당자 이름)
+       */}
+      {project && (
         <InlineAdd
           projectId={project.id}
           category="today"
           color={colorObj}
-          extraFields={{
-            agendas: [cellKey.agendaType],
-            keyMilestoneId: null,
-          }}
+          mention={columnMode === 'mention' ? cellKey.agendaType : undefined}
+          extraFields={
+            columnMode === 'agenda'
+              ? { agendas: [cellKey.agendaType], keyMilestoneId: null }
+              : { keyMilestoneId: null }
+          }
         />
       )}
     </div>
