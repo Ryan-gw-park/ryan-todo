@@ -117,7 +117,7 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
   }, [visibleProjects, tasks, currentUserId, hideDone])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, height: '100%', minHeight: 0 }}>
       {/* 헤더 */}
       <div style={{
         display: 'flex',
@@ -211,8 +211,10 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
         </div>
       ) : (
         <div style={{
+          flex: 1,
+          minHeight: 0,
           overflowX: 'auto',
-          overflowY: 'visible',
+          overflowY: 'auto',
           border: `1px solid ${COLOR.border}`,
           borderRadius: 6,
           background: COLOR.divider,
@@ -224,8 +226,11 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
             background: COLOR.divider,
             minWidth: 220 + columnKeys.length * 160 + (columnKeys.length + 1),
           }}>
-            {/* Column headers */}
+            {/* Column headers — 세로 스크롤 시 상단 고정 (sticky) */}
             <div style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 3,
               background: '#fff',
               padding: '10px 12px',
               fontWeight: 600,
@@ -235,16 +240,17 @@ export default function PersonalAgendaMatrixTable({ projects, tasks }) {
               프로젝트
             </div>
             {columnKeys.map(columnKey => (
-              columnMode === 'mention'
-                ? (
-                  <MentionColumnHeader
-                    key={columnKey}
-                    mentionName={columnKey}
-                    count={mentions.find(m => m.name === columnKey)?.count}
-                    colorMap={mentionColorMap}
-                  />
-                )
-                : <AgendaColHeader key={columnKey} agendaType={columnKey} />
+              <div key={columnKey} style={{ position: 'sticky', top: 0, zIndex: 3, background: '#fff' }}>
+                {columnMode === 'mention'
+                  ? (
+                    <MentionColumnHeader
+                      mentionName={columnKey}
+                      count={mentions.find(m => m.name === columnKey)?.count}
+                      colorMap={mentionColorMap}
+                    />
+                  )
+                  : <AgendaColHeader agendaType={columnKey} />}
+              </div>
             ))}
 
             {/* Project rows */}

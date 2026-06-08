@@ -50,7 +50,7 @@ export default function PersonalTodoShell({ projects, tasks, milestones }) {
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <div style={{ width: '100%', minWidth: 0 }}>
+      <div style={{ width: '100%', minWidth: 0, height: '100%' }}>
         <PersonalAgendaMatrixTable
           projects={projects}
           tasks={tasks}
